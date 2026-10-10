@@ -207,6 +207,18 @@ export default function App() {
   // Modals
   const [detailMedia, setDetailMedia] = useState<MediaItem | null>(null);
 
+  // Persisted native-video resume entries, newest first.
+  const [continueWatching, setContinueWatching] = useState<{ media: MediaItem; progress: number; duration: number; updatedAt: number }[]>([]);
+  const refreshContinueWatching = React.useCallback(() => {
+    try {
+      const entries = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
+      if (Array.isArray(entries)) {
+        setContinueWatching(entries.filter(entry => entry?.media?.id && entry.progress >= 5 && (!entry.duration || entry.progress / entry.duration < 0.95)).slice(0, 12));
+      }
+    } catch { setContinueWatching([]); }
+  }, []);
+  useEffect(() => { refreshContinueWatching(); }, [refreshContinueWatching]);
+
   // Watchlist persisted in localStorage
   const [watchlistIds, setWatchlistIds] = useState<string[]>(() => {
     try {
@@ -392,7 +404,8 @@ export default function App() {
             <CinemaPlayer
               media={activeMedia}
               initialMirrorId={activeMirrorId}
-              onClose={() => setActiveMedia(null)}
+              onClose={() => { setActiveMedia(null); refreshContinueWatching(); }}
+              onProgressSaved={refreshContinueWatching}
               onMirrorChange={(mirror) => setActiveMirrorId(mirror.id)}
               hasPlayNext={catalog.length > 1}
               onPlayNext={() => {
@@ -402,6 +415,37 @@ export default function App() {
               }}
             />
           </div>
+        )}
+
+        {currentTab === 'browse' && !searchQuery.trim() && continueWatching.length > 0 && (
+          <section className="mb-8" aria-label="Continue Watching">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xl font-bold text-white">Continue Watching</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-3">
+              {continueWatching.map(entry => (
+                <button key={entry.media.id} type="button"
+                  onClick={() => {
+                    handlePlayMedia(entry.media);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="group text-left w-40 sm:w-48 shrink-0 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500 focus-visible:outline-2 focus-visible:outline-amber-400"
+                  aria-label={`Resume ${entry.media.title}`}>
+                  <div className="relative aspect-video bg-slate-950">
+                    {entry.media.backdropUrl && <img src={entry.media.backdropUrl} alt="" loading="lazy" className="w-full h-full object-cover" />}
+                    <span className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/80 text-amber-300 text-xs font-bold">▶ Resume</span>
+                    <div className="absolute bottom-0 left-0 right-0 bg-slate-700 h-1">
+                      <div className="bg-amber-500 h-full" style={{ width: `${entry.duration > 0 ? Math.min(100, Math.round(entry.progress / entry.duration * 100)) : 0}%` }} />
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    <p className="text-sm text-white font-medium truncate">{entry.media.title}</p>
+                    <p className="text-xs text-slate-400">{Math.floor(entry.progress / 60)} min watched</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* Spotlight Hero Banner */}
