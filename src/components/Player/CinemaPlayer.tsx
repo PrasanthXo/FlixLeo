@@ -413,7 +413,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           } else if (showShortcutsModal) {
             setShowShortcutsModal(false);
           } else {
-            onClose();
+            setIsMiniPlayer(true);
           }
           break;
       }
@@ -709,10 +709,10 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         >
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={onClose}
+              onClick={() => setIsMiniPlayer(true)}
               className="w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-200 transition-colors shrink-0"
-              title="Return to Catalog"
-              aria-label="Back"
+              title="Return to catalog and keep playing in mini-player"
+              aria-label="Minimize player"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
