@@ -427,6 +427,7 @@ app.get('/api/tmdb/details/tv/:id', async (req: Request, res: Response) => {
                 number,
                 title: episode.name || `Episode ${number}`,
                 duration: episode.runtime ? `${episode.runtime}m` : 'Duration unavailable',
+                airDate: /^\d{4}-\d{2}-\d{2}$/.test(episode.air_date || '') ? episode.air_date : null,
                 mirrors
               };
             })
