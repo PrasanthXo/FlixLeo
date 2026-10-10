@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Film, Search, Sparkles, Bookmark, Link as LinkIcon,
   Play, RefreshCw, Layers, CheckCircle2, Tv
@@ -27,6 +27,18 @@ export default function App() {
   const [tvCategory, setTvCategory] = useState<'trending' | 'popular' | 'top_rated'>('trending');
   const [tvShows, setTvShows] = useState<MediaItem[]>([]);
   const [isLoadingTv, setIsLoadingTv] = useState<boolean>(false);
+  // Infinite scrolling is deliberately limited to the Movies and Series tabs.
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const loadingNextRef = useRef(false);
+  const [movieExtra, setMovieExtra] = useState<MediaItem[]>([]);
+  const [tvExtra, setTvExtra] = useState<MediaItem[]>([]);
+  const [movieNextPage, setMovieNextPage] = useState(4);
+  const [tvNextPage, setTvNextPage] = useState(2);
+  const [movieHasMore, setMovieHasMore] = useState(true);
+  const [tvHasMore, setTvHasMore] = useState(true);
+  const [loadMoreError, setLoadMoreError] = useState('');
+  const [loadingMore, setLoadingMore] = useState(false);
+
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [tmdbSearchResults, setTmdbSearchResults] = useState<MediaItem[]>([]);
@@ -95,6 +107,85 @@ export default function App() {
   // Active Playback State
   const [activeMedia, setActiveMedia] = useState<MediaItem | null>(null);
   const [activeMirrorId, setActiveMirrorId] = useState<string | undefined>(undefined);
+  // Reset pagination whenever the underlying category changes.
+  useEffect(() => {
+    setMovieExtra([]);
+    setMovieNextPage(4);
+    setMovieHasMore(true);
+    setLoadMoreError('');
+  }, [tmdbCategory]);
+  useEffect(() => {
+    setTvExtra([]);
+    setTvNextPage(2);
+    setTvHasMore(true);
+    setLoadMoreError('');
+  }, [tvCategory]);
+
+  const tabCanLoadMore = (currentTab === 'movies' || currentTab === 'series') &&
+    !searchQuery.trim() && sourceFilter === 'all' && !activeMedia &&
+    (currentTab === 'series' || tmdbCategory !== 'all');
+  const isMoreAvailable = currentTab === 'movies' ? movieHasMore : tvHasMore;
+  const initialListLoading = currentTab === 'movies' ? isLoadingTmdb : isLoadingTv;
+  const liveFeedReady = currentTab === 'series' ? tvShows.length > 0 : isTmdbLive && tmdbMovies.length > 0;
+
+  useEffect(() => {
+    if (!tabCanLoadMore || !isMoreAvailable || !liveFeedReady || initialListLoading || loadingMore || loadMoreError) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0]?.isIntersecting && !loadingNextRef.current) {
+        loadingNextRef.current = true;
+        setLoadingMore(true);
+      }
+    }, { rootMargin: '450px 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [tabCanLoadMore, isMoreAvailable, liveFeedReady, initialListLoading, loadingMore, loadMoreError, currentTab]);
+
+  useEffect(() => {
+    if (!loadingMore) return;
+    const controller = new AbortController();
+    const isMovie = currentTab === 'movies';
+    const page = isMovie ? movieNextPage : tvNextPage;
+    const category = isMovie ? tmdbCategory : tvCategory;
+    const url = isMovie ? `/api/tmdb/${category}?page=${page}` : `/api/tmdb/tv/${category}?page=${page}`;
+    const run = async () => {
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error('Could not load more titles');
+        const result = await response.json();
+        if (!result.success || !Array.isArray(result.items)) throw new Error('TMDB returned an invalid page');
+        if (!result.isLive || !result.items.length || (typeof result.totalPages === 'number' && page >= result.totalPages)) {
+          if (isMovie) setMovieHasMore(false); else setTvHasMore(false);
+        }
+        if (isMovie) {
+          setMovieExtra(prev => {
+            const seen = new Set([...tmdbMovies, ...prev].map(item => item.id));
+            return [...prev, ...result.items.filter((item: MediaItem) => !seen.has(item.id) && seen.add(item.id))];
+          });
+          setMovieNextPage(page + 1);
+        } else {
+          setTvExtra(prev => {
+            const seen = new Set([...tvShows, ...prev].map(item => item.id));
+            return [...prev, ...result.items.filter((item: MediaItem) => !seen.has(item.id) && seen.add(item.id))];
+          });
+          setTvNextPage(page + 1);
+        }
+        setLoadMoreError('');
+      } catch (error) {
+        if (!controller.signal.aborted) setLoadMoreError('Could not load more titles. Tap Retry.');
+      } finally {
+        if (!controller.signal.aborted) {
+          loadingNextRef.current = false;
+          setLoadingMore(false);
+        }
+      }
+    };
+    void run();
+    return () => controller.abort();
+  }, [loadingMore, currentTab, movieNextPage, tvNextPage, tmdbCategory, tvCategory]);
+  
+
 
   // Modals
   const [detailMedia, setDetailMedia] = useState<MediaItem | null>(null);
@@ -211,13 +302,13 @@ export default function App() {
 
     // When on Movies tab
     if (currentTab === 'movies') {
-      list = tmdbMovies.length > 0 ? tmdbMovies : catalog;
+      list = tmdbMovies.length > 0 ? [...tmdbMovies, ...movieExtra] : catalog;
     }
 
     // When on Series tab
     if (currentTab === 'series') {
       const manualSeries = catalog.filter(m => m.id.startsWith('tv-') || m.type === 'tv');
-      list = [...tvShows, ...manualSeries];
+      list = Array.from(new Map([...tvShows, ...tvExtra, ...manualSeries].map(item => [item.id, item])).values());
     }
 
     // When on Home (browse), use TMDB catalog if selected and populated
@@ -250,7 +341,7 @@ export default function App() {
     }
 
     return list;
-  }, [catalog, currentTab, tmdbCategory, tmdbMovies, tvShows, sourceFilter, searchQuery, watchlistIds]);
+  }, [catalog, currentTab, tmdbCategory, tmdbMovies, tvShows, movieExtra, tvExtra, sourceFilter, searchQuery, watchlistIds]);
 
   // Spotlight media for hero banner
   const featuredMedia = useMemo(() => {
@@ -450,6 +541,14 @@ export default function App() {
                     onToggleBookmark={toggleBookmark}
                   />
                 ))}
+              </div>
+            )}
+
+            {tabCanLoadMore && liveFeedReady && (
+              <div ref={loadMoreRef} className="py-8 text-center" aria-live="polite">
+                {loadingMore && <p className="text-sm text-slate-300">Loading more {currentTab === 'movies' ? 'movies' : 'series'}…</p>}
+                {loadMoreError && <button type="button" onClick={() => { setLoadMoreError(''); loadingNextRef.current = false; }} className="px-4 py-2 rounded-lg bg-slate-800 text-amber-300">Retry loading more</button>}
+                {!loadingMore && !loadMoreError && !isMoreAvailable && <p className="text-xs text-slate-500">You've reached the end of available titles.</p>}
               </div>
             )}
 
