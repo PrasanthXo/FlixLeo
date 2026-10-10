@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { TmdbArtwork } from './TmdbArtwork';
 import { Play, Info, Bookmark, BookmarkCheck, Film } from 'lucide-react';
 import { MediaItem, getSourceDisplayBadge } from '../../types/stream';
 
@@ -17,30 +18,12 @@ export const MovieCard: React.FC<MovieCardProps> = ({
   isBookmarked,
   onToggleBookmark
 }) => {
-  const [imageError, setImageError] = useState<boolean>(false);
-  React.useEffect(() => { setImageError(false); }, [media.posterUrl, media.id]);
 
   return (
     <div className="group relative flex flex-col rounded-xl overflow-hidden bg-slate-900/40 border border-slate-800/80 hover:border-slate-700 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
       {/* Poster Container (Aspect 3:4) */}
       <div className="relative aspect-3/4 w-full overflow-hidden bg-slate-950">
-        {!imageError ? (
-          <img
-            src={media.posterUrl || "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=640&auto=format&fit=crop&q=80"}
-            alt={media.title}
-            referrerPolicy="no-referrer"
-            onError={() => setImageError(true)}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full relative flex flex-col items-center justify-center p-4 bg-gradient-to-b from-slate-900 to-slate-950 text-slate-500" style={{ backgroundImage: "linear-gradient(to top, rgba(2,6,23,.92), rgba(2,6,23,.20)), url(https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=640&auto=format&fit=crop&q=80)", backgroundSize: "cover", backgroundPosition: "center" }}>
-            <Film className="w-8 h-8 mb-2 text-slate-600" />
-            <span className="text-xs text-center font-medium line-clamp-2 text-slate-400">
-              {media.title}
-            </span>
-          </div>
-        )}
+        <TmdbArtwork media={media} kind="poster" alt={media.title} referrerPolicy="no-referrer" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
 
         {/* Gradient Scrim for readable contrast */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
