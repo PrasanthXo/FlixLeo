@@ -31,6 +31,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const lastProgressSaveRef = useRef<number>(-1);
   const dockPositionRef = useRef<number | null>(null);
   const dockWasPlayingRef = useRef(false);
   const hlsRef = useRef<Hls | null>(null);
@@ -293,7 +294,9 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       if (video.buffered.length > 0) {
         setBufferedEnd(video.buffered.end(video.buffered.length - 1));
       }
-      if (Math.floor(video.currentTime) % 5 === 0 && video.currentTime > 5) {
+      const progressSecond = Math.floor(video.currentTime);
+      if (progressSecond >= 5 && (lastProgressSaveRef.current < 0 || progressSecond - lastProgressSaveRef.current >= 5)) {
+        lastProgressSaveRef.current = progressSecond;
         localStorage.setItem(`cinehub_prog_${media.id}`, video.currentTime.toString());
         try {
           const saved = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
