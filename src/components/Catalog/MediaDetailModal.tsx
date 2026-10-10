@@ -29,6 +29,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
 
   const [episodeLoadError, setEpisodeLoadError] = React.useState<string | null>(null);
   const [loadingEpisodes, setLoadingEpisodes] = React.useState(false);
+  const [showAudioOptions, setShowAudioOptions] = React.useState(false);
 
   React.useEffect(() => {
     if (!media) return;
@@ -197,22 +198,27 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 <span className="text-slate-200">{activeMedia.cast.join(', ')}</span>
               </div>
             )}
-            {activeMedia.language && (
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                <Globe className="w-4 h-4 text-amber-400 shrink-0" />
-                <div>
-                  <span className="text-slate-400">Audio / Language:</span>{' '}
-                  <span className="text-slate-200 font-semibold">{activeMedia.language}</span>
-                </div>
-              </div>
-            )}
-            {activeMedia.audioTracks && (
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                <Volume2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <div className="truncate">
-                  <span className="text-slate-400">Audio Tracks:</span>{' '}
-                  <span className="text-slate-200">{activeMedia.audioTracks.join(' · ')}</span>
-                </div>
+            {(activeMedia.language || activeMedia.audioTracks?.length) && (
+              <div className="md:col-span-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                <button type="button" onClick={() => setShowAudioOptions(v => !v)}
+                  className="flex items-center justify-between gap-3 p-3 w-full text-left hover:bg-slate-800/60 rounded-xl"
+                  aria-expanded={showAudioOptions} aria-label="View audio and language options">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <Globe className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span><span className="text-slate-400">Audio / Language: </span>
+                      <span className="text-slate-200 font-semibold">{activeMedia.language || 'Not specified'}</span>
+                      {activeMedia.audioTracks?.length ? <span className="block text-slate-400 mt-1">Audio metadata: {activeMedia.audioTracks.join(' · ')}</span> : null}
+                    </span>
+                  </span>
+                  <span className="text-amber-400 shrink-0 font-semibold">{showAudioOptions ? 'Hide' : 'Options'}</span>
+                </button>
+                {showAudioOptions && (
+                  <div className="p-3 border-t border-slate-800 space-y-2 text-xs">
+                    <p className="text-slate-300">Language and Dolby labels are catalogue metadata, not guaranteed selectable soundtracks. Use the player's Settings → Audio / Language to switch real tracks when available in HLS streams. Embedded providers have their own audio controls.</p>
+                    <button type="button" onClick={() => { onPlayMedia(activeMedia); onClose(); }}
+                      className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded-lg font-semibold">Open player audio settings</button>
+                  </div>
+                )}
               </div>
             )}
           </div>
