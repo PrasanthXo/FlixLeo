@@ -28,6 +28,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const dockPositionRef = useRef<number | null>(null);
+  const dockWasPlayingRef = useRef(false);
   const hlsRef = useRef<Hls | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sleepTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -101,6 +103,15 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     if (onMirrorChange) onMirrorChange(mirror);
   };
 
+  const setDocked = (minimized: boolean) => {
+    const video = videoRef.current;
+    if (video && selectedMirror.streamType !== 'embed-iframe') {
+      dockPositionRef.current = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+      dockWasPlayingRef.current = !video.paused;
+    }
+    setIsMiniPlayer(minimized);
+  };
+
   // Format time (hh:mm:ss or mm:ss)
   const formatTime = (secs: number) => {
     if (isNaN(secs) || secs < 0) return '00:00';
@@ -132,6 +143,14 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
 
     const video = videoRef.current;
     if (!video) return;
+    const dockPosition = dockPositionRef.current;
+    const resumeDockPlayback = dockPosition !== null ? dockWasPlayingRef.current : true;
+    dockPositionRef.current = null;
+    const restoreDockPosition = () => {
+      if (dockPosition !== null && dockPosition > 0) {
+        try { video.currentTime = dockPosition; } catch { /* wait for metadata */ }
+      }
+    };
 
     setIsBuffering(true);
     setHasPlaybackError(false);
@@ -176,12 +195,13 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsBuffering(false);
-        const savedTime = localStorage.getItem(`cinehub_prog_${media.id}`);
+        const savedTime = dockPosition === null ? localStorage.getItem(`cinehub_prog_${media.id}`) : null;
+        restoreDockPosition();
         if (savedTime && parseFloat(savedTime) > 10) {
           video.currentTime = parseFloat(savedTime);
           triggerToast(`Resumed playback at ${formatTime(parseFloat(savedTime))}`);
         }
-        video.play().catch(() => setIsPlaying(false));
+        if (resumeDockPlayback) video.play().catch(() => setIsPlaying(false));
       });
 
       let recoveryAttempts = 0;
@@ -214,22 +234,24 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       video.src = streamUrl;
       video.load();
 
-      const savedTime = localStorage.getItem(`cinehub_prog_${media.id}`);
+      const savedTime = dockPosition === null ? localStorage.getItem(`cinehub_prog_${media.id}`) : null;
+      video.addEventListener('loadedmetadata', restoreDockPosition, { once: true });
       if (savedTime && parseFloat(savedTime) > 10) {
         video.currentTime = parseFloat(savedTime);
       }
 
-      video.play().catch(() => setIsPlaying(false));
+      if (resumeDockPlayback) video.play().catch(() => setIsPlaying(false));
     }
 
     return () => {
+      video.removeEventListener('loadedmetadata', restoreDockPosition);
       window.clearTimeout(loadingTimeout);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [selectedMirror, media.id]);
+  }, [selectedMirror, media.id, isMiniPlayer]);
 
   // Video event listeners & audio setup
   useEffect(() => {
@@ -413,7 +435,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           } else if (showShortcutsModal) {
             setShowShortcutsModal(false);
           } else {
-            setIsMiniPlayer(true);
+            setDocked(true);
           }
           break;
       }
@@ -520,7 +542,6 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           ) : (
             <video
               ref={videoRef}
-              src={selectedMirror.url}
               playsInline
               preload="auto"
               onClick={togglePlay}
@@ -534,7 +555,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
               <span className="text-xs font-bold truncate max-w-[200px]">{media.title}</span>
               <div className="flex items-center gap-1.5 pointer-events-auto">
                 <button
-                  onClick={() => setIsMiniPlayer(false)}
+                  onClick={() => setDocked(false)}
                   className="p-1 rounded bg-black/60 hover:bg-slate-800 text-slate-200"
                   title="Expand to Full Cinema View"
                 >
@@ -709,7 +730,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         >
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => setIsMiniPlayer(true)}
+              onClick={() => setDocked(true)}
               className="w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-200 transition-colors shrink-0"
               title="Return to catalog and keep playing in mini-player"
               aria-label="Minimize player"
