@@ -27,21 +27,35 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   const [selectedEpisodeId, setSelectedEpisodeId] = React.useState<string | null>(null);
   const [detailedMedia, setDetailedMedia] = React.useState<MediaItem | null>(media);
 
+  const [episodeLoadError, setEpisodeLoadError] = React.useState<string | null>(null);
+  const [loadingEpisodes, setLoadingEpisodes] = React.useState(false);
+
   React.useEffect(() => {
-    if (media && media.type === 'tv' && !media.seasons) {
-      fetch(`/api/tmdb/details/tv/${media.id}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data && data.success && data.item) {
-            setDetailedMedia(data.item);
-          }
-        })
-        .catch(console.error);
-    } else if (media) {
-      setDetailedMedia(media);
-    }
+    if (!media) return;
+    setDetailedMedia(media);
+    setSelectedEpisodeId(null);
+    setSelectedSeasonNumber(media.seasons?.[0]?.number ?? 1);
+    setEpisodeLoadError(null);
+    if (media.type !== 'tv' && !media.id.startsWith('tv-')) return;
+    if (media.seasons?.length) return;
+    let cancelled = false;
+    setLoadingEpisodes(true);
+    fetch(`/api/tmdb/details/tv/${media.id}`)
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok || !data?.success || !data.item) throw new Error(data?.message || 'Episode metadata unavailable');
+        return data.item as MediaItem;
+      })
+      .then(item => {
+        if (cancelled) return;
+        setDetailedMedia(item);
+        setSelectedSeasonNumber(item.seasons?.find(s => s.number === 1)?.number ?? item.seasons?.[0]?.number ?? 1);
+      })
+      .catch(err => { if (!cancelled) setEpisodeLoadError(err instanceof Error ? err.message : 'Could not load seasons'); })
+      .finally(() => { if (!cancelled) setLoadingEpisodes(false); });
+    return () => { cancelled = true; };
   }, [media]);
-  
+
   if (!isOpen || !media) return null;
 
   const activeMedia = detailedMedia || media;
