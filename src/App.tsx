@@ -18,7 +18,7 @@ function uniqueTitles(items: MediaItem[]): MediaItem[] {
   const seen = new Set<string>();
   return items.filter(item => {
     const type = item.type === 'tv' || item.id.startsWith('tv-') ? 'tv' : 'movie';
-    const normalized = item.title.normalize('NFKC').toLocaleLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim();
+    const normalized = item.title.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
     const key = `${type}|${normalized}|${item.year || ''}`;
     const idKey = `${type}|${item.id}`;
     if (seen.has(key) || seen.has(idKey)) return false;
@@ -176,7 +176,9 @@ export default function App() {
         if (isMovie) {
           setMovieExtra(prev => {
             const seen = new Set([...tmdbMovies, ...prev].map(item => item.id));
-            return uniqueTitles([...prev, ...result.items.filter((item: MediaItem) => !seen.has(item.id) && seen.add(item.id))].filter(item => !uniqueTitles([...tmdbMovies, ...prev]).some(existing => existing.title.normalize('NFKC').toLocaleLowerCase() === item.title.normalize('NFKC').toLocaleLowerCase() && existing.year === item.year && existing.id !== item.id)));
+            const combined = uniqueTitles([...tmdbMovies, ...prev, ...result.items]);
+            const baseIds = new Set(tmdbMovies.map(item => item.id));
+            return combined.filter(item => !baseIds.has(item.id));
           });
           setMovieNextPage(page + 1);
         } else {
