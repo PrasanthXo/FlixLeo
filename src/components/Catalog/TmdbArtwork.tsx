@@ -17,6 +17,8 @@ export function TmdbArtwork({ media, kind, onError, ...props }: Props) {
     tried.current = false;
   }, [media.id, media.type, original, kind]);
 
+  React.useEffect(() => { if (!original) void resolveFromTmdb(); }, [media.id, media.type, original, kind]);
+
   const resolveFromTmdb = async () => {
     if (tried.current) { setFailed(true); return; }
     tried.current = true;
