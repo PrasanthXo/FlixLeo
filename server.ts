@@ -397,6 +397,51 @@ app.get('/api/tmdb/tv/:id', async (req: Request, res: Response) => {
   }
 });
 
+// TMDB season and episode metadata for the existing TV details modal.
+app.get('/api/tmdb/details/tv/:id', async (req: Request, res: Response) => {
+  const cleanId = String(req.params.id).replace(/^(tv-|tmdb-)/, '');
+  if (!/^\\d+$/.test(cleanId)) return res.status(400).json({ success: false, message: 'Invalid series ID' });
+  try {
+    const details = await fetchFromTmdb(`/tv/${cleanId}`);
+    if (!details) return res.status(503).json({ success: false, message: 'TMDB is not configured' });
+    const item = transformTmdbTvShow(details);
+    const seasons = await Promise.all((details.seasons || [])
+      .filter((season: any) => season.season_number >= 0 && season.episode_count > 0)
+      .map(async (season: any) => {
+        try {
+          const data = await fetchFromTmdb(`/tv/${cleanId}/season/${season.season_number}`);
+          return {
+            number: season.season_number,
+            episodes: (data?.episodes || []).map((episode: any) => {
+              const number = episode.episode_number;
+              const seriesNumber = season.season_number;
+              const base = item.mirrors.filter((mirror: any) => mirror.streamType === 'embed-iframe');
+              const mirrors = base.map((mirror: any) => ({
+                ...mirror,
+                id: `${mirror.id}-s${seriesNumber}e${number}`,
+                label: mirror.label.replace(/S01E01/g, `S${String(seriesNumber).padStart(2,'0')}E${String(number).padStart(2,'0')}`),
+                url: mirror.url.replace(/\\/1\\/1(?=\\/?(?:[?#]|$))/, `/${seriesNumber}/${number}`)
+              }));
+              return {
+                id: `s${seriesNumber}e${number}`,
+                number,
+                title: episode.name || `Episode ${number}`,
+                duration: episode.runtime ? `${episode.runtime}m` : 'Duration unavailable',
+                mirrors
+              };
+            })
+          };
+        } catch {
+          return { number: season.season_number, episodes: [] };
+        }
+      }));
+    item.seasons = seasons;
+    return res.json({ success: true, item });
+  } catch (err: any) {
+    return res.status(502).json({ success: false, message: 'Could not load TMDB episodes' });
+  }
+});
+
 // API: TMDB Movie Details
 app.get('/api/tmdb/movie/:id', async (req: Request, res: Response) => {
   const cleanId = req.params.id.replace('tmdb-', '');
