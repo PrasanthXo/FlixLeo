@@ -85,13 +85,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Zone 3: 1 Primary Action (with compact inline search) */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Quick Search Input */}
-          <div className="relative hidden sm:block w-40 sm:w-48 lg:w-60">
+          <div className="relative w-36 min-[380px]:w-44 sm:w-48 lg:w-60">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              type="text"
+              aria-label="Search movies and TV series"
+              type="search"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search TMDB movies..."
+              placeholder="Search movies & series..."
               className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
             />
           </div>
