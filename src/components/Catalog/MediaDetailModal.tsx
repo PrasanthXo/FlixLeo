@@ -70,7 +70,8 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         {/* Backdrop Banner with Scrim */}
         <div className="relative h-64 md:h-80 w-full overflow-hidden shrink-0">
           <img
-            src={activeMedia.backdropUrl}
+            src={activeMedia.backdropUrl || "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=1600&auto=format&fit=crop&q=80"}
+            onError={(e) => { const img = e.currentTarget; const fallback = "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=1600&auto=format&fit=crop&q=80"; if (img.src !== fallback) img.src = fallback; else img.style.display = "none"; }}
             alt={activeMedia.title}
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover"
