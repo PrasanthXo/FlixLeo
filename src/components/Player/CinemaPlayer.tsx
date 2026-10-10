@@ -13,6 +13,7 @@ interface CinemaPlayerProps {
   media: MediaItem;
   initialMirrorId?: string;
   onClose: () => void;
+  onProgressSaved?: () => void;
   onMirrorChange?: (mirror: StreamMirror) => void;
   onPlayNext?: () => void;
   hasPlayNext?: boolean;
@@ -22,6 +23,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   media,
   initialMirrorId,
   onClose,
+  onProgressSaved,
   onMirrorChange,
   onPlayNext,
   hasPlayNext
@@ -273,6 +275,16 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       }
       if (Math.floor(video.currentTime) % 5 === 0 && video.currentTime > 5) {
         localStorage.setItem(`cinehub_prog_${media.id}`, video.currentTime.toString());
+        try {
+          const saved = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
+          const existing = Array.isArray(saved) ? saved.filter((entry: any) => entry?.media?.id !== media.id) : [];
+          if (Number.isFinite(video.duration) && video.duration > 0 && video.currentTime / video.duration >= 0.95) {
+            localStorage.setItem('flixleo_continue_watching', JSON.stringify(existing.slice(0, 19)));
+          } else {
+            localStorage.setItem('flixleo_continue_watching', JSON.stringify([{ media, progress: video.currentTime, duration: video.duration || 0, updatedAt: Date.now() }, ...existing].slice(0, 20)));
+          }
+          onProgressSaved?.();
+        } catch { /* storage may be restricted */ }
       }
     };
     const onLoadedMetadata = () => {
@@ -304,7 +316,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       video.removeEventListener('loadedmetadata', onLoadedMetadata);
       video.removeEventListener('error', onError);
     };
-  }, [media.id]);
+  }, [media.id, onProgressSaved]);
 
   // Audio Booster (Web Audio API)
   const applyAudioBoost = (level: number) => {
