@@ -1,0 +1,6 @@
+{
+  "name": "FlixLeo",
+  "description": "High-performance streaming platform for mobile and desktop supporting 4K UHD cinema, Regional South Asian masters, FastStream CDN, and direct cloud playback.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
