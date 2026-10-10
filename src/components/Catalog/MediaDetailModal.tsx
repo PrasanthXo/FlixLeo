@@ -78,6 +78,13 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
 
   const selectedSeason = activeMedia.seasons?.find(s => s.number === selectedSeasonNumber);
   const selectedEpisode = selectedSeason?.episodes.find(e => e.id === selectedEpisodeId);
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const isUpcoming = (airDate?: string | null) => Boolean(airDate && /^\d{4}-\d{2}-\d{2}$/.test(airDate) && airDate > todayUtc);
+  const formatAirDate = (airDate?: string | null) => {
+    if (!airDate || !/^\d{4}-\d{2}-\d{2}$/.test(airDate)) return 'Air date TBA';
+    return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(airDate + 'T12:00:00Z'));
+  };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
@@ -240,6 +247,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                       &larr; Back to episodes
                     </button>
                     <h4 className="text-lg font-semibold text-white">Select Quality: {selectedEpisode.title}</h4>
+                    <p className="text-xs text-slate-400">{isUpcoming(selectedEpisode.airDate) ? 'Upcoming · ' : selectedEpisode.airDate ? 'Aired · ' : ''}{formatAirDate(selectedEpisode.airDate)}</p>
                     <div className="space-y-2">
                       {selectedEpisode.mirrors.map(mirror => (
                         <button
@@ -263,13 +271,17 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                       {selectedSeason?.episodes.map((episode) => (
                         <button
                           key={`${selectedSeason.number}-${episode.id}`}
-                          onClick={() => setSelectedEpisodeId(episode.id)}
-                          className="w-full p-3 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors text-left"
+                          onClick={() => { if (!isUpcoming(episode.airDate)) setSelectedEpisodeId(episode.id); }}
+                          disabled={isUpcoming(episode.airDate)}
+                          className="w-full p-3 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors text-left disabled:cursor-not-allowed disabled:opacity-70"
                         >
                           <div className="flex justify-between items-center">
                             <span className="min-w-0 flex flex-col gap-1 pr-3">
                               <span className="text-xs font-semibold text-amber-400">S{String(selectedSeason.number).padStart(2, '0')} · E{String(episode.number).padStart(2, '0')}</span>
                               <span className="text-sm font-medium text-slate-100 break-words">{episode.title || `Episode ${episode.number}`}</span>
+                              <span className={`text-xs ${isUpcoming(episode.airDate) ? 'text-sky-300' : 'text-slate-400'}`}>
+                                {isUpcoming(episode.airDate) ? 'Upcoming · ' : episode.airDate ? 'Aired · ' : ''}{formatAirDate(episode.airDate)}
+                              </span>
                             </span>
                             <span className="text-xs text-slate-400 shrink-0">{episode.duration}</span>
                           </div>
