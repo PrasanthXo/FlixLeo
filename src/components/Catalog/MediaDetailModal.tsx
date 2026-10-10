@@ -267,10 +267,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           className="w-full p-3 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors text-left"
                         >
                           <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-slate-200">
-                              {episode.number}. {episode.title}
+                            <span className="min-w-0 flex flex-col gap-1 pr-3">
+                              <span className="text-xs font-semibold text-amber-400">S{String(selectedSeason.number).padStart(2, '0')} · E{String(episode.number).padStart(2, '0')}</span>
+                              <span className="text-sm font-medium text-slate-100 break-words">{episode.title || `Episode ${episode.number}`}</span>
                             </span>
-                            <span className="text-xs text-slate-500">{episode.duration}</span>
+                            <span className="text-xs text-slate-400 shrink-0">{episode.duration}</span>
                           </div>
                         </button>
                       ))}
