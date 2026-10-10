@@ -417,11 +417,12 @@ export default function App() {
           </div>
         )}
 
-        {currentTab === 'browse' && !searchQuery.trim() && continueWatching.length > 0 && (
+        {currentTab === 'browse' && !searchQuery.trim() && (
           <section className="mb-8" aria-label="Continue Watching">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xl font-bold text-white">Continue Watching</h2>
             </div>
+            {continueWatching.length === 0 && <p className="text-sm text-slate-400 rounded-xl border border-slate-800 bg-slate-900/50 p-4 mb-3">Your Continue Watching list is empty. Play a movie using a compatible direct or HLS stream to save progress. Embedded providers may not share viewing progress.</p>}
             <div className="flex gap-3 overflow-x-auto pb-3">
               {continueWatching.map(entry => (
                 <button key={entry.media.id} type="button"
