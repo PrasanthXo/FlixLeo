@@ -29,6 +29,7 @@ export interface Episode {
   number: number;
   title: string;
   duration: string;
+  airDate?: string | null;
   mirrors: StreamMirror[];
 }
 
