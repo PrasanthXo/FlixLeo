@@ -30,6 +30,8 @@ export default function App() {
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [tmdbSearchResults, setTmdbSearchResults] = useState<MediaItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
 
   // Fetch TMDB Movie Catalogs
   useEffect(() => {
@@ -86,26 +88,40 @@ export default function App() {
     }
   }, [watchlistIds]);
 
-  // Live TMDB API Search effect
+  // Search live TMDB movies and television together, with cancellation for fast typing.
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
       setTmdbSearchResults([]);
+      setSearchLoading(false);
+      setSearchError('');
       return;
     }
-
-    const timer = setTimeout(() => {
-      fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data && data.success && Array.isArray(data.items)) {
-            setTmdbSearchResults(data.items);
-          }
-        })
-        .catch(() => {});
-    }, 280);
-
-    return () => clearTimeout(timer);
+    const controller = new AbortController();
+    setSearchLoading(true);
+    setSearchError('');
+    setTmdbSearchResults([]);
+    const timer = window.setTimeout(async () => {
+      try {
+        const endpoints = ['/api/tmdb/search', '/api/tmdb/tv/search'];
+        const data = await Promise.all(endpoints.map(async endpoint => {
+          const response = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+          if (!response.ok) throw new Error('TMDB search unavailable');
+          const payload = await response.json();
+          if (!payload?.success || !Array.isArray(payload.items)) throw new Error('TMDB search unavailable');
+          return payload.items as MediaItem[];
+        }));
+        if (controller.signal.aborted) return;
+        const unique = new Map<string, MediaItem>();
+        for (const item of data.flat()) unique.set(item.id, item);
+        setTmdbSearchResults(Array.from(unique.values()));
+      } catch (error) {
+        if (!controller.signal.aborted) setSearchError('Live search is unavailable. Check the TMDB connection and try again.');
+      } finally {
+        if (!controller.signal.aborted) setSearchLoading(false);
+      }
+    }, 300);
+    return () => { window.clearTimeout(timer); controller.abort(); };
   }, [searchQuery]);
 
   // Toggle Bookmark
@@ -409,6 +425,13 @@ export default function App() {
             )}
 
             {/* Live TMDB Global Search Results */}
+            {searchQuery.trim() && (
+              <div className="mt-8 pt-6 border-t border-slate-800">
+                {searchLoading && <p role="status" className="text-sm text-slate-300">Searching movies and series…</p>}
+                {searchError && <p role="alert" className="text-sm text-amber-300">{searchError}</p>}
+                {!searchLoading && !searchError && tmdbSearchResults.length === 0 && <p className="text-sm text-slate-400">No matching movies or series found in TMDB.</p>}
+              </div>
+            )}
             {searchQuery && tmdbSearchResults.length > 0 && (
               <div className="mt-8 pt-6 border-t border-slate-800">
                 <div className="flex items-center gap-2 mb-4">
@@ -416,7 +439,7 @@ export default function App() {
                     TMDB
                   </span>
                   <h3 className="text-base font-bold text-white">
-                    Live TMDB Database Matches ({tmdbSearchResults.length})
+                    Movie & Series Search Results ({tmdbSearchResults.length})
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-6">
