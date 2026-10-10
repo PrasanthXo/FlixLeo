@@ -23,10 +23,12 @@ export const MovieCard: React.FC<MovieCardProps> = ({
     <div className="group relative flex flex-col rounded-xl overflow-hidden bg-slate-900/40 border border-slate-800/80 hover:border-slate-700 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
       {/* Poster Container (Aspect 3:4) */}
       <div className="relative aspect-3/4 w-full overflow-hidden bg-slate-950">
-        <TmdbArtwork media={media} kind="poster" alt={media.title} referrerPolicy="no-referrer" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+        <button type="button" onClick={() => onOpenDetails(media)} aria-label={`View details for ${media.title}`} className="absolute inset-0 w-full h-full cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-amber-500 focus-visible:outline-offset-[-2px]">
+          <TmdbArtwork media={media} kind="poster" alt={media.title} referrerPolicy="no-referrer" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none" loading="lazy" />
+        </button>
 
         {/* Gradient Scrim for readable contrast */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         {/* Source Badge (Top Left - interactive indicator) */}
         <div className="absolute top-2.5 left-2.5">
