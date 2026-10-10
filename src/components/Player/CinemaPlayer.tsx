@@ -114,6 +114,9 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     // If embed iframe mirror is active, bypass HTML5 video setup
     if (selectedMirror.streamType === 'embed-iframe') {
       setIsBuffering(false);
+      setHasPlaybackError(false);
+      setErrorMessage('');
+      setIsPlaying(false);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -495,7 +498,9 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           {selectedMirror.streamType === 'embed-iframe' ? (
             <iframe
               src={selectedMirror.url}
-              className="w-full h-full border-0 pointer-events-none"
+              className="w-full h-full border-0"
+              allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+              allowFullScreen
               title={media.title}
             />
           ) : (
@@ -509,11 +514,11 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
             />
           )}
 
-          {/* Mini overlay controls */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between">
+          {/* Embedded providers must receive touch/mouse input to expose their own controls. */}
+          <div className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between ${selectedMirror.streamType === 'embed-iframe' ? 'pointer-events-none' : ''}`}>
             <div className="flex items-center justify-between text-white">
               <span className="text-xs font-bold truncate max-w-[200px]">{media.title}</span>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 pointer-events-auto">
                 <button
                   onClick={() => setIsMiniPlayer(false)}
                   className="p-1 rounded bg-black/60 hover:bg-slate-800 text-slate-200"
@@ -532,15 +537,15 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
             </div>
 
             <div className="flex items-center justify-between">
-              <button
+              {selectedMirror.streamType !== 'embed-iframe' && <button
                 onClick={togglePlay}
                 className="w-8 h-8 rounded-full bg-amber-500 text-black flex items-center justify-center font-bold"
               >
                 {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-              </button>
-              <span className="text-[10px] font-mono text-slate-300">
+              </button>}
+              {selectedMirror.streamType === 'embed-iframe' ? <span className="text-[10px] text-slate-300">Use provider controls</span> : <span className="text-[10px] font-mono text-slate-300">
                 {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
+              </span>}
             </div>
           </div>
         </div>
@@ -607,9 +612,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           onClick={togglePlay}
           onError={(e) => e.stopPropagation()}
           className={`absolute inset-0 w-full h-full cursor-pointer bg-black ${getVideoAspectClass()}`}
-        >
-          <source src={selectedMirror.url} type={selectedMirror.url.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4'} />
-        </video>
+        />
       )}
 
       {/* Buffering spinner */}
