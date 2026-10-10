@@ -21,7 +21,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
     <div className="relative w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800/80 mb-8 min-h-[380px] md:min-h-[480px] flex items-end">
       {/* Background Image with Measured Contrast Scrim */}
       <img
-        src={media.backdropUrl}
+        src={media.backdropUrl || "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=1600&auto=format&fit=crop&q=80"}
+        onError={(e) => { const img = e.currentTarget; const fallback = "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=1600&auto=format&fit=crop&q=80"; if (img.src !== fallback) img.src = fallback; else img.style.display = "none"; }}
         alt={media.title}
         referrerPolicy="no-referrer"
         className="absolute inset-0 w-full h-full object-cover object-center"
