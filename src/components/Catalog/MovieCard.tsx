@@ -18,6 +18,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
   onToggleBookmark
 }) => {
   const [imageError, setImageError] = useState<boolean>(false);
+  React.useEffect(() => { setImageError(false); }, [media.posterUrl, media.id]);
 
   return (
     <div className="group relative flex flex-col rounded-xl overflow-hidden bg-slate-900/40 border border-slate-800/80 hover:border-slate-700 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
@@ -25,7 +26,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
       <div className="relative aspect-3/4 w-full overflow-hidden bg-slate-950">
         {!imageError ? (
           <img
-            src={media.posterUrl}
+            src={media.posterUrl || "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=640&auto=format&fit=crop&q=80"}
             alt={media.title}
             referrerPolicy="no-referrer"
             onError={() => setImageError(true)}
@@ -33,7 +34,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-b from-slate-900 to-slate-950 text-slate-500">
+          <div className="w-full h-full relative flex flex-col items-center justify-center p-4 bg-gradient-to-b from-slate-900 to-slate-950 text-slate-500" style={{ backgroundImage: "linear-gradient(to top, rgba(2,6,23,.92), rgba(2,6,23,.20)), url(https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=640&auto=format&fit=crop&q=80)", backgroundSize: "cover", backgroundPosition: "center" }}>
             <Film className="w-8 h-8 mb-2 text-slate-600" />
             <span className="text-xs text-center font-medium line-clamp-2 text-slate-400">
               {media.title}
