@@ -400,7 +400,7 @@ app.get('/api/tmdb/tv/:id', async (req: Request, res: Response) => {
 // TMDB season and episode metadata for the existing TV details modal.
 app.get('/api/tmdb/details/tv/:id', async (req: Request, res: Response) => {
   const cleanId = String(req.params.id).replace(/^(tv-|tmdb-)/, '');
-  if (!/^\\d+$/.test(cleanId)) return res.status(400).json({ success: false, message: 'Invalid series ID' });
+  if (!/^[0-9]+$/.test(cleanId)) return res.status(400).json({ success: false, message: 'Invalid series ID' });
   try {
     const details = await fetchFromTmdb(`/tv/${cleanId}`);
     if (!details) return res.status(503).json({ success: false, message: 'TMDB is not configured' });
@@ -420,7 +420,7 @@ app.get('/api/tmdb/details/tv/:id', async (req: Request, res: Response) => {
                 ...mirror,
                 id: `${mirror.id}-s${seriesNumber}e${number}`,
                 label: mirror.label.replace(/S01E01/g, `S${String(seriesNumber).padStart(2,'0')}E${String(number).padStart(2,'0')}`),
-                url: mirror.url.replace(/\\/1\\/1(?=\\/?(?:[?#]|$))/, `/${seriesNumber}/${number}`)
+                url: mirror.url.replace(/\/1\/1(?=\/|[?#]|$)/, `/${seriesNumber}/${number}`)
               }));
               return {
                 id: `s${seriesNumber}e${number}`,
