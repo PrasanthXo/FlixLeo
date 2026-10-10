@@ -183,7 +183,7 @@ export default function App() {
     };
     void run();
     return () => controller.abort();
-  }, [loadingMore, currentTab, movieNextPage, tvNextPage, tmdbCategory, tvCategory]);
+  }, [loadingMore, currentTab, tmdbCategory, tvCategory]);
   
 
 
