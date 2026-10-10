@@ -65,6 +65,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<string>(
     media.audioTracks && media.audioTracks[0] ? media.audioTracks[0] : 'Original Audio Track'
   );
+  const [availableAudioTracks, setAvailableAudioTracks] = useState<{ index: number; name: string; lang: string }[]>([]);
+  const [activeAudioIndex, setActiveAudioIndex] = useState<number>(-1);
   const [selectedSubtitle, setSelectedSubtitle] = useState<string>('en');
   const [selectedQuality, setSelectedQuality] = useState<QualityOption>(selectedMirror.quality);
   const [isBuffering, setIsBuffering] = useState<boolean>(true);
@@ -85,6 +87,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
 
   // Switch active mirror
   const handleSelectMirror = (mirror: StreamMirror) => {
+    setAvailableAudioTracks([]);
+    setActiveAudioIndex(-1);
     setSelectedMirror(mirror);
     setSelectedQuality(mirror.quality);
     setHasPlaybackError(false);
@@ -111,6 +115,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
 
   // Setup stream with HLS or Native HTML5 Video
   useEffect(() => {
+    setAvailableAudioTracks([]);
+    setActiveAudioIndex(-1);
     // If embed iframe mirror is active, bypass HTML5 video setup
     if (selectedMirror.streamType === 'embed-iframe') {
       setIsBuffering(false);
@@ -157,6 +163,14 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         backBufferLength: 90
       });
       hlsRef.current = hls;
+      const syncAudioTracks = () => {
+        setAvailableAudioTracks(hls.audioTracks.map((track, index) => ({
+          index, name: track.name || track.lang || `Track ${index + 1}`, lang: track.lang || ''
+        })));
+        setActiveAudioIndex(hls.audioTrack);
+      };
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncAudioTracks);
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, syncAudioTracks);
       hls.loadSource(streamUrl);
       hls.attachMedia(video);
 
@@ -984,6 +998,30 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
                       </div>
                     </div>
 
+                    {/* Select actual HLS audio renditions; catalogue language labels are metadata, not playable tracks. */}
+                    <div className="border-t border-slate-800 pt-2">
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Audio / Language</div>
+                      {availableAudioTracks.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {availableAudioTracks.map(track => (
+                            <button key={track.index} type="button"
+                              onClick={() => {
+                                if (hlsRef.current) {
+                                  hlsRef.current.audioTrack = track.index;
+                                  setActiveAudioIndex(track.index);
+                                  setSelectedAudioTrack(track.name);
+                                  triggerToast(`Audio: ${track.name}`);
+                                }
+                              }}
+                              className={`px-3 py-2 rounded text-left text-xs ${activeAudioIndex === track.index ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}>
+                              {track.name}{track.lang ? ` · ${track.lang}` : ''}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400">No selectable audio tracks exposed by this stream. Embedded players manage their own audio settings.</p>
+                      )}
+                    </div>
                     {/* Audio Volume Booster */}
                     <div className="border-t border-slate-800 pt-2">
                       <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
