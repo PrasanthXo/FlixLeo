@@ -13,6 +13,21 @@ import { MovieCard } from './components/Catalog/MovieCard';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
 
+// Deduplicate repeated TMDB entries by ID and normalized title/year within each media type.
+function uniqueTitles(items: MediaItem[]): MediaItem[] {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    const type = item.type === 'tv' || item.id.startsWith('tv-') ? 'tv' : 'movie';
+    const normalized = item.title.normalize('NFKC').toLocaleLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim();
+    const key = `${type}|${normalized}|${item.year || ''}`;
+    const idKey = `${type}|${item.id}`;
+    if (seen.has(key) || seen.has(idKey)) return false;
+    seen.add(key);
+    seen.add(idKey);
+    return true;
+  });
+}
+
 export default function App() {
   // Catalog State
   const [catalog, setCatalog] = useState<MediaItem[]>(MEDIA_CATALOG);
@@ -77,7 +92,7 @@ export default function App() {
           }
         }
         if (!controller.signal.aborted) {
-          setTmdbMovies(Array.from(unique.values()));
+          setTmdbMovies(uniqueTitles(Array.from(unique.values())));
           setIsTmdbLive(Boolean(first.isLive));
         }
       } catch {
@@ -97,7 +112,7 @@ export default function App() {
       .then(r => r.json())
       .then(d => {
         if (d && d.success && Array.isArray(d.items)) {
-          setTvShows(d.items);
+          setTvShows(uniqueTitles(d.items));
         }
       })
       .catch(() => {})
@@ -161,13 +176,13 @@ export default function App() {
         if (isMovie) {
           setMovieExtra(prev => {
             const seen = new Set([...tmdbMovies, ...prev].map(item => item.id));
-            return [...prev, ...result.items.filter((item: MediaItem) => !seen.has(item.id) && seen.add(item.id))];
+            return uniqueTitles([...prev, ...result.items.filter((item: MediaItem) => !seen.has(item.id) && seen.add(item.id))].filter(item => !uniqueTitles([...tmdbMovies, ...prev]).some(existing => existing.title.normalize('NFKC').toLocaleLowerCase() === item.title.normalize('NFKC').toLocaleLowerCase() && existing.year === item.year && existing.id !== item.id)));
           });
           setMovieNextPage(page + 1);
         } else {
           setTvExtra(prev => {
             const seen = new Set([...tvShows, ...prev].map(item => item.id));
-            return [...prev, ...result.items.filter((item: MediaItem) => !seen.has(item.id) && seen.add(item.id))];
+            return uniqueTitles([...prev, ...result.items.filter((item: MediaItem) => !seen.has(item.id) && seen.add(item.id))]);
           });
           setTvNextPage(page + 1);
         }
@@ -234,7 +249,7 @@ export default function App() {
         if (controller.signal.aborted) return;
         const unique = new Map<string, MediaItem>();
         for (const item of data.flat()) unique.set(item.id, item);
-        setTmdbSearchResults(Array.from(unique.values()));
+        setTmdbSearchResults(uniqueTitles(Array.from(unique.values())));
       } catch (error) {
         if (!controller.signal.aborted) setSearchError('Live search is unavailable. Check the TMDB connection and try again.');
       } finally {
@@ -308,7 +323,7 @@ export default function App() {
     // When on Series tab
     if (currentTab === 'series') {
       const manualSeries = catalog.filter(m => m.id.startsWith('tv-') || m.type === 'tv');
-      list = Array.from(new Map([...tvShows, ...tvExtra, ...manualSeries].map(item => [item.id, item])).values());
+      list = [...tvShows, ...tvExtra, ...manualSeries];
     }
 
     // When on Home (browse), use TMDB catalog if selected and populated
@@ -340,7 +355,7 @@ export default function App() {
       );
     }
 
-    return list;
+    return uniqueTitles(list);
   }, [catalog, currentTab, tmdbCategory, tmdbMovies, tvShows, movieExtra, tvExtra, sourceFilter, searchQuery, watchlistIds]);
 
   // Spotlight media for hero banner
