@@ -30,6 +30,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const dockPositionRef = useRef<number | null>(null);
   const dockWasPlayingRef = useRef(false);
   const hlsRef = useRef<Hls | null>(null);
@@ -103,6 +104,25 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     setShowMirrorMenu(false);
     triggerToast(`Switched to ${mirror.label}`);
     if (onMirrorChange) onMirrorChange(mirror);
+  };
+
+  // Closing must terminate the current media resource, not just hide the window.
+  const stopAndClose = () => {
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.removeAttribute('src');
+      video.querySelectorAll('source').forEach(source => source.removeAttribute('src'));
+      video.load();
+    }
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    if (iframeRef.current) iframeRef.current.src = 'about:blank';
+    setIsPlaying(false);
+    setIsBuffering(false);
+    onClose();
   };
 
   const setDocked = (minimized: boolean) => {
@@ -545,6 +565,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         <div className="relative aspect-video bg-black flex items-center justify-center">
           {selectedMirror.streamType === 'embed-iframe' ? (
             <iframe
+              ref={iframeRef}
               src={selectedMirror.url}
               className="w-full h-full border-0"
               allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
@@ -574,7 +595,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
                   <Maximize2 className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={onClose}
+                  onClick={stopAndClose}
+                  aria-label="Close mini-player and stop playback"
                   className="p-1 rounded bg-black/60 hover:bg-red-950 text-slate-200 hover:text-red-400"
                   title="Close Stream"
                 >
@@ -643,6 +665,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         <div className="absolute inset-0 w-full h-full bg-black">
           <iframe
             key={selectedMirror.id}
+            ref={iframeRef}
             src={selectedMirror.url}
             className="w-full h-full border-0 absolute inset-0 bg-black"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
