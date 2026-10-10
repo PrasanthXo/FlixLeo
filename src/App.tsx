@@ -33,20 +33,49 @@ export default function App() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
 
-  // Fetch TMDB Movie Catalogs
+  // Show the first TMDB catalogue page plus 25 additional unique releases on Home and Movies.
   useEffect(() => {
     if (tmdbCategory === 'all') return;
+    const controller = new AbortController();
     setIsLoadingTmdb(true);
-    fetch(`/api/tmdb/${tmdbCategory}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d && d.success && Array.isArray(d.items)) {
-          setTmdbMovies(d.items);
-          setIsTmdbLive(Boolean(d.isLive));
+    const load = async () => {
+      try {
+        const fetchPage = async (page: number) => {
+          const response = await fetch(`/api/tmdb/${tmdbCategory}?page=${page}`, { signal: controller.signal });
+          if (!response.ok) throw new Error('Movie catalogue unavailable');
+          const data = await response.json();
+          if (!data.success || !Array.isArray(data.items)) throw new Error('Invalid catalogue response');
+          return data as { items: MediaItem[]; isLive?: boolean; totalPages?: number };
+        };
+        const first = await fetchPage(1);
+        if (controller.signal.aborted) return;
+        const unique = new Map<string, MediaItem>(first.items.map(movie => [movie.id, movie]));
+        if (first.isLive) {
+          const pageCount = Math.min(3, Math.max(1, first.totalPages || 3));
+          const nextPages = await Promise.all(Array.from({ length: pageCount - 1 }, (_, i) => fetchPage(i + 2)));
+          let added = 0;
+          for (const page of nextPages) {
+            for (const movie of page.items) {
+              if (added >= 25) break;
+              if (!unique.has(movie.id)) {
+                unique.set(movie.id, movie);
+                added++;
+              }
+            }
+          }
         }
-      })
-      .catch(() => {})
-      .finally(() => setIsLoadingTmdb(false));
+        if (!controller.signal.aborted) {
+          setTmdbMovies(Array.from(unique.values()));
+          setIsTmdbLive(Boolean(first.isLive));
+        }
+      } catch {
+        // Preserve the previous catalogue if TMDB is temporarily unavailable.
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingTmdb(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
   }, [tmdbCategory]);
 
   // Fetch TMDB TV Series Catalogs
