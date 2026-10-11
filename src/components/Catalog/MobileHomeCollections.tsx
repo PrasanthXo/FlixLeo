@@ -28,7 +28,11 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
   const movie = unique.filter(x => x.type !== 'tv' && !x.id.startsWith('tv-'));
   const southIndianSelection = useMemo(() => {
     const labels = ['Tamil','Telugu','Malayalam','Kannada'];
-    const source = [...southIndianMovies, ...movie].filter(item =>
+    const source = [
+      ...southIndianMovies,
+      ...labels.flatMap(language => additionalCollections['language:' + language] || []),
+      ...movie
+    ].filter(item =>
       item.type !== 'tv' && !item.id.startsWith('tv-') && labels.some(language => languageMatch(item.language,language))
     );
     const buckets = labels.map(language => source.filter(item => languageMatch(item.language, language)));
@@ -45,7 +49,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
       }
     }
     return result;
-  }, [southIndianMovies, movie]);
+  }, [southIndianMovies, movie, additionalCollections]);
   const series = unique.filter(x => x.type === 'tv' || x.id.startsWith('tv-'));
   const rows: { label:string; subtitle:string; list: MediaItem[]; kind?: 'continue' }[] = [
     { label:'Trending Movies',subtitle:'Big-screen favourites',list:movie.slice(0,16)},
