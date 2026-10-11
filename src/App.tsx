@@ -234,9 +234,10 @@ export default function App() {
   const [watchlistIds, setWatchlistIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('cinehub_watchlist');
-      return saved ? JSON.parse(saved) : ['stream-overdrive-4k', 'stream-rajputana-warrior'];
+      const ids = saved ? JSON.parse(saved) : [];
+      return Array.isArray(ids) ? ids.filter((id: unknown) => typeof id === 'string' && !['stream-overdrive-4k', 'stream-rajputana-warrior'].includes(id)) : [];
     } catch {
-      return ['stream-overdrive-4k', 'stream-rajputana-warrior'];
+      return [];
     }
   });
 
