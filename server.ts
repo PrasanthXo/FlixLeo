@@ -688,8 +688,8 @@ app.get('/api/stremio/subtitles', async (req: Request, res: Response) => {
           try {
             const u = new URL(track.url);
             if (u.protocol !== 'https:' || u.username || u.password || !u.hostname.includes('.') ||
-                !/\.vtt$/i.test(u.pathname)) return [];
-            return [{ url: u.toString(), label: String(track.id || track.lang || 'Subtitles').slice(0, 70),
+                !/\.(?:vtt|srt)$/i.test(u.pathname)) return [];
+            return [{ url: u.toString(), label: String(track.name || track.id || track.lang || 'Subtitles').slice(0, 70),
               language: String(track.lang || 'und').slice(0, 12) }];
           } catch { return []; }
         });
