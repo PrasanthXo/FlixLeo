@@ -183,6 +183,20 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals) }, mirror.id);
     onClose();
   };
+  const playInVlc = (mirror: StreamMirror) => {
+    try {
+      const source = new URL(mirror.url);
+      if (source.protocol !== 'https:' || source.username || source.password || mirror.streamType === 'embed-iframe') {
+        window.alert('This source cannot be opened directly in VLC.');
+        return;
+      }
+      const intent = 'intent://' + source.href.slice('https://'.length) +
+        '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
+      window.location.href = intent;
+    } catch {
+      window.alert('This stream has no supported VLC playback link.');
+    }
+  };
   const selectedSeason = activeMedia.seasons?.find(s => s.number === selectedSeasonNumber);
   const selectedEpisode = selectedSeason?.episodes.find(e => e.id === selectedEpisodeId);
   const todayUtc = new Date().toISOString().slice(0, 10);
@@ -370,7 +384,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                             <span className="break-words">{mirror.label}</span>
                             <span className="shrink-0 text-amber-400">{mirror.quality}</span>
                           </button>
-
+                          <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                            onClick={() => playInVlc(mirror)}
+                            className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-3 text-xs font-semibold text-orange-200 disabled:opacity-40">
+                            VLC Play
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -460,18 +478,6 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {mirror.downloadUrl && (
-                          <a
-                            href={mirror.downloadUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                            title="Direct Download"
-                          >
-                            <Download className="w-4 h-4" />
-                          </a>
-                        )}
-
                         <button
                           onClick={() => {
                             playSelected(mirror, activeMedia.mirrors);
@@ -481,6 +487,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
                           {waitingForServers ? 'Fetching…' : 'Play'}
+                        </button>
+                        <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                          onClick={() => playInVlc(mirror)}
+                          className="px-3 py-2 rounded-lg border border-orange-500/40 bg-orange-500/15 text-orange-200 font-semibold text-xs disabled:opacity-40">
+                          VLC Play
                         </button>
                       </div>
                     </div>
