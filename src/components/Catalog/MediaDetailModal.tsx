@@ -2,7 +2,7 @@ import React from 'react';
 import { TmdbArtwork } from './TmdbArtwork';
 import {
   X, Play, Bookmark, BookmarkCheck, Download,
-  Volume2, Globe, Server, Star
+  Volume2, Server, Star
 } from 'lucide-react';
 import { MediaItem, StreamMirror, getSourceDisplayBadge } from '../../types/stream';
 
@@ -29,7 +29,6 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
 
   const [episodeLoadError, setEpisodeLoadError] = React.useState<string | null>(null);
   const [loadingEpisodes, setLoadingEpisodes] = React.useState(false);
-  const [showAudioOptions, setShowAudioOptions] = React.useState(false);
   const [addonStreams, setAddonStreams] = React.useState<StreamMirror[]>([]);
   const [addonLoading, setAddonLoading] = React.useState(false);
   const [addonError, setAddonError] = React.useState('');
