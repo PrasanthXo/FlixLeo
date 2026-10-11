@@ -315,23 +315,18 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                       {addonLoading && <p className="text-xs text-slate-400">Checking additional sources…</p>}
                       {addonError && <p className="text-xs text-slate-500">{addonError}</p>}
                       {orderedMirrors(selectedEpisode.mirrors).map(mirror => (
-                        <button
-                          key={mirror.id}
-                          onClick={() => {
-                            playSelected(mirror, selectedEpisode.mirrors);
-                          }}
-                          className="w-full p-3 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors text-left flex justify-between"
-                        >
-                          <span>{mirror.label}</span>
-                          <span className="text-amber-400">{mirror.quality}</span>
-{vlcLink(mirror) && (
-                          <a href={vlcLink(mirror)!}
-                            className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-amber-300 text-xs font-semibold"
-                            title="Open this network stream in VLC for Android">
-                            Open in VLC
-                          </a>
-                        )}
-                        </button>
+                        <div key={mirror.id} className="flex items-center gap-2">
+                          <button
+                            onClick={() => playSelected(mirror, selectedEpisode.mirrors)}
+                            className="min-w-0 flex-1 p-3 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors text-left flex justify-between gap-2"
+                          >
+                            <span className="break-words">{mirror.label}</span>
+                            <span className="shrink-0 text-amber-400">{mirror.quality}</span>
+                          </button>
+                          {vlcLink(mirror) && (
+                            <a href={vlcLink(mirror)!} className="shrink-0 px-3 py-3 rounded-lg bg-slate-800 border border-slate-700 text-amber-300 text-xs font-semibold" title="Open stream in VLC for Android">VLC</a>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
