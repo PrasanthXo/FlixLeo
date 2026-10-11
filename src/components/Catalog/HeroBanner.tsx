@@ -37,9 +37,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             <Flame className="w-3.5 h-3.5 fill-current" />
             SPOTLIGHT PREMIERE
           </span>
-          <span className="px-2.5 py-1 rounded bg-slate-900/90 text-amber-300 border border-amber-500/30 text-xs font-bold">
-            {media.resolutionBadge || '4K UHD HDR'}
-          </span>
           <span className="px-2.5 py-1 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-semibold">
             {media.mirrors.length} Active Mirrors
           </span>
@@ -74,7 +71,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             <Server className="w-3.5 h-3.5 text-amber-400" />
             Verified Streams:
           </span>
-          <span className="text-sky-300">Ultra 4K</span>
+          <span className="text-sky-300">Streaming</span>
           <span aria-hidden="true">·</span>
           <span className="text-pink-300">Regional Master</span>
           <span aria-hidden="true">·</span>
@@ -90,7 +87,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             className="py-3 px-6 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm flex items-center gap-2 shadow-xl shadow-amber-500/10 transition-transform active:scale-95"
           >
             <Play className="w-4 h-4 fill-current" />
-            Watch Now (4K UHD)
+            Watch Now
           </button>
 
           <button
