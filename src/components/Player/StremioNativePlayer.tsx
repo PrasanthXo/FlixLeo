@@ -98,7 +98,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     setSelectedSubtitle('');
     const fail = () => { if (!disposed) { setBuffering(false); setError('Unable to play this stream in your browser.'); } };
     const url = audioFix && active.audioFixUrl ? active.audioFixUrl : active.url;
-    const isAdaptive = !audioFix && (active.streamType === 'hls' || /\\.m3u8(?:\\?|$)|\\.mpd(?:\\?|$)/i.test(url));
+    const isAdaptive = !audioFix && (active.streamType === 'hls' || /\.m3u8(?:\?|$)|\.mpd(?:\?|$)/i.test(url));
     let shakaPlayer: any = null;
     const setupShaka = async () => {
       try {
@@ -143,7 +143,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         if (disposed) return;
         if (shakaPlayer) { void shakaPlayer.destroy(); shakaPlayer = null; shakaRef.current = null; }
         // Keep the existing HLS/native playback if Shaka fails to initialize.
-        if (active.streamType === 'hls' || /\\.m3u8(?:\\?|$)/i.test(url)) {
+        if (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url)) {
           if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
           else if (Hls.isSupported()) {
             const fallback = new Hls({ enableWorker: true, startLevel: -1, maxBufferLength: 20 });
