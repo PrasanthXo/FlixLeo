@@ -1,4 +1,4 @@
-export type CloudUser = { id: string; email?: string; user_metadata?: { display_name?: string; preferred_language?: string; favorite_languages?: string[]; favorite_genres?: string[]; favorite_artists?: string[] } };
+export type CloudUser = { id: string; email?: string; email_confirmed_at?: string | null; user_metadata?: { display_name?: string; preferred_language?: string; favorite_languages?: string[]; favorite_genres?: string[]; favorite_artists?: string[] } };
 type Session = { access_token: string; refresh_token: string; expires_at: number; user: CloudUser };
 const KEY = 'flixleo_cloud_session';
 export const cloudConfigured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
@@ -9,6 +9,7 @@ const authRedirect = 'https://flixleo.cyou/';
 const redirectQuery = '?redirect_to=' + encodeURIComponent(authRedirect);
 let session: Session | null = null;
 try { session = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { /* ignore */ }
+if (session && !session.user?.email_confirmed_at) { session = null; try { localStorage.removeItem(KEY); } catch {} }
 const persist = (value: Session | null) => {
   session = value;
   try { value ? localStorage.setItem(KEY, JSON.stringify(value)) : localStorage.removeItem(KEY); } catch { /* ignore */ }
@@ -29,22 +30,29 @@ async function accessToken() {
   const data = await request('/auth/v1/token?grant_type=refresh_token', {
     method: 'POST', body: JSON.stringify({ refresh_token: session.refresh_token })
   });
-  persist({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user || session.user, expires_at: Math.floor(Date.now() / 1000) + data.expires_in });
+  const verifiedUser = await request('/auth/v1/user', {}, data.access_token);
+  if (!verifiedUser.email_confirmed_at) { persist(null); throw new Error('Confirm your email address before signing in. Check your inbox or resend verification.'); }
+  persist({ access_token: data.access_token, refresh_token: data.refresh_token, user: verifiedUser, expires_at: Math.floor(Date.now() / 1000) + data.expires_in });
   return data.access_token;
 }
 export async function cloudSignIn(email: string, password: string) {
   if (!cloudConfigured) throw new Error('Supabase is not configured yet.');
   const data = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email, password }) });
-  persist({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user, expires_at: Math.floor(Date.now() / 1000) + data.expires_in });
-  return data.user as CloudUser;
+  const verifiedUser = await request('/auth/v1/user', {}, data.access_token);
+  if (!verifiedUser.email_confirmed_at) { persist(null); throw new Error('Email not verified. Confirm your email before signing in, or select Resend verification email.'); }
+  persist({ access_token: data.access_token, refresh_token: data.refresh_token, user: verifiedUser, expires_at: Math.floor(Date.now() / 1000) + data.expires_in });
+  return verifiedUser as CloudUser;
 }
 export async function cloudSignUp(email: string, password: string) {
   if (!cloudConfigured) throw new Error('Supabase is not configured yet.');
   const data = await request('/auth/v1/signup' + redirectQuery, { method: 'POST', body: JSON.stringify({ email, password }) });
-  if (data.access_token) {
+  // Do not create a logged-in session until the email is verified.
+  if (data.access_token && data.user?.email_confirmed_at) {
     persist({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user, expires_at: Math.floor(Date.now() / 1000) + data.expires_in });
+    return true;
   }
-  return Boolean(data.access_token);
+  persist(null);
+  return false;
 }
 export async function cloudResendVerification(email: string) {
   if (!cloudConfigured) throw new Error('Supabase is not configured yet.');
