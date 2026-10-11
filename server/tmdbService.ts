@@ -4,7 +4,7 @@ const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
 // Movie and episode playback sources must be title-specific. Never reuse demo videos as real movies.
-\n// Genre ID to name lookup
+// Genre ID to name lookup
 export const TMDB_GENRES: Record<number, string> = {
   28: 'Action',
   12: 'Adventure',
