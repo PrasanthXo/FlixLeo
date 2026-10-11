@@ -876,7 +876,6 @@ export default function App() {
             ) : (
               <div className="space-y-3">
                 {phonePairId && <p className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-200">Sign in to your verified account, then approve connecting your TV.</p>}
-                <button type="button" onClick={() => setTvSignInMode(true)} className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 font-bold text-amber-200">Sign in on TV with QR code</button>
                 <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-900 p-1" role="tablist" aria-label="Account access">
                   <button type="button" role="tab" aria-selected={authTab === 'signin'} onClick={() => { setAuthTab('signin'); setAccountNotice(''); }} className={`rounded-lg p-2 font-semibold ${authTab === 'signin' ? 'bg-amber-500 text-black' : 'text-slate-300'}`}>Sign in</button>
                   <button type="button" role="tab" aria-selected={authTab === 'signup'} onClick={() => { setAuthTab('signup'); setAccountNotice(''); }} className={`rounded-lg p-2 font-semibold ${authTab === 'signup' ? 'bg-amber-500 text-black' : 'text-slate-300'}`}>Create account</button>
