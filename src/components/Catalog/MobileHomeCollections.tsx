@@ -20,15 +20,17 @@ export function MobileHomeCollections({ items, recent, onOpen, onPlay }: Props) 
     });
   }, [items]);
   const genres = ['Action', 'Sci-Fi', 'Thriller', 'Comedy', 'Drama', 'Romance', 'Horror', 'Adventure'];
-  const languages = ['Tamil', 'English', 'Hindi', 'Sinhala', 'Telugu', 'Malayalam', 'Korean'];
-  const languageMatch = (value: string, label: string) => value?.toLowerCase() === label.toLowerCase() || ({Tamil:'ta',English:'en',Hindi:'hi',Sinhala:'si',Telugu:'te',Malayalam:'ml',Korean:'ko'} as Record<string,string>)[label] === value?.toLowerCase();
+  const languages = ['Tamil', 'English', 'Hindi', 'Sinhala', 'Telugu', 'Malayalam', 'Kannada', 'Korean'];
+  const languageMatch = (value: string, label: string) => value?.toLowerCase() === label.toLowerCase() || ({Tamil:'ta',English:'en',Hindi:'hi',Sinhala:'si',Telugu:'te',Malayalam:'ml',Kannada:'kn',Korean:'ko'} as Record<string,string>)[label] === value?.toLowerCase();
   const movie = unique.filter(x => x.type !== 'tv' && !x.id.startsWith('tv-'));
+  const southIndianMovies = movie.filter(item => ['Tamil','Telugu','Malayalam','Kannada'].some(language => languageMatch(item.language, language)));
   const series = unique.filter(x => x.type === 'tv' || x.id.startsWith('tv-'));
   const rows: { label:string; subtitle:string; list: MediaItem[]; kind?: 'continue' }[] = [
     { label:'Continue Watching',subtitle:'Pick up where you left off',list:recent.map(x => x.media).filter(Boolean),kind:'continue'},
     { label:'For You',subtitle:'Discover your next favourite',list:unique.slice(4,19)},
     { label:'Trending Movies',subtitle:'Big-screen favourites',list:movie.slice(0,16)},
     { label:'Popular Series',subtitle:'Stories worth following',list:series.slice(0,16)},
+    { label:'South Indian Movies',subtitle:'Tamil • Telugu • Malayalam • Kannada cinema',list:southIndianMovies.slice(0,24)},
     ...genres.map(g => ({label:`${g} Movies & Series`,subtitle:'Explore by genre',list:unique.filter(x => x.genres?.some(v => v.toLowerCase() === g.toLowerCase())).slice(0,15)})),
     ...languages.map(l => ({label:`${l} Movies & Series`,subtitle:'Watch in your language',list:unique.filter(x => languageMatch(x.language,l)).slice(0,15)})),
     {label:'Top Rated Picks',subtitle:'Critically loved titles',list:[...unique].filter(x=>Number.parseFloat(x.imdbRating)>0).sort((a,b)=>Number.parseFloat(b.imdbRating)-Number.parseFloat(a.imdbRating)).slice(0,15)},
