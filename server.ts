@@ -528,6 +528,39 @@ app.get('/api/tmdb/indian', async (req: Request, res: Response) => {
   }
 });
 
+// Dedicated South Indian cinema feed. Resolve each language separately so a
+// failed or empty response cannot suppress all of the other languages.
+app.get('/api/tmdb/south-indian', async (req: Request, res: Response) => {
+  const page = Math.min(10, Math.max(1, Number(req.query.page) || 1));
+  const languages = ['ta', 'te', 'ml', 'kn'];
+  const results = await Promise.allSettled(languages.map(language =>
+    fetchFromTmdb('/discover/movie', {
+      with_original_language: language,
+      sort_by: 'popularity.desc',
+      page: String(page)
+    })
+  ));
+  const movies = new Map<string, any>();
+  for (const result of results) {
+    if (result.status !== 'fulfilled' || !Array.isArray(result.value?.results)) continue;
+    for (const movie of result.value.results) {
+      if (movie?.id && languages.includes(movie.original_language) && !movies.has(String(movie.id))) {
+        movies.set(String(movie.id), movie);
+      }
+    }
+  }
+  if (!movies.size) {
+    for (const movie of CURATED_TMDB_MOVIES) {
+      if (languages.includes(movie.original_language) && movie.id) movies.set(String(movie.id), movie);
+    }
+  }
+  const items = [...movies.values()].sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+    .map(movie => transformTmdbMovie(movie));
+  return res.json({ success: true, isLive: results.some(result =>
+    result.status === 'fulfilled' && Array.isArray(result.value?.results) && result.value.results.length > 0
+  ), items, page });
+});
+
 // API: TMDB Live Search
 app.get('/api/tmdb/search', async (req: Request, res: Response) => {
   const query = (req.query.q as string || '').trim();
