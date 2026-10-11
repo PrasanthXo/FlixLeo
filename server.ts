@@ -118,8 +118,8 @@ app.post('/api/tv/pair/:id/approve', tvPairRateLimit, async (req: Request, res: 
   if (!pair || pair.expires < Date.now() || pair.consumed) return res.status(410).json({ error: 'Pairing expired. Refresh the TV code.' });
   if (pair.tokenHash) return res.status(409).json({ error: 'TV pairing has already been approved.' });
   const bearer = String(req.headers.authorization || '');
-  if (!/^Bearer [^\\s]+$/.test(bearer)) return res.status(401).json({ error: 'Sign in on your phone first.' });
-  const supabaseUrl = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+  if (!bearer.startsWith('Bearer ') || bearer.length < 20) return res.status(401).json({ error: 'Sign in on your phone first.' });
+  const supabaseUrl = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(new RegExp('/$'), '');
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) return res.status(503).json({ error: 'TV sign-in is not configured on this server.' });
   try {
