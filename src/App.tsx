@@ -254,11 +254,12 @@ export default function App() {
   const [cloudUser, setCloudUser] = useState<CloudUser | null>(() => currentCloudUser());
   const [accountOpen, setAccountOpen] = useState(false);
   const [tvSignInMode, setTvSignInMode] = useState(() =>
+    window.location.pathname.toLowerCase().replace(/\/$/, '') === '/tv6' ||
     new URLSearchParams(window.location.search).get('tv') === '1' ||
     /smart-tv|smarttv|hbbtv|netcast|web0s|webos|tizen|android tv|googletv|aft[a-z]|bravia|viera|roku|vidaa/i.test(navigator.userAgent));
   const [phonePairId, setPhonePairId] = useState(() => new URLSearchParams(window.location.search).get('tv_pair') || '');
   useEffect(() => {
-    if (phonePairId || new URLSearchParams(window.location.search).get('tv') === '1') setAccountOpen(true);
+    if (phonePairId || window.location.pathname.toLowerCase().replace(/\/$/, '') === '/tv6' || new URLSearchParams(window.location.search).get('tv') === '1') setAccountOpen(true);
   }, [phonePairId]);
   const completeTvPair = () => {
     setPhonePairId('');
