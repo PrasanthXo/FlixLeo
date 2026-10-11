@@ -14,6 +14,7 @@ import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
 import { TvSignIn, TvPairApproval } from './components/TvPairing';
 import { TvExperience } from './components/TvExperience';
+import { TvTitleCard } from './components/TvTitleCard';
 import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudResendVerification, cloudSignOut, cloudUpdateProfile, cloudChangePassword, cloudResetPassword, cloudRecoveryTokenFromUrl, cloudCompleteRecovery, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
 
 // Deduplicate repeated TMDB entries by ID and normalized title/year within each media type.
@@ -849,7 +850,7 @@ export default function App() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xl font-bold text-white">Continue Watching</h2>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-3">
+            <div className={isTvDisplay ? "tv6-resume-row" : "flex gap-3 overflow-x-auto pb-3"}>
               {continueWatching.map(entry => (
                 <button key={entry.media.id + ':s' + (entry.media.playbackSeason ?? '') + 'e' + (entry.media.playbackEpisode ?? '')} type="button"
                   onClick={() => {
@@ -862,7 +863,7 @@ export default function App() {
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                   }}
-                  className="group text-left w-40 sm:w-48 shrink-0 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500 focus-visible:outline-2 focus-visible:outline-amber-400"
+                  className={isTvDisplay ? "tv6-resume-tile" : "group text-left w-40 sm:w-48 shrink-0 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500 focus-visible:outline-2 focus-visible:outline-amber-400"}
                   aria-label={`Resume ${entry.media.title}`}>
                   <div className="relative aspect-video bg-slate-950">
                     <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-950 to-black text-slate-500">
@@ -871,7 +872,7 @@ export default function App() {
                     {(entry.media.backdropUrl || entry.media.posterUrl) && <img
                       src={entry.media.backdropUrl || entry.media.posterUrl}
                       alt=""
-                      loading="lazy"
+                      loading={isTvDisplay ? 'eager' : 'lazy'}
                       className="absolute inset-0 w-full h-full object-cover"
                       onError={event => {
                         const img = event.currentTarget;
@@ -915,16 +916,17 @@ export default function App() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
+            <div className={isTvDisplay ? "tv6-poster-row" : "flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory"}>
               {forYouTitles.map(media => (
-                <div key={media.id} className="w-36 sm:w-44 shrink-0 snap-start">
+                <div key={media.id} className={isTvDisplay ? "tv6-poster-item" : "w-36 sm:w-44 shrink-0 snap-start"}>
+                  {isTvDisplay ? <TvTitleCard media={media} onOpen={setDetailMedia} /> : <>
                   <MovieCard
                     media={media}
                     onPlay={m => setDetailMedia(m)}
                     onOpenDetails={m => setDetailMedia(m)}
                     isBookmarked={watchlistIds.includes(media.id)}
                     onToggleBookmark={toggleBookmark}
-                  />
+                  /></>}
                 </div>
               ))}
             </div>
@@ -1109,8 +1111,8 @@ export default function App() {
               </div>
             ) : (
               /* Same responsive title grid for mobile and desktop. */
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-5">
-                {filteredCatalog.map((media) => (
+              <div className={isTvDisplay ? "tv6-catalog-grid" : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-5"}>
+                {filteredCatalog.map((media) => isTvDisplay ? <TvTitleCard key={media.id} media={media} onOpen={setDetailMedia} /> : (
                   <MovieCard
                     key={media.id}
                     media={media}
