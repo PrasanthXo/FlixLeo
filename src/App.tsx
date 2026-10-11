@@ -648,7 +648,6 @@ export default function App() {
                   <button type="button" role="tab" aria-selected={authTab === 'signin'} onClick={() => { setAuthTab('signin'); setAccountNotice(''); }} className={`rounded-lg p-2 font-semibold ${authTab === 'signin' ? 'bg-amber-500 text-black' : 'text-slate-300'}`}>Sign in</button>
                   <button type="button" role="tab" aria-selected={authTab === 'signup'} onClick={() => { setAuthTab('signup'); setAccountNotice(''); }} className={`rounded-lg p-2 font-semibold ${authTab === 'signup' ? 'bg-amber-500 text-black' : 'text-slate-300'}`}>Create account</button>
                 </div>
-                <p className="text-sm text-slate-400">{authTab === 'signup' ? 'Create an account, then choose your favorite languages, actors and genres.' : 'Welcome back. Your saved titles and preferences will be restored.'}</p>
                 <form onSubmit={e => { e.preventDefault(); void submitAccount(authTab); }} className="space-y-3">
                   <input type="email" required autoComplete="email" placeholder="Email" value={accountEmail} onChange={e => setAccountEmail(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
                   <input type="password" required minLength={authTab === 'signup' ? 8 : 1} autoComplete={authTab === 'signup' ? 'new-password' : 'current-password'} placeholder={authTab === 'signup' ? 'Create password (8+ characters)' : 'Password'} value={accountPassword} onChange={e => setAccountPassword(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
@@ -659,7 +658,7 @@ export default function App() {
                   <button type="submit" disabled={accountBusy || (authTab === 'signup' && !signupAgreed)} className="w-full bg-amber-500 text-black font-bold rounded-lg p-3 disabled:opacity-50">{accountBusy ? 'Please wait…' : authTab === 'signin' ? 'Sign in' : 'Create account'}</button>
                 </form>
                 {authTab === 'signin' && <button type="button" disabled={accountBusy || !accountEmail.trim()} onClick={() => void accountAction(() => cloudResetPassword(accountEmail), 'Password reset email requested. Check your inbox.')} className="text-sm text-amber-300 hover:underline disabled:opacity-50">Forgot password?</button>}
-                <button type="button" disabled={accountBusy || !accountEmail.trim()} onClick={() => void accountAction(() => cloudResendVerification(accountEmail), 'Verification email requested. Check your inbox and spam folder. If it does not arrive, the site owner must configure custom SMTP in Supabase.')} className="block text-sm text-sky-300 hover:underline disabled:opacity-50">Resend verification email</button>
+                <button type="button" disabled={accountBusy || !accountEmail.trim()} onClick={() => void accountAction(() => cloudResendVerification(accountEmail), 'Verification email requested. Check your inbox or spam folder.')} className="block text-sm text-sky-300 hover:underline disabled:opacity-50">Resend verification</button>
               </div>
             )}
             {accountNotice && <p role="status" className="mt-4 text-sm text-amber-200">{accountNotice}</p>}
