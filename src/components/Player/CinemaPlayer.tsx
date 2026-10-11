@@ -4,6 +4,7 @@ import { StremioNativePlayer } from './StremioNativePlayer';
 import { ArrowLeft, ExternalLink, RefreshCw, Share2, Maximize2, Minimize2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
+const resumeKey = (m: MediaItem) => m.id + (m.playbackSeason !== undefined && m.playbackEpisode !== undefined ? ':s' + m.playbackSeason + 'e' + m.playbackEpisode : '');
 interface CinemaPlayerProps {
   media: MediaItem;
   initialMirrorId?: string;
@@ -145,7 +146,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     if (!video) return;
     try {
       const entries = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
-      const resume = Array.isArray(entries) ? entries.find((entry: any) => entry?.media?.id === media.id) : null;
+      const resume = Array.isArray(entries) ? entries.find((entry: any) => entry?.media && resumeKey(entry.media) === resumeKey(media)) : null;
       const position = Number(resume?.progress || 0);
       if (position >= 5 && Number.isFinite(position) && (!Number.isFinite(video.duration) || position < video.duration - 15)) {
         video.currentTime = position;
@@ -163,7 +164,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       const existing = JSON.parse(localStorage.getItem(key) || '[]');
       const list = Array.isArray(existing) ? existing : [];
       const entry = { media, progress: video.currentTime, duration: Number.isFinite(video.duration) ? video.duration : 0, updatedAt: Date.now() };
-      localStorage.setItem(key, JSON.stringify([entry, ...list.filter((r: any) => r?.media?.id !== media.id)].slice(0, 20)));
+      localStorage.setItem(key, JSON.stringify([entry, ...list.filter((r: any) => !r?.media || resumeKey(r.media) !== resumeKey(media))].slice(0, 20)));
       onProgressSaved?.();
     } catch { /* playback continues even without storage */ }
   };
