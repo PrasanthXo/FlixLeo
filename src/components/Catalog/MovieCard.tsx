@@ -42,17 +42,19 @@ export const MovieCard: React.FC<MovieCardProps> = ({
         <div className="absolute z-30 top-2 right-2">
           <button type="button" aria-label={`More options for ${media.title}`} aria-expanded={menuOpen}
             onClick={e => { e.stopPropagation(); setMenuOpen(open => !open); }}
-            className="h-9 w-9 rounded-full bg-black/85 border border-white/20 text-white flex items-center justify-center shadow-lg backdrop-blur-md">
-            <MoreVertical className="h-5 w-5" />
+            className="h-8 w-8 rounded-full bg-black/85 border border-white/20 text-white flex items-center justify-center shadow-lg backdrop-blur-md">
+            <MoreVertical className="h-4 w-4" />
           </button>
-          {menuOpen && <div className="absolute right-0 top-10 w-44 rounded-lg border border-slate-700 bg-[#141923] shadow-2xl p-1">
-            <button type="button" onClick={e => { e.stopPropagation(); onToggleBookmark(media); setMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left text-white hover:bg-slate-700 rounded-md">
-              {isBookmarked ? <BookmarkCheck className="h-4 w-4 text-amber-400" /> : <Bookmark className="h-4 w-4" />}
-              {isBookmarked ? 'Remove from Watchlist' : 'Add to Watchlist'}
-            </button>
-            <button type="button" onClick={e => { e.stopPropagation(); setMenuOpen(false); onOpenDetails(media); }} className="w-full px-3 py-2 text-sm text-left text-slate-300 hover:bg-slate-700 rounded-md">View details</button>
-          </div>}
+
         </div>
+
+          {menuOpen && <div className="absolute z-40 top-12 left-1.5 right-1.5 rounded-lg border border-slate-700 bg-[#141923] shadow-2xl p-1">
+            <button type="button" onClick={e => { e.stopPropagation(); onToggleBookmark(media); setMenuOpen(false); }} className="flex items-center gap-2 w-full px-2 py-2 text-xs text-left text-white hover:bg-slate-700 rounded-md">
+              {isBookmarked ? <BookmarkCheck className="h-4 w-4 text-amber-400" /> : <Bookmark className="h-4 w-4" />}
+              {isBookmarked ? 'Remove from List' : 'Add to Watchlist'}
+            </button>
+            <button type="button" onClick={e => { e.stopPropagation(); setMenuOpen(false); onOpenDetails(media); }} className="w-full px-2 py-2 text-xs text-left text-slate-300 hover:bg-slate-700 rounded-md">View details</button>
+          </div>}
 
         {/* Resolution indicator (Top Right) */}
         {media.resolutionBadge && (
