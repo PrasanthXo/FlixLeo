@@ -69,7 +69,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     const source = active.url;
     const intent = 'intent://' + source.slice('https://'.length) +
       '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
-    setVlcNotice('If VLC does not open, use Copy stream URL and open it in VLC → New stream.');
+    setVlcNotice('Opening VLC. If it does not open, check VLC is installed and the streaming source allows external playback.');
     window.location.href = intent;
   };
   const lastSave = useRef(0);
@@ -428,13 +428,6 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           <button type="button" onClick={openInVlc}
             className="rounded-lg border border-orange-400/50 bg-orange-500/15 px-3 py-2 text-xs font-semibold text-orange-200">
             Open in VLC (4K audio)
-          </button>
-          <button type="button" onClick={async () => {
-            if (!active?.url) return;
-            try { await navigator.clipboard.writeText(active.url); setVlcNotice('Stream URL copied. In VLC, open New stream and paste it.'); }
-            catch { setVlcNotice('Clipboard unavailable. Use a browser that supports copying links.'); }
-          }} className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-200">
-            Copy stream URL
           </button>
         </div>
         {vlcNotice && <p role="status" className="text-xs text-slate-300">{vlcNotice}</p>}
