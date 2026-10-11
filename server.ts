@@ -552,7 +552,9 @@ app.get('/api/tmdb/movie/:id', async (req: Request, res: Response) => {
 // stream URLs from completed Stremio discovery and explicitly allowed media hosts.
 const audioFixSessions = new Map<string, { url: string; expires: number }>();
 let activeAudioFixes = 0;
-const audioFixHosts = new Set((process.env.FLIXLEO_AUDIO_FIX_HOSTS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean));
+// Pixeldrain's documented file API is a known direct-video origin. FSL/FSLV2 hosts
+// must be explicitly configured to avoid routing arbitrary websites through FFmpeg.
+const audioFixHosts = new Set(['pixeldrain.com', ...(process.env.FLIXLEO_AUDIO_FIX_HOSTS || '').split(',')].map(x => x.trim().toLowerCase()).filter(Boolean));
 function audioFixTicket(raw: string): string | undefined {
   if (!ffmpegPath || !audioFixHosts.size) return;
   let url: URL;
@@ -688,7 +690,7 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
         const quality = /(?:2160p|4k|uhd)/i.test(qualityText) ? '4K' : /1080p/i.test(qualityText) ? '1080p' : /720p/i.test(qualityText) ? '720p' : /480p/i.test(qualityText) ? '480p' : /360p/i.test(qualityText) ? '360p' : 'Auto';
         return [{ provider: provider.hostname, name: String(stream.name || 'Add-on stream').slice(0, 80),
           title: label, url: url.toString(), quality, streamType: hls ? 'hls' : 'direct-video',
-          audioFixUrl: !hls ? audioFixTicket(url.toString()) : undefined }];
+          audioFixUrl: !hls && quality === '4K' ? audioFixTicket(url.toString()) : undefined }];
       });
       const kinds = { httpsUrls: entries.filter((e: any) => typeof e.url === 'string' && e.url.startsWith('https://')).length,
         torrents: entries.filter((e: any) => Boolean(e.infoHash)).length,
