@@ -59,7 +59,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         const streams: StreamMirror[] = (Array.isArray(data.streams) ? data.streams : []).map((stream: any, index: number) => ({
           id: 'stremio-' + index,
           source: 'custom',
-          label: String(stream.name || 'Add-on stream') + ' · ' + String(stream.provider || 'Provider'),
+          label: String(stream.provider || 'Stremio').split('.')[0].replace(/[^a-z0-9 -]/gi, ' ').trim() || 'Stremio',
           quality: stream.quality === '4K' ? '4K UHD' : stream.quality === '1080p' ? '1080p' : stream.quality === '720p' ? '720p' : 'Auto',
           url: stream.url,
           streamType: stream.streamType === 'hls' ? 'hls' : 'direct-video',
@@ -131,18 +131,6 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   const orderedMirrors = (mirrors: StreamMirror[]) => [...mirrors, ...addonStreams]
     .filter((mirror, i, all) => all.findIndex(other => other.url === mirror.url) === i)
     .sort((a, b) => qualityRank(b) - qualityRank(a));
-  // Android Chrome can hand compatible network streams to installed VLC.
-  // This opens an external app: VLC codecs cannot be loaded into the browser player.
-  const vlcLink = (mirror: StreamMirror): string | null => {
-    if (mirror.streamType === 'embed-iframe') return null;
-    try {
-      const uri = new URL(mirror.url);
-      if (uri.protocol !== 'https:' || uri.username || uri.password) return null;
-      // Avoid an injected Intent fragment: only the URL parts preceding #Intent are used.
-      const resource = (uri.host + uri.pathname + uri.search).replace(/#/g, '%23').replace(/;/g, '%3B');
-      return 'intent://' + resource + '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
-    } catch { return null; }
-  };
   const playSelected = (mirror: StreamMirror, originals: StreamMirror[]) => {
     onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals) }, mirror.id);
     onClose();
@@ -323,9 +311,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                             <span className="break-words">{mirror.label}</span>
                             <span className="shrink-0 text-amber-400">{mirror.quality}</span>
                           </button>
-                          {vlcLink(mirror) && (
-                            <a href={vlcLink(mirror)!} className="shrink-0 px-3 py-3 rounded-lg bg-slate-800 border border-slate-700 text-amber-300 text-xs font-semibold" title="Open stream in VLC for Android">VLC</a>
-                          )}
+
                         </div>
                       ))}
                     </div>
@@ -416,13 +402,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                             <Download className="w-4 h-4" />
                           </a>
                         )}
-{vlcLink(mirror) && (
-                          <a href={vlcLink(mirror)!}
-                            className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-amber-300 text-xs font-semibold"
-                            title="Open this network stream in VLC for Android">
-                            Open in VLC
-                          </a>
-                        )}
+
                         <button
                           onClick={() => {
                             playSelected(mirror, activeMedia.mirrors);
