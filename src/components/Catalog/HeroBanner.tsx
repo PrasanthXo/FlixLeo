@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Info, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MediaItem } from '../../types/stream';
 import { TmdbArtwork } from './TmdbArtwork';
+import { PosterOptions } from './PosterOptions';
 import './CinematicWheel.css';
 
 interface HeroBannerProps {
@@ -62,6 +63,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
           onTouchStart={e => { startX.current = e.touches[0]?.clientX ?? null; }}
           onTouchEnd={e => { const x = e.changedTouches[0]?.clientX; if (x != null && startX.current != null && Math.abs(x - startX.current) > 45) move(x < startX.current ? 1 : -1); startX.current = null; }}>
           <div className="flixleo-wheel-halo" aria-hidden="true" />
+          <PosterOptions media={current} onOpen={onOpenDetails} isBookmarked={selectedSaved} onToggleBookmark={onToggleBookmark} className="flixleo-wheel-cover-options" />
           {len > 1 && <button type="button" className="flixleo-wheel-arrow flixleo-wheel-prev" aria-label="Previous featured title" onClick={() => move(-1)}><ChevronLeft /></button>}
           <div className="flixleo-wheel-track">
             {slides.map((slide, i) => {
