@@ -33,6 +33,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   const [addonLoading, setAddonLoading] = React.useState(false);
   const [addonError, setAddonError] = React.useState('');
   const [completedLookupKey, setCompletedLookupKey] = React.useState<string | null>(null);
+  const tvBrowser = typeof window !== 'undefined' && (window.location.pathname.toLowerCase().replace(/\/$/, '') === '/tv6' || /webos|web0s|smart-tv|tizen|hbbtv/i.test(navigator.userAgent));
   const isSeries = Boolean(media && (media.type === 'tv' || media.id.startsWith('tv-')));
   const tmdbId = media?.id.match(/^(?:tmdb-|tv-)(\d+)$/)?.[1];
   const selectedEpisodeNumber = detailedMedia?.seasons?.find(season => season.number === selectedSeasonNumber)
@@ -53,7 +54,15 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     }
     setAddonLoading(true);
     let active = true;
-    const deadline = window.setTimeout(() => controller.abort(), 20000);
+    const lookupId = [tmdbId, isSeries ? 'series' : 'movie', isSeries ? selectedSeasonNumber : '', isSeries ? selectedEpisodeNumber : ''].join(':');
+    const deadline = window.setTimeout(() => {
+      controller.abort();
+      if (active && tvBrowser) {
+        setAddonLoading(false);
+        setCompletedLookupKey(lookupId);
+        setAddonError('No streams available');
+      }
+    }, tvBrowser ? 12000 : 20000);
     fetch('/api/stremio/streams?' + params, { signal: controller.signal })
       .then(async response => {
         const data = await response.json();
