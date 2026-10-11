@@ -11,6 +11,7 @@ import { CinemaPlayer } from './components/Player/CinemaPlayer';
 import { HeroBanner } from './components/Catalog/HeroBanner';
 import { MobileHomeCollections } from './components/Catalog/MobileHomeCollections';
 import { MovieCard } from './components/Catalog/MovieCard';
+import { PosterOptions } from './components/Catalog/PosterOptions';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
 import { TvSignIn, TvPairApproval } from './components/TvPairing';
@@ -986,6 +987,7 @@ export default function App() {
             </div>
             <div className={isTvDisplay ? "tv6-resume-row" : "flex gap-3 overflow-x-auto pb-3"}>
               {continueWatching.map(entry => (
+                <div className="relative shrink-0">
                 <button key={entry.media.id + ':s' + (entry.media.playbackSeason ?? '') + 'e' + (entry.media.playbackEpisode ?? '')} type="button"
                   onClick={() => {
                     if ((entry.media.type === 'tv' || entry.media.id.startsWith('tv-')) &&
@@ -1033,6 +1035,8 @@ export default function App() {
                     <p className="text-xs text-slate-400">{entry.progress >= 5 ? `${Math.floor(entry.progress / 60)} min watched` : 'Recently opened · start playback'}</p>
                   </div>
                 </button>
+                {!isTvDisplay && <PosterOptions media={entry.media} onOpen={setDetailMedia} isBookmarked={watchlistIds.includes(entry.media.id)} onToggleBookmark={toggleBookmark} />}
+                </div>
               ))}
             </div>
           </section>
