@@ -744,7 +744,7 @@ export default function App() {
       )}
       {accountOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-lg p-3 sm:p-6" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAccountOpen(false); }}>
-          <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="w-full max-w-xl max-h-[92dvh] overflow-y-auto rounded-[28px] border border-white/10 bg-[#0d111c] p-4 sm:p-7 shadow-[0_24px_100px_rgba(0,0,0,.75)]">
+          <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="tv6-account-dialog w-full max-w-xl max-h-[92dvh] overflow-y-auto rounded-[28px] border border-white/10 bg-[#0d111c] p-4 sm:p-7 shadow-[0_24px_100px_rgba(0,0,0,.75)]">
             <div className="flex justify-between items-center mb-4">
               <div><p className="text-[10px] font-bold uppercase tracking-[.3em] text-slate-400">Your space</p><h2 className="text-2xl font-extrabold tracking-tight text-white">FlixLeo <span style={{color: profileAccent}}>Account</span></h2></div>
               <button onClick={() => setAccountOpen(false)} className="text-slate-300 hover:text-white" aria-label="Close account window">✕</button>
