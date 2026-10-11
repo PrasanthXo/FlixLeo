@@ -26,7 +26,26 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
   const languages = ['Tamil', 'English', 'Hindi', 'Sinhala', 'Telugu', 'Malayalam', 'Kannada', 'Korean'];
   const languageMatch = (value: string, label: string) => value?.toLowerCase() === label.toLowerCase() || ({Tamil:'ta',English:'en',Hindi:'hi',Sinhala:'si',Telugu:'te',Malayalam:'ml',Kannada:'kn',Korean:'ko'} as Record<string,string>)[label] === value?.toLowerCase();
   const movie = unique.filter(x => x.type !== 'tv' && !x.id.startsWith('tv-'));
-  const southIndianSelection = [...southIndianMovies, ...movie].filter(item => ['Tamil','Telugu','Malayalam','Kannada'].some(language => languageMatch(item.language, language))).filter((item, i, all) => all.findIndex(x => x.id === item.id) === i);
+  const southIndianSelection = useMemo(() => {
+    const labels = ['Tamil','Telugu','Malayalam','Kannada'];
+    const source = [...southIndianMovies, ...movie].filter(item =>
+      item.type !== 'tv' && !item.id.startsWith('tv-') && labels.some(language => languageMatch(item.language,language))
+    );
+    const buckets = labels.map(language => source.filter(item => languageMatch(item.language, language)));
+    const result: MediaItem[] = [];
+    const seen = new Set<string>();
+    const maxLength = Math.max(0, ...buckets.map(bucket => bucket.length));
+    for (let i = 0; i < maxLength && result.length < 24; i++) {
+      for (const bucket of buckets) {
+        const item = bucket[i];
+        if (item && !seen.has(item.id)) {
+          seen.add(item.id);
+          result.push(item);
+        }
+      }
+    }
+    return result;
+  }, [southIndianMovies, movie]);
   const series = unique.filter(x => x.type === 'tv' || x.id.startsWith('tv-'));
   const rows: { label:string; subtitle:string; list: MediaItem[]; kind?: 'continue' }[] = [
     { label:'Trending Movies',subtitle:'Big-screen favourites',list:movie.slice(0,16)},
