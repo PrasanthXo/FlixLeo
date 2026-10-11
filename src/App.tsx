@@ -767,9 +767,9 @@ export default function App() {
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               {[
                 { id: 'trending' as const, label: '🔥 Trending Today' },
+                { id: 'indian' as const, label: '🎬 South Asian / Indian Movies' },
                 { id: 'popular' as const, label: '⭐ Popular Hits' },
                 { id: 'top_rated' as const, label: '🏆 Top Rated' },
-                { id: 'indian' as const, label: '🎬 South Asian Cinema' },
                 { id: 'all' as const, label: '💎 All Releases' },
               ].map((cat) => {
                 const isActive = tmdbCategory === cat.id;
@@ -777,11 +777,11 @@ export default function App() {
                   <button
                     key={cat.id}
                     onClick={() => setTmdbCategory(cat.id)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 transition-all ${
-                      isActive
-                        ? 'bg-[#01b4e4] text-black font-bold shadow-md'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                    }`}
+                    className={`whitespace-nowrap shrink-0 transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300 ${cat.id === 'indian'
+                      ? `px-5 py-3 text-sm sm:text-base font-extrabold rounded-xl border shadow-lg ${isActive
+                          ? 'bg-gradient-to-r from-amber-300 via-orange-400 to-rose-500 text-slate-950 border-amber-200 shadow-orange-500/30 scale-[1.02]'
+                          : 'bg-gradient-to-r from-orange-600/30 to-rose-600/30 text-amber-200 border-orange-500/60 hover:from-orange-500 hover:to-rose-500 hover:text-white hover:-translate-y-0.5'}`
+                      : `px-3 py-2 text-xs font-semibold rounded-lg ${isActive ? 'bg-[#01b4e4] text-black font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}`}
                   >
                     {cat.label}
                   </button>
