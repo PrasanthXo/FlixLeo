@@ -150,7 +150,7 @@ export function transformTmdbMovie(raw: any): MediaItem {
 
   // Cast members if detailed info available
   let cast: string[] = [];
-  let director: string = 'Cinema Director';
+  let director: string | undefined;
   if (raw.credits) {
     if (raw.credits.cast) {
       cast = raw.credits.cast.slice(0, 4).map((c: any) => c.name);
@@ -179,7 +179,7 @@ export function transformTmdbMovie(raw: any): MediaItem {
     resolutionBadge: '4K UHD HDR',
     trending: true,
     director,
-    cast: cast.length > 0 ? cast : ['Lead Cast', 'Co-Star', 'Ensemble'],
+    cast: cast.length > 0 ? cast : undefined,
     audioTracks: ['Dolby Atmos 7.1', `${langDisplay} Original`, 'Dual Audio Hindi + Eng'],
     subtitles: [
       { label: 'English (SDH)', language: 'en', isDefault: true },
@@ -455,6 +455,8 @@ export function transformTmdbTvShow(raw: any): MediaItem {
       { label: 'English (SDH)', language: 'en', isDefault: true },
       { label: 'Spanish', language: 'es' }
     ],
+    director: (raw.created_by || []).map((person: any) => person.name).filter(Boolean).join(', ') || raw.credits?.crew?.find((person: any) => person.job === 'Director')?.name || undefined,
+    cast: Array.isArray(raw.credits?.cast) ? raw.credits.cast.slice(0, 6).map((person: any) => person.name).filter(Boolean) : undefined,
     mirrors
   };
 }
