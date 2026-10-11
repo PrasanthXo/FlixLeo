@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import type { MediaItem } from '../../types/stream';
 import { TmdbArtwork } from './TmdbArtwork';
+import { PosterOptions } from './PosterOptions';
 import './MobileHomeCollections.css';
 
 type Props = {
@@ -11,9 +12,11 @@ type Props = {
   recent: { media: MediaItem; progress: number; duration: number }[];
   onOpen: (item: MediaItem) => void;
   onPlay: (item: MediaItem) => void;
+  bookmarkedIds?: string[];
+  onToggleBookmark?: (item: MediaItem) => void;
 };
 
-export function MobileHomeCollections({ items, southIndianMovies = [], additionalCollections = {}, recent, onOpen, onPlay }: Props) {
+export function MobileHomeCollections({ items, southIndianMovies = [], additionalCollections = {}, recent, onOpen, onPlay, bookmarkedIds = [], onToggleBookmark }: Props) {
   const unique = useMemo(() => {
     const seen = new Set<string>();
     return items.filter(item => {
@@ -72,6 +75,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
             <button type="button" onClick={() => onOpen(item)} aria-label={`More about ${item.title}`} className="flixleo-mobile-collection-poster">
               <TmdbArtwork media={item} kind="poster" alt={item.title} loading="lazy" referrerPolicy="no-referrer" className="flixleo-mobile-collection-artwork"/>
             </button>
+            <PosterOptions media={item} onOpen={onOpen} isBookmarked={bookmarkedIds.includes(item.id)} onToggleBookmark={onToggleBookmark} />
             <div className="flixleo-mobile-collection-card-foot"><span title={item.title}>{item.title}</span><button type="button" onClick={() => onPlay(item)} aria-label={`Play ${item.title}`}><Play size={12} fill="currentColor"/></button></div>
           </div>;
         })}
