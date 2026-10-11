@@ -12,7 +12,7 @@ import { HeroBanner } from './components/Catalog/HeroBanner';
 import { MovieCard } from './components/Catalog/MovieCard';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
-import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudSignOut, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
+import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudSignOut, cloudUpdateProfile, cloudChangePassword, cloudResetPassword, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
 
 // Deduplicate repeated TMDB entries by ID and normalized title/year within each media type.
 function uniqueTitles(items: MediaItem[]): MediaItem[] {
@@ -248,6 +248,17 @@ export default function App() {
   const [accountPassword, setAccountPassword] = useState('');
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountNotice, setAccountNotice] = useState('');
+  const [accountSection, setAccountSection] = useState<'overview' | 'profile' | 'security'>('overview');
+  const [profileName, setProfileName] = useState(() => currentCloudUser()?.user_metadata?.display_name || '');
+  const [preferredLanguage, setPreferredLanguage] = useState(() => currentCloudUser()?.user_metadata?.preferred_language || 'all');
+  const [newPassword, setNewPassword] = useState('');
+  const [showAccountHistory, setShowAccountHistory] = useState(false);
+  const accountAction = async (action: () => Promise<unknown>, success: string) => {
+    setAccountBusy(true); setAccountNotice('');
+    try { await action(); setAccountNotice(success); }
+    catch (error) { setAccountNotice(error instanceof Error ? error.message : 'Request failed.'); }
+    finally { setAccountBusy(false); }
+  };
   const [cloudReady, setCloudReady] = useState(false);
   const cloudLoadingRef = useRef(false);
   const cloudSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -300,6 +311,9 @@ export default function App() {
       } else { await cloudSignIn(accountEmail.trim(), accountPassword); }
       setCloudReady(false);
       setCloudUser(currentCloudUser());
+      setProfileName(currentCloudUser()?.user_metadata?.display_name || '');
+      setPreferredLanguage(currentCloudUser()?.user_metadata?.preferred_language || 'all');
+      setAccountSection('overview');
       setAccountPassword('');
     } catch (error) {
       setAccountNotice(error instanceof Error ? error.message : 'Authentication failed.');
@@ -514,31 +528,77 @@ export default function App() {
 
       {accountOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAccountOpen(false); }}>
-          <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#10151f] p-6 shadow-2xl">
+          <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 bg-[#10151f] p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-white">FlixLeo Account</h2>
               <button onClick={() => setAccountOpen(false)} className="text-slate-300 hover:text-white" aria-label="Close account window">✕</button>
             </div>
             {!cloudConfigured ? (
-              <p className="text-sm text-amber-300">Cloud accounts are not configured yet. The site owner needs to set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY on Render and run supabase/schema.sql. Your local data is unaffected.</p>
+              <p className="text-sm text-amber-300">Account service unavailable. Please contact support.</p>
             ) : cloudUser ? (
               <div className="space-y-4">
-                <p className="text-sm text-slate-200">Signed in as <strong>{cloudUser.email}</strong></p>
-                <p className="text-sm text-slate-400">{cloudReady ? 'Cloud sync active' : 'Cloud sync connecting or waiting for retry'}</p>
-                <div className="flex gap-2">
-                  <button onClick={() => void loadCloud()} disabled={accountBusy} className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-black">Sync now</button>
-                  <button onClick={() => { void cloudSignOut().then(() => { setCloudUser(null); setCloudReady(false); setAccountNotice('Signed out. Local data remains on this device.'); }); }} className="rounded-lg bg-slate-700 px-4 py-2 text-white">Sign out</button>
+                <div className="rounded-xl bg-gradient-to-r from-amber-500/15 to-slate-800 p-4 border border-amber-500/20">
+                  <div className="flex gap-3 items-center">
+                    <div className="h-12 w-12 rounded-full bg-amber-500 text-black font-extrabold grid place-items-center text-xl">{(profileName || cloudUser.email || 'F').charAt(0).toUpperCase()}</div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white truncate">{profileName || cloudUser.email?.split('@')[0] || 'FlixLeo member'}</p>
+                      <p className="text-xs text-slate-300 truncate">{cloudUser.email}</p>
+                      <p className={`text-xs mt-1 ${cloudReady ? 'text-emerald-400' : 'text-amber-300'}`}>{cloudReady ? '● Cloud sync active' : '○ Cloud sync pending'}</p>
+                    </div>
+                  </div>
                 </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button type="button" onClick={() => setAccountSection('overview')} className={`rounded-lg py-2 text-sm ${accountSection === 'overview' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>My activity</button>
+                  <button type="button" onClick={() => setAccountSection('profile')} className={`rounded-lg py-2 text-sm ${accountSection === 'profile' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>Profile</button>
+                  <button type="button" onClick={() => setAccountSection('security')} className={`rounded-lg py-2 text-sm ${accountSection === 'security' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>Security</button>
+                </div>
+                {accountSection === 'overview' && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => { setCurrentTab('watchlist'); setAccountOpen(false); }} className="text-left rounded-xl bg-slate-800 p-4 hover:bg-slate-700">
+                        <div className="text-2xl font-bold text-white">{watchlistIds.length}</div><div className="text-xs text-slate-300">Saved to watchlist →</div>
+                      </button>
+                      <button type="button" onClick={() => { setShowAccountHistory(v => !v); }} className="text-left rounded-xl bg-slate-800 p-4 hover:bg-slate-700">
+                        <div className="text-2xl font-bold text-white">{recentPlayed.length}</div><div className="text-xs text-slate-300">Recently played ↓</div>
+                      </button>
+                    </div>
+                    {showAccountHistory && <div className="max-h-40 overflow-y-auto rounded-lg bg-slate-900 p-2 space-y-1">{recentPlayed.length ? recentPlayed.map(media => <div key={media.id} className="text-sm text-slate-200 p-2 border-b border-slate-800">{media.title}</div>) : <p className="text-sm text-slate-400 p-2">Nothing watched yet.</p>}</div>}
+                    <p className="text-xs text-slate-400">Your watchlist and Continue Watching are available across devices after cloud sync.</p>
+                    <button type="button" onClick={() => void loadCloud()} disabled={accountBusy} className="w-full rounded-lg bg-amber-500 p-3 font-semibold text-black disabled:opacity-50">Sync my data now</button>
+                  </div>
+                )}
+                {accountSection === 'profile' && (
+                  <form className="space-y-3" onSubmit={e => { e.preventDefault(); void accountAction(async () => { const user = await cloudUpdateProfile({ display_name: profileName.trim(), preferred_language: preferredLanguage }); setCloudUser(user); }, 'Profile updated successfully.'); }}>
+                    <label className="block text-sm text-slate-300">Display name<input maxLength={50} value={profileName} onChange={e => setProfileName(e.target.value)} placeholder="Your name" className="mt-1 w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" /></label>
+                    <label className="block text-sm text-slate-300">Preferred movie language<select value={preferredLanguage} onChange={e => setPreferredLanguage(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white">
+                      <option value="all">All languages</option><option value="en">English</option><option value="ta">Tamil</option><option value="si">Sinhala</option><option value="hi">Hindi</option><option value="te">Telugu</option><option value="ml">Malayalam</option><option value="kn">Kannada</option>
+                    </select></label>
+                    <p className="text-xs text-slate-400">Your preference is saved to your account. Catalog filters remain under Movies and Series.</p>
+                    <button disabled={accountBusy} className="w-full rounded-lg bg-amber-500 p-3 text-black font-bold disabled:opacity-50">Save profile</button>
+                  </form>
+                )}
+                {accountSection === 'security' && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-300">Change password for {cloudUser.email}</p>
+                    <form onSubmit={e => { e.preventDefault(); void accountAction(async () => { await cloudChangePassword(newPassword); setNewPassword(''); }, 'Password updated.'); }} className="space-y-2">
+                      <input type="password" autoComplete="new-password" minLength={8} required value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password (8+ characters)" className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
+                      <button disabled={accountBusy} className="w-full rounded-lg bg-amber-500 p-3 text-black font-semibold disabled:opacity-50">Update password</button>
+                    </form>
+                    <button type="button" disabled={accountBusy} onClick={() => void accountAction(() => cloudResetPassword(cloudUser.email || ''), 'Password reset email requested. Check your inbox.')} className="w-full rounded-lg border border-slate-600 p-3 text-white">Email password reset link</button>
+                  </div>
+                )}
+                <button type="button" onClick={() => { void accountAction(async () => { await cloudSignOut(); setCloudUser(null); setCloudReady(false); setAccountSection('overview'); }, 'Signed out. Your cloud data remains in your account.'); }} disabled={accountBusy} className="w-full rounded-lg border border-rose-500/40 py-2.5 text-rose-300 disabled:opacity-50">Sign out</button>
               </div>
             ) : (
               <form onSubmit={e => { e.preventDefault(); void submitAccount('signin'); }} className="space-y-3">
-                <p className="text-sm text-slate-400">Sign in on your other devices to sync your watchlist and playback progress.</p>
+                <p className="text-sm text-slate-400">Create a free FlixLeo account to save your watchlist and continue watching across devices.</p>
                 <input type="email" required autoComplete="email" placeholder="Email" value={accountEmail} onChange={e => setAccountEmail(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
                 <input type="password" required minLength={6} autoComplete="current-password" placeholder="Password" value={accountPassword} onChange={e => setAccountPassword(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
                 <div className="flex gap-2">
                   <button type="submit" disabled={accountBusy} className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-black disabled:opacity-50">Sign in</button>
                   <button type="button" disabled={accountBusy || !accountEmail || accountPassword.length < 6} onClick={() => void submitAccount('signup')} className="rounded-lg bg-slate-700 px-4 py-2 text-white disabled:opacity-50">Create account</button>
                 </div>
+                <button type="button" disabled={accountBusy || !accountEmail.trim()} onClick={() => void accountAction(() => cloudResetPassword(accountEmail), 'Password reset email requested. Check your inbox.')} className="text-sm text-amber-300 hover:underline disabled:opacity-50">Forgot password?</button>
               </form>
             )}
             {accountNotice && <p role="status" className="mt-4 text-sm text-amber-200">{accountNotice}</p>}
