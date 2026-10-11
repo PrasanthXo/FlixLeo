@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TmdbArtwork } from './TmdbArtwork';
-import { Play, Info, Bookmark, BookmarkCheck, MoreVertical } from 'lucide-react';
+import { Play, Info, Bookmark, BookmarkCheck, MoreVertical, Share2 } from 'lucide-react';
 import { MediaItem, getSourceDisplayBadge } from '../../types/stream';
 
 interface MovieCardProps {
@@ -53,6 +53,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
               {isBookmarked ? <BookmarkCheck className="h-4 w-4 text-amber-400" /> : <Bookmark className="h-4 w-4" />}
               {isBookmarked ? 'Remove from List' : 'Add to Watchlist'}
             </button>
+            <button type="button" onClick={async e => { e.stopPropagation(); setMenuOpen(false); const url = new URL(window.location.origin); url.searchParams.set('media', media.id); try { if (navigator.share) await navigator.share({ title: media.title + ' · FlixLeo', url: url.toString() }); else { await navigator.clipboard.writeText(url.toString()); window.alert('Movie link copied'); } } catch (err) { if ((err as Error)?.name !== 'AbortError') window.alert('Unable to share this movie'); } }} className="flex items-center gap-2 w-full px-2 py-2 text-xs text-left text-slate-200 hover:bg-slate-700 rounded-md"><Share2 className="h-4 w-4 shrink-0" /> Share</button>
             <button type="button" onClick={e => { e.stopPropagation(); setMenuOpen(false); onOpenDetails(media); }} className="w-full px-2 py-2 text-xs text-left text-slate-300 hover:bg-slate-700 rounded-md">View details</button>
           </div>}
 
