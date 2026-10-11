@@ -224,7 +224,7 @@ export default function App() {
       const entries = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
       if (Array.isArray(entries)) {
         setRecentPlayed(entries.filter(entry => entry?.media?.id).slice(0, 20).map(entry => entry.media));
-        setContinueWatching(entries.filter(entry => entry?.media?.id && entry.progress >= 5 && (!entry.duration || entry.progress / entry.duration < 0.95)).slice(0, 12));
+        setContinueWatching(entries.filter(entry => entry?.media?.id && (!entry.duration || entry.progress / entry.duration < 0.95)).slice(0, 12));
       }
     } catch { setContinueWatching([]); }
   }, []);
@@ -789,14 +789,14 @@ export default function App() {
                   aria-label={`Resume ${entry.media.title}`}>
                   <div className="relative aspect-video bg-slate-950">
                     {entry.media.backdropUrl && <img src={entry.media.backdropUrl} alt="" loading="lazy" className="w-full h-full object-cover" />}
-                    <span className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/80 text-amber-300 text-xs font-bold">▶ Resume</span>
+                    <span className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/80 text-amber-300 text-xs font-bold">{entry.progress >= 5 ? '▶ Resume' : '▶ Continue'}</span>
                     <div className="absolute bottom-0 left-0 right-0 bg-slate-700 h-1">
                       <div className="bg-amber-500 h-full" style={{ width: `${entry.duration > 0 ? Math.min(100, Math.round(entry.progress / entry.duration * 100)) : 0}%` }} />
                     </div>
                   </div>
                   <div className="p-2">
                     <p className="text-sm text-white font-medium truncate">{entry.media.title}</p>
-                    <p className="text-xs text-slate-400">{Math.floor(entry.progress / 60)} min watched</p>
+                    <p className="text-xs text-slate-400">{entry.progress >= 5 ? `${Math.floor(entry.progress / 60)} min watched` : 'Recently opened · start playback'}</p>
                   </div>
                 </button>
               ))}
