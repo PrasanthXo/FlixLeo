@@ -63,6 +63,8 @@ export interface MediaItem {
   trending?: boolean;
   resolutionBadge?: string;
   type?: 'movie' | 'tv';
+  playbackSeason?: number;
+  playbackEpisode?: number;
   seasons?: Season[];
 }
 
