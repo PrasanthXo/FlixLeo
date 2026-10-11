@@ -57,7 +57,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
       {label:provider+' Series',subtitle:'Discover titles listed by provider · US region',list:combined('providerSeries:'+provider)}
     ]),
     {label:'Top Rated Picks',subtitle:'Popular highly rated titles',list:[...unique].filter(x=>Number.parseFloat(x.imdbRating)>0).sort((x,y)=>Number.parseFloat(y.imdbRating)-Number.parseFloat(x.imdbRating)).slice(0,16)},
-    ...['Netflix','STARZ','ZEE5'].flatMap(provider => [
+    ...['STARZ','ZEE5'].flatMap(provider => [
       {label:provider+' Movies',subtitle:'All languages · provider discovery',list:combined('allProviderMovie:'+provider)},
       {label:provider+' Series',subtitle:'All languages · provider discovery',list:combined('allProviderSeries:'+provider)}
     ])
