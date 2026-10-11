@@ -9,6 +9,7 @@ import { Navbar } from './components/Header/Navbar';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { CinemaPlayer } from './components/Player/CinemaPlayer';
 import { HeroBanner } from './components/Catalog/HeroBanner';
+import { MobileHomeCollections } from './components/Catalog/MobileHomeCollections';
 import { MovieCard } from './components/Catalog/MovieCard';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
@@ -1203,6 +1204,15 @@ export default function App() {
                   />
                 ))}
               </div>
+            )}
+
+            {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
+              <MobileHomeCollections
+                items={uniqueTitles([...tmdbMovies, ...tvShows, ...catalog])}
+                recent={continueWatching}
+                onOpen={setDetailMedia}
+                onPlay={handlePlayMedia}
+              />
             )}
 
             {tabCanLoadMore && liveFeedReady && (
