@@ -22,6 +22,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const [tried, setTried] = useState<number[]>([]);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
+  const [qualityLevels, setQualityLevels] = useState<{ level: number; height: number }[]>([]);
+  const [selectedQuality, setSelectedQuality] = useState(-1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const lastSaveRef = useRef(0);
@@ -50,6 +52,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
 
   useEffect(() => {
     setReady(false);
+    setQualityLevels([]);
+    setSelectedQuality(-1);
     if (!active) return;
     onMirrorChange?.(active);
     if (active.streamType === 'embed-iframe') {
@@ -69,10 +73,14 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     video.addEventListener('loadeddata', working);
     const url = active.url;
     if (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url)) {
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      if (typeof (window as any).ManagedMediaSource !== 'undefined' && video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
       } else if (Hls.isSupported()) {
-        const hls = new Hls();
+        const hls = new Hls({ enableWorker: true, capLevelToPlayerSize: false, startLevel: -1 });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (disposed) return;
+          setQualityLevels(hls.levels.map((level, i) => ({ level: i, height: level.height })).filter(level => level.height > 0).sort((a, b) => b.height - a.height));
+        });
         hlsRef.current = hls;
         hls.loadSource(url);
         hls.attachMedia(video);
@@ -131,6 +139,13 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
             : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onTimeUpdate={saveProgress} onEnded={saveProgress} className="h-full w-full object-contain" />}
       </div>
       <div className="p-3 sm:p-4 space-y-3">
+        {qualityLevels.length > 0 && <label className="flex items-center gap-2 text-sm text-white">Video quality
+          <select aria-label="Video quality" className="rounded bg-slate-800 border border-slate-600 p-2 text-white" value={selectedQuality} onChange={e => { const level = Number(e.target.value); setSelectedQuality(level); if (hlsRef.current) hlsRef.current.currentLevel = level; }}>
+            <option value={-1}>Auto (adaptive)</option>
+            {qualityLevels.map(level => <option key={level.level} value={level.level}>{level.height >= 2160 ? '4K UHD (2160p)' : `${level.height}p`}</option>)}
+          </select>
+        </label>}
+        {active?.streamType === 'hls' && !qualityLevels.length && <p className="text-xs text-slate-400">Quality selection depends on stream and browser support. 4K is shown only when the provider offers it.</p>}
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-semibold text-white text-sm">Available servers</h3>
           <span className="text-xs text-slate-400">{mirrors.length} listed</span>
