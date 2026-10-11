@@ -556,6 +556,29 @@ export default function App() {
     }).sort((a, b) => b.score - a.score || Number(b.media.year || 0) - Number(a.media.year || 0)).slice(0, 16).map(item => item.media);
   }, [tmdbMovies, tvShows, movieExtra, tvExtra, catalog, recentPlayed, favoriteLanguages, favoriteGenres, favoriteArtists]);
 
+  // Open a shared FlixLeo title when the recipient visits its link.
+  useEffect(() => {
+    const mediaId = new URLSearchParams(window.location.search).get('media');
+    if (!mediaId || detailMedia || activeMedia) return;
+    const found = [...catalog, ...tmdbMovies, ...movieExtra, ...tvShows, ...tvExtra].find(item => item.id === mediaId);
+    if (found) {
+      setDetailMedia(found);
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+    if (!/^(?:tmdb-|tv-)?[0-9]+$/.test(mediaId)) return;
+    let cancelled = false;
+    const isTv = mediaId.startsWith('tv-');
+    fetch('/api/tmdb/' + (isTv ? 'tv/' : 'movie/') + encodeURIComponent(mediaId.replace(/^(tmdb-|tv-)/, '')))
+      .then(r => r.json()).then(data => {
+        if (!cancelled && data?.item) {
+          setDetailMedia(data.item as MediaItem);
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [catalog, tmdbMovies, movieExtra, tvShows, tvExtra, detailMedia, activeMedia]);
+
   // Spotlight media for hero banner
   const featuredMedia = useMemo(() => {
     if (currentTab === 'series' && tvShows.length > 0) {
