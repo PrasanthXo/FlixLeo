@@ -12,7 +12,7 @@ import { HeroBanner } from './components/Catalog/HeroBanner';
 import { MovieCard } from './components/Catalog/MovieCard';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
-import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudSignOut, cloudUpdateProfile, cloudChangePassword, cloudResetPassword, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
+import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudResendVerification, cloudSignOut, cloudUpdateProfile, cloudChangePassword, cloudResetPassword, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
 
 // Deduplicate repeated TMDB entries by ID and normalized title/year within each media type.
 function uniqueTitles(items: MediaItem[]): MediaItem[] {
@@ -656,6 +656,7 @@ export default function App() {
                   <button type="submit" disabled={accountBusy || (authTab === 'signup' && !signupAgreed)} className="w-full bg-amber-500 text-black font-bold rounded-lg p-3 disabled:opacity-50">{accountBusy ? 'Please wait…' : authTab === 'signin' ? 'Sign in' : 'Create account'}</button>
                 </form>
                 {authTab === 'signin' && <button type="button" disabled={accountBusy || !accountEmail.trim()} onClick={() => void accountAction(() => cloudResetPassword(accountEmail), 'Password reset email requested. Check your inbox.')} className="text-sm text-amber-300 hover:underline disabled:opacity-50">Forgot password?</button>}
+                <button type="button" disabled={accountBusy || !accountEmail.trim()} onClick={() => void accountAction(() => cloudResendVerification(accountEmail), 'Verification email requested. Check your inbox and spam folder. If it does not arrive, the site owner must configure custom SMTP in Supabase.')} className="block text-sm text-sky-300 hover:underline disabled:opacity-50">Resend verification email</button>
               </div>
             )}
             {accountNotice && <p role="status" className="mt-4 text-sm text-amber-200">{accountNotice}</p>}
