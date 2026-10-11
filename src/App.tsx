@@ -753,9 +753,6 @@ export default function App() {
         {(currentTab === 'browse' || currentTab === 'movies') && !searchQuery && (
           <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-slate-900/90 via-[#0a101d] to-slate-950 border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#01b4e4]/20 text-[#01b4e4] border border-[#01b4e4]/30 uppercase">
-                TMDB Movies v3
-              </span>
               <span className="text-xs text-slate-300 font-semibold">
                 Movie Catalogs ({filteredCatalog.length} releases)
               </span>
