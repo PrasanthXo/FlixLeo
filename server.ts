@@ -96,17 +96,11 @@ app.get('/api/pixeldrain/info/:id', async (req: Request, res: Response) => {
       downloadUrl: `https://pixeldrain.com/api/file/${cleanId}?download`,
       canStream: data.mime_type ? data.mime_type.startsWith('video/') || data.mime_type.startsWith('audio/') : true
     });
-  } catch (err: any) {
-    // If upstream fetch fails, still provide direct stream URL format
-    return res.json({
-      success: true,
+  } catch {
+    return res.status(502).json({
+      success: false,
       id: cleanId,
-      name: `PixelDrain Stream [${cleanId}]`,
-      size: 0,
-      mimeType: 'video/mp4',
-      directUrl: `https://pixeldrain.com/api/file/${cleanId}`,
-      downloadUrl: `https://pixeldrain.com/api/file/${cleanId}?download`,
-      canStream: true
+      message: 'Pixeldrain file information could not be verified.'
     });
   }
 });
