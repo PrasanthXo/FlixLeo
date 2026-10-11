@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Film, Tv, UserRound } from 'lucide-react';
+import { Home, Film, Tv, Search, UserRound } from 'lucide-react';
 
 interface MobileBottomNavProps {
   currentTab: string;
@@ -14,7 +14,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 }) => {
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0d14]/95 backdrop-blur-lg border-t border-slate-800/80 px-2 pb-safe">
-      <div className="grid grid-cols-4 items-center h-16 max-w-md mx-auto">
+      <div className="grid grid-cols-5 items-center h-16 max-w-md mx-auto">
         {/* Tab 1: Home */}
         <button
           onClick={() => onSelectTab('browse')}
@@ -75,7 +75,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           </span>
         </button>
 
-        {/* Tab 4: Profile */}
+        {/* Tab 4: Search, immediately before Profile */}
+        <button type="button" onClick={() => onSelectTab('search')}
+          className="flex flex-col items-center justify-center min-h-[44px] py-1 transition-colors" aria-label="Search">
+          <Search className={`w-5 h-5 transition-transform ${currentTab === 'search' ? 'text-amber-400 scale-110' : 'text-slate-400'}`} />
+          <span className={`text-[9px] font-medium tracking-tight mt-1 ${currentTab === 'search' ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>Search</span>
+        </button>
+
+        {/* Tab 5: Profile */}
         <button
           type="button"
           onClick={onOpenProfile}
