@@ -821,8 +821,14 @@ export default function App() {
               {continueWatching.map(entry => (
                 <button key={entry.media.id + ':s' + (entry.media.playbackSeason ?? '') + 'e' + (entry.media.playbackEpisode ?? '')} type="button"
                   onClick={() => {
-                    handlePlayMedia(entry.media);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    if ((entry.media.type === 'tv' || entry.media.id.startsWith('tv-')) &&
+                        (entry.media.playbackSeason === undefined || entry.media.playbackEpisode === undefined)) {
+                      // Older stored series have no episode identity; never pretend the title is an episode.
+                      setDetailMedia(entry.media);
+                    } else {
+                      handlePlayMedia(entry.media);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
                   }}
                   className="group text-left w-40 sm:w-48 shrink-0 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500 focus-visible:outline-2 focus-visible:outline-amber-400"
                   aria-label={`Resume ${entry.media.title}`}>
@@ -852,7 +858,11 @@ export default function App() {
                   </div>
                   <div className="p-2">
                     <p className="text-sm text-white font-medium truncate">{entry.media.title}</p>
-                    {entry.media.playbackSeason !== undefined && entry.media.playbackEpisode !== undefined && <p className="text-xs font-bold text-amber-300">Season {entry.media.playbackSeason} · Episode {entry.media.playbackEpisode}</p>}
+                    {(entry.media.type === 'tv' || entry.media.id.startsWith('tv-')) && (
+                      entry.media.playbackSeason !== undefined && entry.media.playbackEpisode !== undefined
+                        ? <p className="text-xs font-bold text-amber-300">Season {entry.media.playbackSeason} · Episode {entry.media.playbackEpisode}</p>
+                        : <p className="text-xs font-bold text-amber-300">Select season & episode</p>
+                    )}
                     <p className="text-xs text-slate-400">{entry.progress >= 5 ? `${Math.floor(entry.progress / 60)} min watched` : 'Recently opened · start playback'}</p>
                   </div>
                 </button>
