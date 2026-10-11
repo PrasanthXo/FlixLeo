@@ -1,4 +1,4 @@
-export type CloudUser = { id: string; email?: string };
+export type CloudUser = { id: string; email?: string; user_metadata?: { display_name?: string; preferred_language?: string } };
 type Session = { access_token: string; refresh_token: string; expires_at: number; user: CloudUser };
 const KEY = 'flixleo_cloud_session';
 export const cloudConfigured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
@@ -42,6 +42,23 @@ export async function cloudSignUp(email: string, password: string) {
     persist({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user, expires_at: Math.floor(Date.now() / 1000) + data.expires_in });
   }
   return Boolean(data.access_token);
+}
+export async function cloudUpdateProfile(details: { display_name?: string; preferred_language?: string }) {
+  const token = await accessToken();
+  const result = await request('/auth/v1/user', {
+    method: 'PUT', body: JSON.stringify({ data: details })
+  }, token);
+  if (session) persist({ ...session, user: result });
+  return result as CloudUser;
+}
+export async function cloudChangePassword(password: string) {
+  if (password.length < 8) throw new Error('Use at least 8 characters.');
+  const token = await accessToken();
+  await request('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ password }) }, token);
+}
+export async function cloudResetPassword(email: string) {
+  if (!email.trim()) throw new Error('Enter your email address first.');
+  await request('/auth/v1/recover', { method: 'POST', body: JSON.stringify({ email: email.trim() }) });
 }
 export async function cloudSignOut() {
   const token = await accessToken().catch(() => '');
