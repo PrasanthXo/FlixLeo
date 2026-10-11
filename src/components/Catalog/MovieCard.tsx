@@ -49,10 +49,10 @@ export const MovieCard: React.FC<MovieCardProps> = ({
         {/* Hover Quick Actions overlay */}
         <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
           <button
-            onClick={() => onPlay(media)}
+            onClick={() => onOpenDetails(media)}
             className="w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 text-black flex items-center justify-center shadow-xl transition-transform active:scale-95"
-            title="Stream immediately"
-            aria-label="Play"
+            title="Choose quality and play"
+            aria-label="Choose quality and play"
           >
             <Play className="w-6 h-6 fill-current translate-x-0.5" />
           </button>
