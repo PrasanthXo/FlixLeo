@@ -179,7 +179,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         {docked && <div className="absolute z-20 right-1 top-1 flex gap-1"><button type="button" onClick={() => { setDocked(false); playerAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
           : active.streamType === 'embed-iframe'
-            ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
+            ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allowFullScreen referrerPolicy="no-referrer" />
             : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={saveProgress} className="h-full w-full object-contain" />}
       </div>
       <div className="p-3 sm:p-4 space-y-3">
