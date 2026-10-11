@@ -156,31 +156,28 @@ app.post('/api/resolve', async (req: Request, res: Response) => {
 
   // 3. Regional Cinema Stream detection
   if (trimmed.includes('einthusan.tv') || trimmed.includes('einthusan') || trimmed.includes('regional')) {
-    return res.json({
-      success: true,
-      source: 'einthusan',
-      name: 'South Asian Cinema Stream',
-      streamType: 'direct-video',
-      streamUrl: trimmed.endsWith('.mp4') || trimmed.endsWith('.m3u8') ? trimmed : 'https://archive.org/download/Sita_Sings_the_Blues_1080p/Sita_Sings_the_Blues_1080p.mp4',
-      embedUrl: trimmed,
-      quality: '1080p HD Full Film',
-      language: 'South Asian Master (Multi-Audio)',
-      features: ['Full Feature Length', 'Regional Master Source', 'Dual Subtitles']
-    });
+    let mediaUrl: URL;
+    try { mediaUrl = new URL(trimmed); } catch {
+      return res.status(400).json({ success: false, message: 'A valid video URL is required.' });
+    }
+    const hls = /[.]m3u8$/i.test(mediaUrl.pathname);
+    if (!hls && !/[.](mp4|webm|m4v|mov)$/i.test(mediaUrl.pathname)) {
+      return res.status(422).json({ success: false, source: 'einthusan', pageUrl: mediaUrl.href, message: 'This is a web page, not a playable video file. A matching authorized direct video URL is required.' });
+    }
+    return res.json({ success: true, source: 'einthusan', name: 'External Video', streamType: hls ? 'hls' : 'direct-video', streamUrl: mediaUrl.href, quality: 'Source quality (unverified)' });
   }
 
   // 4. FastStream Link detection
   if (trimmed.includes('fsl') || trimmed.includes('faststream') || trimmed.includes('hubcloud') || trimmed.includes('filepress')) {
-    return res.json({
-      success: true,
-      source: 'fsl',
-      name: 'FastStream Edge Ultra Stream',
-      streamType: 'direct-video',
-      streamUrl: trimmed.endsWith('.mp4') || trimmed.endsWith('.m3u8') ? trimmed : 'https://archive.org/download/Charade_1963/Charade.mp4',
-      embedUrl: trimmed,
-      quality: '1080p Fast CDN Full Feature',
-      features: ['Full Feature Length (1h 53m)', 'Zero-Buffer Fast Server', 'Unlimited Bandwidth']
-    });
+    let mediaUrl: URL;
+    try { mediaUrl = new URL(trimmed); } catch {
+      return res.status(400).json({ success: false, message: 'A valid video URL is required.' });
+    }
+    const hls = /[.]m3u8$/i.test(mediaUrl.pathname);
+    if (!hls && !/[.](mp4|webm|m4v|mov)$/i.test(mediaUrl.pathname)) {
+      return res.status(422).json({ success: false, source: 'fsl', pageUrl: mediaUrl.href, message: 'This is a web page, not a playable video file. A matching authorized direct video URL is required.' });
+    }
+    return res.json({ success: true, source: 'fsl', name: 'External Video', streamType: hls ? 'hls' : 'direct-video', streamUrl: mediaUrl.href, quality: 'Source quality (unverified)' });
   }
 
   // 5. 4KHDHub links: only accept an actual direct media URL.
