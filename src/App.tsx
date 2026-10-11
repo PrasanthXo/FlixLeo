@@ -210,11 +210,13 @@ export default function App() {
   const [detailMedia, setDetailMedia] = useState<MediaItem | null>(null);
 
   // Persisted native-video resume entries, newest first.
+  const [recentPlayed, setRecentPlayed] = useState<MediaItem[]>([]);
   const [continueWatching, setContinueWatching] = useState<{ media: MediaItem; progress: number; duration: number; updatedAt: number }[]>([]);
   const refreshContinueWatching = React.useCallback(() => {
     try {
       const entries = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
       if (Array.isArray(entries)) {
+        setRecentPlayed(entries.filter(entry => entry?.media?.id).slice(0, 20).map(entry => entry.media));
         setContinueWatching(entries.filter(entry => entry?.media?.id && entry.progress >= 5 && (!entry.duration || entry.progress / entry.duration < 0.95)).slice(0, 12));
       }
     } catch { setContinueWatching([]); }
@@ -287,7 +289,7 @@ export default function App() {
       void cloudWrite(makeLocalSnapshot()).catch(() => setAccountNotice('Cloud sync failed; local data is still saved.'));
     }, 1200);
     return () => { if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current); };
-  }, [cloudUser, cloudReady, watchlistIds, continueWatching, makeLocalSnapshot]);
+  }, [cloudUser, cloudReady, watchlistIds, continueWatching, recentPlayed, makeLocalSnapshot]);
   const submitAccount = async (mode: 'signin' | 'signup') => {
     setAccountBusy(true);
     setAccountNotice('');
@@ -374,8 +376,25 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // For You learns from each opened movie or episode, including embedded players.
+  // Keep prior resume progress rather than overwriting it with zero.
+  const rememberPlayed = (media: MediaItem) => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
+      const entries = Array.isArray(saved) ? saved : [];
+      const previous = entries.find(entry => entry?.media?.id === media.id);
+      const updated = [
+        { media, progress: previous?.progress || 0, duration: previous?.duration || 0, updatedAt: Date.now() },
+        ...entries.filter(entry => entry?.media?.id !== media.id)
+      ].slice(0, 20);
+      localStorage.setItem('flixleo_continue_watching', JSON.stringify(updated));
+      refreshContinueWatching();
+    } catch { /* browsing still works without persistent storage */ }
+  };
+
   // Launch Player
   const handlePlayMedia = (media: MediaItem, mirrorId?: string) => {
+    rememberPlayed(media);
     setActiveMedia(media);
     setActiveMirrorId(mirrorId || media.mirrors[0]?.id);
     setTimeout(() => {
@@ -444,6 +463,28 @@ export default function App() {
 
     return uniqueTitles(list);
   }, [catalog, currentTab, tmdbCategory, tmdbMovies, tvShows, movieExtra, tvExtra, sourceFilter, searchQuery, watchlistIds, tmdbSearchResults]);
+
+  // Rank unseen movies and series by recent language and genre preferences.
+  const forYouTitles = useMemo(() => {
+    const candidates = uniqueTitles([...tmdbMovies, ...tvShows, ...movieExtra, ...tvExtra, ...catalog]);
+    const watchedIds = new Set(recentPlayed.map(media => media.id));
+    const history = recentPlayed.slice(0, 12);
+    const recommendations = candidates
+      .filter(media => !watchedIds.has(media.id))
+      .map(media => {
+        const score = history.reduce((sum, watched, index) => {
+          const recency = Math.max(1, 12 - index);
+          const sameLanguage = media.language && watched.language &&
+            media.language.toLocaleLowerCase() === watched.language.toLocaleLowerCase() ? 4 : 0;
+          const watchedGenres = new Set((watched.genres || []).map(g => g.toLocaleLowerCase()));
+          const genreMatches = (media.genres || []).filter(g => watchedGenres.has(g.toLocaleLowerCase())).length;
+          return sum + recency * (sameLanguage + genreMatches * 3);
+        }, 0);
+        return { media, score };
+      })
+      .sort((a,b) => b.score - a.score || Number(b.media.year || 0) - Number(a.media.year || 0));
+    return recommendations.slice(0, 16).map(entry => entry.media);
+  }, [tmdbMovies, tvShows, movieExtra, tvExtra, catalog, recentPlayed]);
 
   // Spotlight media for hero banner
   const featuredMedia = useMemo(() => {
@@ -553,6 +594,34 @@ export default function App() {
                     <p className="text-xs text-slate-400">{Math.floor(entry.progress / 60)} min watched</p>
                   </div>
                 </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && forYouTitles.length > 0 && (
+          <section className="mb-9" aria-label="For You recommendations">
+            <div className="flex justify-between items-end gap-3 mb-4">
+              <div>
+                <h2 className="text-xl md:text-2xl font-extrabold text-white">For You</h2>
+                <p className="text-sm text-slate-400 mt-1">
+                  {recentPlayed.length
+                    ? 'More movies and series matching your recently watched languages and genres'
+                    : 'Discover movies and series. Your picks will personalize as you start watching.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
+              {forYouTitles.map(media => (
+                <div key={media.id} className="w-36 sm:w-44 shrink-0 snap-start">
+                  <MovieCard
+                    media={media}
+                    onPlay={m => setDetailMedia(m)}
+                    onOpenDetails={m => setDetailMedia(m)}
+                    isBookmarked={watchlistIds.includes(media.id)}
+                    onToggleBookmark={toggleBookmark}
+                  />
+                </div>
               ))}
             </div>
           </section>
