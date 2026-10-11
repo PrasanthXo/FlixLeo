@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Info, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MediaItem } from '../../types/stream';
+import { TmdbArtwork } from './TmdbArtwork';
 import './CinematicWheel.css';
 
 interface HeroBannerProps {
@@ -74,7 +75,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
                 aria-label={offset === 0 ? `Featured: ${slide.title}. Open details` : `Select ${slide.title}`}
                 aria-current={offset === 0 ? 'true' : undefined}
                 onClick={() => offset === 0 ? onOpenDetails(slide) : setIndex(i)}>
-                <img src={slide.posterUrl} alt="" loading={distance < 2 ? 'eager' : 'lazy'} referrerPolicy="no-referrer" />
+                <TmdbArtwork media={slide} kind="poster" alt={slide.title} loading={distance < 2 ? 'eager' : 'lazy'} referrerPolicy="no-referrer" className="flixleo-wheel-artwork" />
               </button>;
             })}
           </div>
