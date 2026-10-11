@@ -404,6 +404,12 @@ export default function App() {
 
   // Toggle Bookmark
   const toggleBookmark = (media: MediaItem) => {
+    if (!currentCloudUser()) {
+      setAuthTab('signin');
+      setAccountNotice('Sign in or create a free account to add movies to your watchlist.');
+      setAccountOpen(true);
+      return;
+    }
     setWatchlistIds(prev =>
       prev.includes(media.id) ? prev.filter(id => id !== media.id) : [...prev, media.id]
     );
