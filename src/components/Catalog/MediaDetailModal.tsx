@@ -1,5 +1,6 @@
 import React from 'react';
 import { TmdbArtwork } from './TmdbArtwork';
+import { StremioSources } from './StremioSources';
 import {
   X, Play, Bookmark, BookmarkCheck, Download,
   Volume2, Globe, Server, Star
@@ -210,6 +211,10 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
             )}
           </div>
 
+          <StremioSources media={activeMedia}
+            season={activeMedia.type === 'tv' || activeMedia.id.startsWith('tv-') ? selectedSeasonNumber : undefined}
+            episode={activeMedia.type === 'tv' || activeMedia.id.startsWith('tv-') ? selectedEpisode?.number : undefined}
+            onPlay={(chosen, mirrorId) => { onPlayMedia(chosen, mirrorId); onClose(); }} />
           {/* Stream Mirrors or TV Seasons */}
           <div>
             {(activeMedia.type === 'tv' || activeMedia.seasons || activeMedia.id.startsWith('tv-')) ? (
