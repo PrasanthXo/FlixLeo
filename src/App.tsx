@@ -767,7 +767,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               {[
                 { id: 'trending' as const, label: '🔥 Trending Today' },
                 { id: 'indian' as const, label: '🎬 South Asian / Indian Movies' },
