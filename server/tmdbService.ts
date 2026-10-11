@@ -3,13 +3,8 @@ import { MediaItem, StreamMirror } from '../src/types/stream';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
-// Full-feature continuous video streams (genuine full feature films for direct fallback)
-const STREAM_FEATURE_DIRECT_1 = 'https://archive.org/download/Charade_1963/Charade.mp4'; // 1h 53m feature film
-const STREAM_FEATURE_DIRECT_2 = 'https://archive.org/download/night_of_the_living_dead/night_of_the_living_dead_512kb.mp4'; // 1h 36m feature film
-const STREAM_FEATURE_DIRECT_3 = 'https://archive.org/download/Sita_Sings_the_Blues_1080p/Sita_Sings_the_Blues_1080p.mp4'; // 1h 22m feature film
-const STREAM_HLS = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
-
-// Genre ID to name lookup
+// Movie and episode playback sources must be title-specific. Never reuse demo videos as real movies.
+\n// Genre ID to name lookup
 export const TMDB_GENRES: Record<number, string> = {
   28: 'Action',
   12: 'Adventure',
@@ -163,33 +158,6 @@ export function transformTmdbMovie(raw: any): MediaItem {
       serverNode: 'Fast Cloud Mirror',
       isDirect: false,
       audioTrack: 'Dual Audio Hindi + Eng'
-    },
-    {
-      id: `mir-${id}-direct-mp4`,
-      source: 'streamhub',
-      label: `Direct HTML5 Player · 1080p Full Length Feature Film [MP4 Direct]`,
-      quality: '1080p',
-      url: STREAM_FEATURE_DIRECT_1,
-      streamType: 'direct-video',
-      fileSize: '1.8 GB',
-      bitrate: '8.5 Mbps',
-      serverNode: 'High-Availability Video Node',
-      downloadUrl: STREAM_FEATURE_DIRECT_1,
-      isDirect: true,
-      audioTrack: 'Original Cinema Master'
-    },
-    {
-      id: `mir-${id}-hls-direct`,
-      source: 'fastedge',
-      label: `Adaptive HLS Stream · Full Length Feature [Direct Player]`,
-      quality: 'Auto',
-      url: STREAM_HLS,
-      streamType: 'hls',
-      fileSize: 'Dynamic HLS Stream',
-      bitrate: 'Adaptive 6-12 Mbps',
-      serverNode: 'Adaptive CDN Edge',
-      isDirect: true,
-      audioTrack: 'Surround 5.1'
     }
   ];
 
@@ -488,20 +456,6 @@ export function transformTmdbTvShow(raw: any): MediaItem {
       serverNode: 'Cloud Tier-1 Frankfurt',
       isDirect: false,
       audioTrack: 'Multi-Audio'
-    },
-    {
-      id: `mir-${id}-direct-mp4`,
-      source: 'streamhub',
-      label: `Direct Sample Episode · 1080p HD Feature [MP4 Direct]`,
-      quality: '1080p',
-      url: STREAM_FEATURE_DIRECT_1,
-      streamType: 'direct-video',
-      fileSize: '1.8 GB',
-      bitrate: '8.5 Mbps',
-      serverNode: 'High-Availability Video Node',
-      downloadUrl: STREAM_FEATURE_DIRECT_1,
-      isDirect: true,
-      audioTrack: 'Original Master'
     }
   ];
 
