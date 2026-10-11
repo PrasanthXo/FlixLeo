@@ -12,6 +12,7 @@ import { HeroBanner } from './components/Catalog/HeroBanner';
 import { MovieCard } from './components/Catalog/MovieCard';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
+import { TvSignIn, TvPairApproval } from './components/TvPairing';
 import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudResendVerification, cloudSignOut, cloudUpdateProfile, cloudChangePassword, cloudResetPassword, cloudRecoveryTokenFromUrl, cloudCompleteRecovery, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
 
 // Deduplicate repeated TMDB entries by ID and normalized title/year within each media type.
@@ -252,6 +253,20 @@ export default function App() {
   // Optional Supabase cross-device account. Local storage remains available without login.
   const [cloudUser, setCloudUser] = useState<CloudUser | null>(() => currentCloudUser());
   const [accountOpen, setAccountOpen] = useState(false);
+  const [tvSignInMode, setTvSignInMode] = useState(() =>
+    new URLSearchParams(window.location.search).get('tv') === '1' ||
+    /smart-tv|smarttv|hbbtv|netcast|web0s|webos|tizen|android tv|googletv|aft[a-z]|bravia|viera|roku|vidaa/i.test(navigator.userAgent));
+  const [phonePairId, setPhonePairId] = useState(() => new URLSearchParams(window.location.search).get('tv_pair') || '');
+  useEffect(() => {
+    if (phonePairId || new URLSearchParams(window.location.search).get('tv') === '1') setAccountOpen(true);
+  }, [phonePairId]);
+  const completeTvPair = () => {
+    setPhonePairId('');
+    const params = new URLSearchParams(window.location.search);
+    params.delete('tv_pair');
+    window.history.replaceState({}, '', window.location.pathname + (params.toString() ? '?' + params : '') + window.location.hash);
+    setAccountOpen(false);
+  };
   const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
   const [recoveryPassword, setRecoveryPassword] = useState('');
   const [recoveryConfirm, setRecoveryConfirm] = useState('');
@@ -696,6 +711,7 @@ export default function App() {
               <p className="text-sm text-amber-300">Account service unavailable. Please contact support.</p>
             ) : cloudUser ? (
               <div className="space-y-4">
+                {phonePairId && <TvPairApproval id={phonePairId} user={cloudUser} onComplete={completeTvPair} />}
                 <div className="rounded-2xl bg-gradient-to-br from-white/10 via-slate-800/60 to-slate-950 p-5 border border-white/10 shadow-inner">
                   <div className="flex gap-3 items-center">
                     <div style={{ backgroundColor: profileAccent }} className="h-14 w-14 shrink-0 rounded-2xl text-black font-extrabold grid place-items-center text-2xl shadow-lg">{(profileName || cloudUser.email || 'F').charAt(0).toUpperCase()}</div>
@@ -764,8 +780,20 @@ export default function App() {
                 )}
                 <button type="button" onClick={() => { void accountAction(async () => { await cloudSignOut(); setCloudUser(null); setCloudReady(false); setAccountSection('overview'); }, 'Signed out. Your cloud data remains in your account.'); }} disabled={accountBusy} className="w-full rounded-lg border border-rose-500/40 py-2.5 text-rose-300 disabled:opacity-50">Sign out</button>
               </div>
+            ) : tvSignInMode ? (
+              <TvSignIn onCancel={() => setTvSignInMode(false)} onSignedIn={user => {
+                setCloudReady(false); setCloudUser(user);
+                setProfileName(user.user_metadata?.display_name || '');
+                setPreferredLanguage(user.user_metadata?.preferred_language || 'all');
+                setFavoriteLanguages(user.user_metadata?.favorite_languages || []);
+                setFavoriteGenres(user.user_metadata?.favorite_genres || []);
+                setFavoriteArtists(user.user_metadata?.favorite_artists || []);
+                setAccountOpen(false);
+              }} />
             ) : (
               <div className="space-y-3">
+                {phonePairId && <p className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-200">Sign in to your verified account, then approve connecting your TV.</p>}
+                <button type="button" onClick={() => setTvSignInMode(true)} className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 font-bold text-amber-200">Sign in on TV with QR code</button>
                 <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-900 p-1" role="tablist" aria-label="Account access">
                   <button type="button" role="tab" aria-selected={authTab === 'signin'} onClick={() => { setAuthTab('signin'); setAccountNotice(''); }} className={`rounded-lg p-2 font-semibold ${authTab === 'signin' ? 'bg-amber-500 text-black' : 'text-slate-300'}`}>Sign in</button>
                   <button type="button" role="tab" aria-selected={authTab === 'signup'} onClick={() => { setAuthTab('signup'); setAccountNotice(''); }} className={`rounded-lg p-2 font-semibold ${authTab === 'signup' ? 'bg-amber-500 text-black' : 'text-slate-300'}`}>Create account</button>
