@@ -66,6 +66,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
           isDirect: true
         }));
         setAddonStreams(streams);
+        if (!streams.length) setAddonError(data.message || (Array.isArray(data.diagnostics) ? data.diagnostics.map((d: any) => String(d.provider) + ': ' + String(d.status)).join(' · ') : 'No compatible direct streams returned'));
       })
       .catch(error => { if (!controller.signal.aborted) setAddonError(error.message || 'Provider lookup failed'); })
       .finally(() => { if (!controller.signal.aborted) setAddonLoading(false); });
@@ -300,7 +301,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                     <p className="text-xs text-slate-400">{isUpcoming(selectedEpisode.airDate) ? 'Upcoming · ' : selectedEpisode.airDate ? 'Aired · ' : ''}{formatAirDate(selectedEpisode.airDate)}</p>
                     <div className="space-y-2">
                       {addonLoading && <p className="text-xs text-slate-400">Checking additional sources…</p>}
-                      {addonError && <p className="text-xs text-slate-500">Additional sources unavailable; showing existing options.</p>}
+                      {addonError && <p className="text-xs text-slate-500">{addonError}</p>}
                       {orderedMirrors(selectedEpisode.mirrors).map(mirror => (
                         <button
                           key={mirror.id}
