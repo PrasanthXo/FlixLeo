@@ -629,7 +629,8 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
         const extensionless = !lastSegment.includes('.') && !/\/((embed|watch|view|page|player|login|redirect))(\/|$)/i.test(pathname);
         if (!hls && !video && !extensionless) return [];
         const label = String(stream.title || '').slice(0, 160);
-        const quality = /2160p|4k/i.test(label) ? '4K' : /1080p/i.test(label) ? '1080p' : /720p/i.test(label) ? '720p' : /480p/i.test(label) ? '480p' : 'Auto';
+        const qualityText = [stream.name, stream.title, stream.description, stream.filename].filter(x => typeof x === 'string').join(' ');
+        const quality = /(?:2160p|4k|uhd)/i.test(qualityText) ? '4K' : /1080p/i.test(qualityText) ? '1080p' : /720p/i.test(qualityText) ? '720p' : /480p/i.test(qualityText) ? '480p' : /360p/i.test(qualityText) ? '360p' : 'Auto';
         return [{ provider: provider.hostname, name: String(stream.name || 'Add-on stream').slice(0, 80),
           title: label, url: url.toString(), quality, streamType: hls ? 'hls' : 'direct-video' }];
       });
