@@ -71,7 +71,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
       <div className="flixleo-mobile-collection-head"><div><h2>{row.label}</h2><p>{row.subtitle}</p></div><ArrowRight size={19} aria-hidden="true"/></div>
       {row.list.length === 0 ? <p className="flixleo-mobile-collection-empty">No titles available in this collection right now.</p> : <div className="flixleo-mobile-collection-scroll">
         {row.list.map(item => {
-          return <div className="flixleo-mobile-collection-card" key={item.id}>
+          return <div className="flixleo-mobile-collection-card relative" key={item.id}>
             <button type="button" onClick={() => onOpen(item)} aria-label={`More about ${item.title}`} className="flixleo-mobile-collection-poster">
               <TmdbArtwork media={item} kind="poster" alt={item.title} loading="lazy" referrerPolicy="no-referrer" className="flixleo-mobile-collection-artwork"/>
             </button>
