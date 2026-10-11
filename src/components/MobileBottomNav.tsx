@@ -13,7 +13,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onOpenProfile
 }) => {
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0d14]/95 backdrop-blur-lg border-t border-slate-800/80 px-2 pb-safe">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0d14]/95 backdrop-blur-lg border-t border-slate-800/80 px-2 pb-safe">
       <div className="grid grid-cols-5 items-center h-16 max-w-md mx-auto">
         {/* Tab 1: Home */}
         <button
