@@ -122,15 +122,32 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       setAudio(id);
     }
   };
-  const selectSubtitle = (url: string) => {
-    setSelectedSubtitle(url);
-    if (hlsRef.current) {
-      hlsRef.current.subtitleTrack = url.startsWith('hls-sub:') ? Number(url.slice(8)) : -1;
+  const selectSubtitle = async (url: string) => {
+    subtitleController.current?.abort();
+    setSubtitleError('');
+    if (hlsRef.current) hlsRef.current.subtitleTrack = url.startsWith('hls-sub:') ? Number(url.slice(8)) : -1;
+    if (videoRef.current) for (let i = 0; i < videoRef.current.textTracks.length; i++) videoRef.current.textTracks[i].mode = 'disabled';
+    if (!url || url.startsWith('hls-sub:') || url.startsWith('blob:')) {
+      setSelectedSubtitle(url);
+      return;
     }
-    if (videoRef.current) {
-      for (let i = 0; i < videoRef.current.textTracks.length; i++) videoRef.current.textTracks[i].mode = 'disabled';
-      if (url && !url.startsWith('hls-sub:')) setTimeout(() => { const track = videoRef.current?.textTracks[0]; if (track) track.mode = 'showing'; }, 100);
-    }
+    const controller = new AbortController();
+    subtitleController.current = controller;
+    setSubtitleLoading(true);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error('Subtitle download failed');
+      const raw = await response.text();
+      if (raw.length > 2000000) throw new Error('Subtitle too large');
+      const isVtt = raw.trimStart().startsWith('WEBVTT') || /\.vtt(?:\?|$)/i.test(url);
+      const converted = isVtt ? raw : parseSrt(raw);
+      if (uploadedRef.current) URL.revokeObjectURL(uploadedRef.current);
+      const objectUrl = URL.createObjectURL(new Blob([converted], { type: 'text/vtt' }));
+      uploadedRef.current = objectUrl;
+      setSelectedSubtitle(objectUrl);
+    } catch {
+      if (!controller.signal.aborted) setSubtitleError('Could not install online subtitles. Try another track or upload a file.');
+    } finally { if (!controller.signal.aborted) setSubtitleLoading(false); }
   };
   const uploadSubtitle = async (file: File | undefined) => {
     if (!file || !/\.(srt|vtt)$/i.test(file.name)) return;
@@ -139,9 +156,9 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     const url = URL.createObjectURL(new Blob([/\.srt$/i.test(file.name) ? parseSrt(text) : text], { type: 'text/vtt' }));
     uploadedRef.current = url;
     setSubtitles(old => [...old, { label: file.name, language: 'en', url }]);
-    selectSubtitle(url);
+    void selectSubtitle(url);
   };
-  useEffect(() => () => { if (uploadedRef.current) URL.revokeObjectURL(uploadedRef.current); }, []);
+  useEffect(() => () => { subtitleController.current?.abort(); if (uploadedRef.current) URL.revokeObjectURL(uploadedRef.current); }, []);
   return <section className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700 bg-[#090b11] text-white">
     <div className="relative min-h-32 bg-cover bg-center p-4" style={{ backgroundImage: `linear-gradient(to top, #090b11, transparent), url("${media.backdropUrl}")` }}>
       <button type="button" onClick={() => { save(); onClose(); }} className="mb-5 rounded-full bg-slate-900/90 p-2" aria-label="Back"><ArrowLeft /></button>
@@ -188,7 +205,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           </select>
         </label>
         <label className="block text-xs text-slate-300">Subtitles {subtitleLoading ? '· Searching…' : ''}
-          <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={selectedSubtitle} onChange={e => selectSubtitle(e.target.value)}>
+          <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={selectedSubtitle} onChange={e => void selectSubtitle(e.target.value)}>
             <option value="">Off</option>
             {subtitles.map(t => <option key={t.url} value={t.url}>{t.label} ({t.language})</option>)}
           </select>
@@ -197,6 +214,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           <Upload size={16} /> Install subtitle (.srt or .vtt)
           <input className="sr-only" type="file" accept=".srt,.vtt" onChange={e => void uploadSubtitle(e.target.files?.[0])} />
         </label>
+        {subtitleError && <p role="alert" className="text-xs text-amber-300">{subtitleError}</p>}
         {!subtitles.length && !subtitleLoading && <p className="text-xs text-slate-400">No automatic subtitle tracks found. Install a local subtitle file.</p>}
       </div>}
     </div>
