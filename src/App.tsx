@@ -970,7 +970,7 @@ export default function App() {
       <MobileBottomNav
         currentTab={currentTab}
         onSelectTab={handleSelectTab}
-        bookmarkCount={watchlistIds.length}
+        onOpenProfile={() => { setAccountSection('overview'); setAccountOpen(true); }}
       />
 
       {/* Media Detail & Mirror Selector Modal */}
