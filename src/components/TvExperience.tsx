@@ -23,7 +23,7 @@ export function TvExperience({ currentTab, onSelectTab, onOpenProfile }: {
       const editable = target?.matches('input,textarea,select,[contenteditable="true"]');
       if (editable) return;
       const key = ({37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown',13:'Enter',461:'BrowserBack',10009:'BrowserBack'} as Record<number,string>)[event.keyCode] || event.key;
-      if (key === 'Enter' && target && target !== document.body && !editable && (target.matches('button,a[href]'))) { event.preventDefault(); target.click(); return; }
+      // The browser already synthesizes a click on Enter/OK for focused buttons. Do not double-activate.
       if (key === 'Escape' || key === 'Backspace' || key === 'BrowserBack') {
         const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
         if (dialog) {
@@ -38,10 +38,10 @@ export function TvExperience({ currentTab, onSelectTab, onOpenProfile }: {
         const rect = node.getBoundingClientRect();
         const style = getComputedStyle(node);
         const dialog = document.querySelector('[role="dialog"]');
-        return (!dialog || dialog.contains(node)) && rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight && style.visibility !== 'hidden' && style.display !== 'none';
+        return (!dialog || dialog.contains(node)) && rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
       });
       const active = document.activeElement as HTMLElement;
-      if (!buttons.includes(active)) { event.preventDefault(); buttons[0]?.focus(); return; }
+      if (!buttons.includes(active)) { event.preventDefault(); (document.querySelector<HTMLElement>('[role="dialog"] button') || document.querySelector<HTMLElement>('.flixleo-tv-nav button[aria-current="page"]') || buttons[0])?.focus(); return; }
       const from = active.getBoundingClientRect();
       const fx = from.left + from.width / 2; const fy = from.top + from.height / 2;
       const match = buttons.map(node => {
@@ -51,7 +51,7 @@ export function TvExperience({ currentTab, onSelectTab, onOpenProfile }: {
         const across = key === 'ArrowRight' || key === 'ArrowLeft' ? Math.abs(dy) : Math.abs(dx);
         return { node, score: along + across * 2.5 };
       }).filter((v): v is { node: HTMLElement; score: number } => Boolean(v)).sort((a,b) => a.score-b.score)[0];
-      if (match) { event.preventDefault(); match.node.focus(); match.node.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'smooth'}); }
+      if (match) { event.preventDefault(); match.node.focus(); match.node.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'auto'}); }
     };
     window.addEventListener('keydown', onKey);
     return () => { clearTimeout(timer); window.removeEventListener('keydown', onKey); };
