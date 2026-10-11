@@ -1030,6 +1030,7 @@ export default function App() {
             media={featuredMedia}
             items={currentTab === 'series' ? tvShows : tmdbMovies}
             bookmarkedIds={watchlistIds}
+            mobileHome={currentTab === "browse"}
             onPlay={(m) => handlePlayMedia(m)}
             onOpenDetails={(m) => setDetailMedia(m)}
             isBookmarked={watchlistIds.includes(featuredMedia.id)}
