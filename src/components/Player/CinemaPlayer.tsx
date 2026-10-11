@@ -45,8 +45,11 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   }, []);
   useEffect(() => { if (minimizeSignal > 0) setDocked(true); }, [minimizeSignal]);
   const shareMovie = async () => {
-    const link = new URL(window.location.origin);
-    link.searchParams.set('media', media.id);
+    const tmdbMatch = media.id.match(/^(?:tmdb-|tv-)([0-9]+)$/);
+    const link = tmdbMatch
+      ? new URL(`https://www.themoviedb.org/${media.type === 'tv' || media.id.startsWith('tv-') ? 'tv' : 'movie'}/${tmdbMatch[1]}`)
+      : new URL(window.location.origin);
+    if (!tmdbMatch) link.searchParams.set('media', media.id);
     try {
       if (navigator.share) await navigator.share({ title: media.title + ' · FlixLeo', url: link.toString() });
       else { await navigator.clipboard.writeText(link.toString()); window.alert('Movie link copied'); }
