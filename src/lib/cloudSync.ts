@@ -1,4 +1,4 @@
-export type CloudUser = { id: string; email?: string; user_metadata?: { display_name?: string; preferred_language?: string } };
+export type CloudUser = { id: string; email?: string; user_metadata?: { display_name?: string; preferred_language?: string; favorite_languages?: string[]; favorite_genres?: string[]; favorite_artists?: string[] } };
 type Session = { access_token: string; refresh_token: string; expires_at: number; user: CloudUser };
 const KEY = 'flixleo_cloud_session';
 export const cloudConfigured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
@@ -43,7 +43,7 @@ export async function cloudSignUp(email: string, password: string) {
   }
   return Boolean(data.access_token);
 }
-export async function cloudUpdateProfile(details: { display_name?: string; preferred_language?: string }) {
+export async function cloudUpdateProfile(details: { display_name?: string; preferred_language?: string; favorite_languages?: string[]; favorite_genres?: string[]; favorite_artists?: string[] }) {
   const token = await accessToken();
   const result = await request('/auth/v1/user', {
     method: 'PUT', body: JSON.stringify({ data: details })
