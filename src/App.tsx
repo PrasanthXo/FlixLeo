@@ -123,6 +123,7 @@ export default function App() {
   // Active Playback State
   const [activeMedia, setActiveMedia] = useState<MediaItem | null>(null);
   const [activeMirrorId, setActiveMirrorId] = useState<string | undefined>(undefined);
+  const [minimizeSignal, setMinimizeSignal] = useState(0);
   // Reset pagination whenever the underlying category changes.
   useEffect(() => {
     setMovieExtra([]);
@@ -359,6 +360,7 @@ export default function App() {
 
   // Switch tabs
   const handleSelectTab = (tab: string) => {
+    if (activeMedia) setMinimizeSignal(n => n + 1);
     if (['streamhub', 'vault', 'remux', 'fastedge'].includes(tab)) {
       setCurrentTab('browse');
       setSourceFilter(tab as SourceType);
@@ -375,7 +377,7 @@ export default function App() {
   // Launch Player
   const handlePlayMedia = (media: MediaItem, mirrorId?: string) => {
     setActiveMedia(media);
-    setActiveMirrorId(mirrorId || (media.availableSources.length > 0 ? media.availableSources[0] : undefined));
+    setActiveMirrorId(mirrorId || media.mirrors[0]?.id);
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 50);
@@ -511,6 +513,7 @@ export default function App() {
             <CinemaPlayer
               media={activeMedia}
               initialMirrorId={activeMirrorId}
+              minimizeSignal={minimizeSignal}
               onClose={() => { setActiveMedia(null); refreshContinueWatching(); }}
               onProgressSaved={refreshContinueWatching}
               onMirrorChange={(mirror) => setActiveMirrorId(mirror.id)}
