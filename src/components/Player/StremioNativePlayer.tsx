@@ -17,6 +17,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const uploadedRef = useRef<string | null>(null);
   const subtitleController = useRef<AbortController | null>(null);
   const [audioAvailable, setAudioAvailable] = useState(false);
+  const [audioStatus, setAudioStatus] = useState<'loading' | 'available' | 'unavailable' | 'browser-limited'>('loading');
   const [subtitleError, setSubtitleError] = useState('');
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(true);
@@ -71,7 +72,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     const video = videoRef.current;
     if (!video || !active) return;
     let disposed = false;
-    setError(''); setBuffering(true); setAudioTracks([]); setAudio(-1); setAudioAvailable(false);
+    setError(''); setBuffering(true); setAudioTracks([]); setAudio(-1); setAudioAvailable(false); setAudioStatus('loading');
     setSubtitles(previous => previous.filter(t => !t.url.startsWith('hls-sub:') && !t.url.startsWith('native-sub:')));
     subtitlePreference.current = 'auto';
     subtitleSelection.current = '';
@@ -89,8 +90,18 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           setAudioTracks(hls.audioTracks.map((t, i) => ({ id: i, name: t.name || t.lang || 'Track ' + (i + 1) })));
           setAudio(hls.audioTrack);
           setAudioAvailable(hls.audioTracks.length > 1);
+          setAudioStatus(hls.audioTracks.length > 1 ? 'available' : 'unavailable');
         });
-        hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => { if (!disposed) setAudioTracks(hls.audioTracks.map((t, i) => ({ id: i, name: t.name || t.lang || 'Track ' + (i + 1) }))); setAudioAvailable(hls.audioTracks.length > 1); });
+        hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+          if (disposed) return;
+          setAudioTracks(hls.audioTracks.map((t, i) => ({ id: i, name: [t.name, t.lang].filter(Boolean).join(' · ') || 'Track ' + (i + 1) })));
+          setAudio(hls.audioTrack);
+          setAudioAvailable(hls.audioTracks.length > 1);
+          setAudioStatus(hls.audioTracks.length > 1 ? 'available' : 'unavailable');
+        });
+        hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_event, data) => {
+          if (!disposed) setAudio(data.id);
+        });
         hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
           if (disposed) return;
           // HLS subtitle renditions can be selected directly within hls.js.
@@ -116,14 +127,24 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         if (p > 5 && p < video.duration - 15) video.currentTime = p;
       } catch { /* ignore */ }
     };
+    type NativeAudioTrackList = { length: number; [index: number]: { label?: string; language?: string; enabled: boolean }; addEventListener?: (name: string, listener: () => void) => void; removeEventListener?: (name: string, listener: () => void) => void };
+    const nativeAudio = (video as HTMLVideoElement & { audioTracks?: NativeAudioTrackList }).audioTracks;
     const detectNativeAudio = () => {
-      const native = (video as HTMLVideoElement & { audioTracks?: { length: number; [index: number]: { label?: string; language?: string; enabled: boolean } } }).audioTracks;
-      if (native && native.length > 1) {
-        setAudioTracks(Array.from({ length: native.length }, (_, i) => ({ id: i, name: native[i].label || native[i].language || 'Track ' + (i + 1) })));
-        setAudio(Array.from({ length: native.length }, (_, i) => i).find(i => native[i].enabled) ?? 0);
-        setAudioAvailable(true);
+      if (disposed || hlsRef.current) return;
+      const list = (video as HTMLVideoElement & { audioTracks?: NativeAudioTrackList }).audioTracks;
+      if (list && list.length) {
+        setAudioTracks(Array.from({ length: list.length }, (_, i) => ({ id: i, name: [list[i].label, list[i].language].filter(Boolean).join(' · ') || 'Track ' + (i + 1) })));
+        setAudio(Array.from({ length: list.length }, (_, i) => i).find(i => list[i].enabled) ?? 0);
+        setAudioAvailable(list.length > 1);
+        setAudioStatus(list.length > 1 ? 'available' : 'unavailable');
+      } else if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        setAudioAvailable(false);
+        setAudioStatus('browser-limited');
       }
     };
+    nativeAudio?.addEventListener?.('addtrack', detectNativeAudio);
+    nativeAudio?.addEventListener?.('removetrack', detectNativeAudio);
+    nativeAudio?.addEventListener?.('change', detectNativeAudio);
     const detectEmbeddedSubtitles = () => {
       if (disposed) return;
       const tracks = Array.from(video.textTracks);
@@ -148,12 +169,17 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     video.textTracks.addEventListener('addtrack', detectEmbeddedSubtitles);
     video.addEventListener('loadedmetadata', loaded);
     video.addEventListener('loadedmetadata', detectNativeAudio);
+    video.addEventListener('canplay', detectNativeAudio);
     video.addEventListener('error', fail);
     video.play().catch(() => setPlaying(false));
     return () => {
       disposed = true;
       video.removeEventListener('loadedmetadata', detectEmbeddedSubtitles);
       video.textTracks.removeEventListener('addtrack', detectEmbeddedSubtitles);
+      nativeAudio?.removeEventListener?.('addtrack', detectNativeAudio);
+      nativeAudio?.removeEventListener?.('removetrack', detectNativeAudio);
+      nativeAudio?.removeEventListener?.('change', detectNativeAudio);
+      video.removeEventListener('canplay', detectNativeAudio);
       video.removeEventListener('loadedmetadata', loaded); video.removeEventListener('loadedmetadata', detectNativeAudio); video.removeEventListener('error', fail);
       hlsRef.current?.destroy(); hlsRef.current = null;
       video.pause(); video.removeAttribute('src'); video.load();
@@ -279,10 +305,11 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         </label>
         <label className="block text-xs text-slate-300"><span className="inline-flex items-center gap-1"><Volume2 size={14} /> Audio track</span>
           <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={audio} disabled={!audioAvailable} onChange={e => changeAudio(Number(e.target.value))}>
-            {!audioAvailable && <option value={-1}>Original audio · no alternate track detected</option>}
+            {!audioAvailable && <option value={-1}>{audioStatus === 'loading' ? 'Detecting audio tracks…' : audioStatus === 'browser-limited' ? 'Audio tracks not exposed by this browser' : 'Original audio · no alternate track detected'}</option>}
             {audioTracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </label>
+        {audioStatus === 'browser-limited' && <p className="text-xs text-slate-400">This browser cannot inspect or switch embedded audio tracks for this video. Multi-audio MP4/MKV files may require a compatible HLS stream or server-side remuxing.</p>}
         <div className="space-y-2">
           <span className="block text-xs text-slate-300">Subtitle display</span>
           <div role="group" aria-label="Subtitle display mode" className="grid grid-cols-3 gap-2">
