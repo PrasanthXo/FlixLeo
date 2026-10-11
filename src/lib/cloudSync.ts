@@ -128,7 +128,8 @@ export async function cloudWrite(payload: CloudRecord) {
   }, token);
 }
 export function mergeCloudData(local: CloudRecord, remote: CloudRecord | null): CloudRecord {
-  const watchlist = Array.from(new Set([...(remote?.watchlist || []), ...local.watchlist]));
+  const demoIds = new Set(['stream-overdrive-4k', 'stream-rajputana-warrior']);
+  const watchlist = Array.from(new Set([...(remote?.watchlist || []), ...local.watchlist].filter(id => typeof id === 'string' && !demoIds.has(id))));
   const history = [...(remote?.history || []), ...local.history]
     .filter(entry => entry?.media?.id && Number.isFinite(entry.progress))
     .sort((a,b) => (b.updatedAt || 0) - (a.updatedAt || 0));
