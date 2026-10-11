@@ -68,7 +68,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
               if (offset < -len / 2) offset += len;
               const distance = Math.abs(offset);
               return <button type="button" key={slide.id} className={'flixleo-wheel-poster' + (offset === 0 ? ' is-selected' : '')}
-                style={{ '--wheel-offset': offset, '--wheel-distance': distance, zIndex: 15 - distance, opacity: distance > 3 ? 0 : 1, pointerEvents: distance > 3 ? 'none' : 'auto' } as React.CSSProperties}
+                style={{ '--wheel-shift': `${offset * 72}%`, '--wheel-mobile-shift': `${offset * 65}%`, '--wheel-depth': `${distance * -75}px`, '--wheel-rotate': `${offset * -13}deg`, '--wheel-mobile-rotate': `${offset * -12}deg`, '--wheel-scale': 1 - distance * .08, '--wheel-mobile-scale': 1 - distance * .09, zIndex: 15 - distance, opacity: distance > 3 ? 0 : 1, pointerEvents: distance > 3 ? 'none' : 'auto' } as React.CSSProperties}
                 tabIndex={distance > 3 ? -1 : 0}
                 aria-label={offset === 0 ? `Featured: ${slide.title}. Open details` : `Select ${slide.title}`}
                 aria-current={offset === 0 ? 'true' : undefined}
