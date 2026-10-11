@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
+import { StremioNativePlayer } from './StremioNativePlayer';
 import { ArrowLeft, ExternalLink, RefreshCw, Share2, Maximize2, Minimize2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
@@ -165,6 +166,13 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       onProgressSaved?.();
     } catch { /* playback continues even without storage */ }
   };
+
+  // Stremio streams use the original custom native-style controls only.
+  // Other providers retain the existing CinemaPlayer implementation.
+  if (initialMirrorId?.startsWith('stremio-')) {
+    return <StremioNativePlayer media={media} mirrors={mirrors.filter(m => m.id.startsWith('stremio-'))}
+      initialMirrorId={initialMirrorId} onClose={onClose} onProgressSaved={onProgressSaved} />;
+  }
 
   return (
     <section ref={playerAnchorRef} className="w-full max-w-5xl mx-auto rounded-2xl border border-slate-700 bg-[#0b0e15] shadow-xl" aria-label="Movie player">
