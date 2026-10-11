@@ -1,6 +1,5 @@
 import React from 'react';
 import { TmdbArtwork } from './TmdbArtwork';
-import { StremioSources } from './StremioSources';
 import {
   X, Play, Bookmark, BookmarkCheck, Download,
   Volume2, Globe, Server, Star
@@ -31,6 +30,48 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   const [episodeLoadError, setEpisodeLoadError] = React.useState<string | null>(null);
   const [loadingEpisodes, setLoadingEpisodes] = React.useState(false);
   const [showAudioOptions, setShowAudioOptions] = React.useState(false);
+  const [addonStreams, setAddonStreams] = React.useState<StreamMirror[]>([]);
+  const [addonLoading, setAddonLoading] = React.useState(false);
+  const [addonError, setAddonError] = React.useState('');
+  const isSeries = Boolean(media && (media.type === 'tv' || media.id.startsWith('tv-')));
+  const tmdbId = media?.id.match(/^(?:tmdb-|tv-)(\d+)$/)?.[1];
+  const selectedEpisodeNumber = detailedMedia?.seasons?.find(season => season.number === selectedSeasonNumber)
+    ?.episodes.find(episode => episode.id === selectedEpisodeId)?.number;
+  React.useEffect(() => {
+    setAddonStreams([]);
+    setAddonError('');
+    if (!isOpen || !tmdbId || (isSeries && selectedEpisodeNumber === undefined)) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ tmdb: tmdbId, type: isSeries ? 'series' : 'movie' });
+    if (isSeries) {
+      params.set('season', String(selectedSeasonNumber));
+      params.set('episode', String(selectedEpisodeNumber));
+    }
+    setAddonLoading(true);
+    fetch('/api/stremio/streams?' + params, { signal: controller.signal })
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Provider lookup failed');
+        return data;
+      })
+      .then(data => {
+        if (controller.signal.aborted) return;
+        const streams: StreamMirror[] = (Array.isArray(data.streams) ? data.streams : []).map((stream: any, index: number) => ({
+          id: 'stremio-' + index,
+          source: 'custom',
+          label: String(stream.name || 'Add-on stream') + ' · ' + String(stream.provider || 'Provider'),
+          quality: stream.quality === '4K' ? '4K UHD' : stream.quality === '1080p' ? '1080p' : stream.quality === '720p' ? '720p' : 'Auto',
+          url: stream.url,
+          streamType: stream.streamType === 'hls' ? 'hls' : 'direct-video',
+          isDirect: true
+        }));
+        setAddonStreams(streams);
+      })
+      .catch(error => { if (!controller.signal.aborted) setAddonError(error.message || 'Provider lookup failed'); })
+      .finally(() => { if (!controller.signal.aborted) setAddonLoading(false); });
+    return () => controller.abort();
+  }, [isOpen, tmdbId, isSeries, selectedSeasonNumber, selectedEpisodeNumber]);
+
 
   React.useEffect(() => {
     if (!media) return;
@@ -78,6 +119,21 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     }
   };
 
+  const qualityRank = (mirror: StreamMirror) => {
+    const label = (mirror.quality + ' ' + mirror.label).toLowerCase();
+    if (/4k|2160p/.test(label)) return 2160;
+    if (/1080p/.test(label)) return 1080;
+    if (/720p/.test(label)) return 720;
+    if (/480p/.test(label)) return 480;
+    return 0;
+  };
+  const orderedMirrors = (mirrors: StreamMirror[]) => [...mirrors, ...addonStreams]
+    .filter((mirror, i, all) => all.findIndex(other => other.url === mirror.url) === i)
+    .sort((a, b) => qualityRank(b) - qualityRank(a));
+  const playSelected = (mirror: StreamMirror, originals: StreamMirror[]) => {
+    onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals) }, mirror.id);
+    onClose();
+  };
   const selectedSeason = activeMedia.seasons?.find(s => s.number === selectedSeasonNumber);
   const selectedEpisode = selectedSeason?.episodes.find(e => e.id === selectedEpisodeId);
   const todayUtc = new Date().toISOString().slice(0, 10);
@@ -211,10 +267,6 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
             )}
           </div>
 
-          <StremioSources media={activeMedia}
-            season={activeMedia.type === 'tv' || activeMedia.id.startsWith('tv-') ? selectedSeasonNumber : undefined}
-            episode={activeMedia.type === 'tv' || activeMedia.id.startsWith('tv-') ? selectedEpisode?.number : undefined}
-            onPlay={(chosen, mirrorId) => { onPlayMedia(chosen, mirrorId); onClose(); }} />
           {/* Stream Mirrors or TV Seasons */}
           <div>
             {(activeMedia.type === 'tv' || activeMedia.seasons || activeMedia.id.startsWith('tv-')) ? (
@@ -247,12 +299,13 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                     <h4 className="text-lg font-semibold text-white">Select Quality: {selectedEpisode.title}</h4>
                     <p className="text-xs text-slate-400">{isUpcoming(selectedEpisode.airDate) ? 'Upcoming · ' : selectedEpisode.airDate ? 'Aired · ' : ''}{formatAirDate(selectedEpisode.airDate)}</p>
                     <div className="space-y-2">
-                      {selectedEpisode.mirrors.map(mirror => (
+                      {addonLoading && <p className="text-xs text-slate-400">Checking additional sources…</p>}
+                      {addonError && <p className="text-xs text-slate-500">Additional sources unavailable; showing existing options.</p>}
+                      {orderedMirrors(selectedEpisode.mirrors).map(mirror => (
                         <button
                           key={mirror.id}
                           onClick={() => {
-                            onPlayMedia(activeMedia, mirror.id);
-                            onClose();
+                            playSelected(mirror, selectedEpisode.mirrors);
                           }}
                           className="w-full p-3 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors text-left flex justify-between"
                         >
@@ -294,11 +347,13 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 <div id="flixleo-quality-selector" className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Server className="w-4 h-4 text-amber-400" />
-                    Select Streaming Mirror & Server Source ({activeMedia.mirrors.length} Available)
+                    Select Quality ({orderedMirrors(activeMedia.mirrors).length} Available)
                   </h4>
                 </div>
                 <div className="space-y-2">
-                  {activeMedia.mirrors.map((mirror: StreamMirror) => (
+                  {addonLoading && <p className="text-xs text-slate-400">Checking additional sources…</p>}
+                  {addonError && <p className="text-xs text-slate-500">Additional sources unavailable; showing existing options.</p>}
+                  {orderedMirrors(activeMedia.mirrors).map((mirror: StreamMirror) => (
                     <div
                       key={mirror.id}
                       className="p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
@@ -348,8 +403,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                         )}
                         <button
                           onClick={() => {
-                            onPlayMedia(activeMedia, mirror.id);
-                            onClose();
+                            playSelected(mirror, activeMedia.mirrors);
                           }}
                           className="px-4 py-2 rounded-lg bg-slate-800 group-hover:bg-amber-500 text-white group-hover:text-black font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md"
                         >
