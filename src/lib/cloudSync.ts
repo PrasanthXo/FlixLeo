@@ -79,6 +79,35 @@ export async function cloudResetPassword(email: string) {
   if (!email.trim()) throw new Error('Enter your email address first.');
   await request('/auth/v1/recover' + redirectQuery, { method: 'POST', body: JSON.stringify({ email: email.trim() }) });
 }
+// Handle Supabase recovery links without storing the temporary recovery session.
+export async function cloudRecoveryTokenFromUrl(): Promise<string | null> {
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const query = new URLSearchParams(window.location.search);
+  const access = hash.get('access_token');
+  if (hash.get('type') === 'recovery' && access) {
+    const user = await request('/auth/v1/user', {}, access);
+    if (!user?.id) throw new Error('Recovery link is invalid or expired.');
+    window.history.replaceState({}, '', window.location.pathname);
+    return access;
+  }
+  const tokenHash = query.get('token_hash');
+  if (tokenHash && query.get('type') === 'recovery') {
+    const data = await request('/auth/v1/verify', {
+      method: 'POST', body: JSON.stringify({ token_hash: tokenHash, type: 'recovery' })
+    });
+    if (!data.access_token) throw new Error('Recovery link has expired.');
+    window.history.replaceState({}, '', window.location.pathname);
+    return data.access_token;
+  }
+  return null;
+}
+export async function cloudCompleteRecovery(token: string, password: string) {
+  if (!token) throw new Error('Request a new password reset link.');
+  if (password.length < 8) throw new Error('Use at least 8 characters.');
+  await request('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ password }) }, token);
+  await request('/auth/v1/logout', { method: 'POST' }, token).catch(() => {});
+}
+
 export async function cloudSignOut() {
   const token = await accessToken().catch(() => '');
   if (token) await request('/auth/v1/logout', { method: 'POST' }, token).catch(() => {});
