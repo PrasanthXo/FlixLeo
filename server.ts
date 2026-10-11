@@ -2,6 +2,9 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import ffmpegPath from 'ffmpeg-static';
 
 dotenv.config();
 
@@ -545,6 +548,58 @@ app.get('/api/tmdb/movie/:id', async (req: Request, res: Response) => {
  * This endpoint deliberately excludes torrents, magnets, embeds and off-site page links:
  * browsers can only use direct, CORS-enabled HLS or video sources.
  */
+// Audio-only compatibility mode: never re-encode video. Only operate on HTTPS
+// stream URLs from completed Stremio discovery and explicitly allowed media hosts.
+const audioFixSessions = new Map<string, { url: string; expires: number }>();
+let activeAudioFixes = 0;
+const audioFixHosts = new Set((process.env.FLIXLEO_AUDIO_FIX_HOSTS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean));
+function audioFixTicket(raw: string): string | undefined {
+  if (!ffmpegPath || !audioFixHosts.size) return;
+  let url: URL;
+  try { url = new URL(raw); } catch { return; }
+  if (url.protocol !== 'https:' || url.username || url.password ||
+      !audioFixHosts.has(url.hostname.toLowerCase()) || url.port) return;
+  const ticket = randomUUID();
+  audioFixSessions.set(ticket, { url: url.href, expires: Date.now() + 10 * 60_000 });
+  if (audioFixSessions.size > 300) {
+    for (const [key, entry] of audioFixSessions) if (entry.expires < Date.now()) audioFixSessions.delete(key);
+    while (audioFixSessions.size > 300) audioFixSessions.delete(audioFixSessions.keys().next().value!);
+  }
+  return '/api/stremio/audio-fix/' + ticket;
+}
+app.get('/api/stremio/audio-fix/:ticket', (req: Request, res: Response) => {
+  const record = audioFixSessions.get(req.params.ticket);
+  if (!record || record.expires < Date.now()) return res.status(404).send('Audio fix link expired. Reload servers.');
+  if (activeAudioFixes >= 2) return res.status(503).send('Audio conversion is busy. Try again soon.');
+  if (!ffmpegPath) return res.status(503).send('Audio conversion unavailable.');
+  activeAudioFixes++;
+  res.setHeader('Content-Type', 'video/mp4');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  const args = [
+    '-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '1',
+    '-protocol_whitelist', 'file,https,tls,tcp,crypto', '-i', record.url,
+    '-map', '0:v:0', '-map', '0:a:0?', '-sn', '-dn',
+    '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ac', '2',
+    '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+    '-f', 'mp4', 'pipe:1'
+  ];
+  const process = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  let done = false;
+  const timeout = setTimeout(() => process.kill('SIGKILL'), 2 * 60 * 60_000);
+  const cleanup = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(timeout);
+    activeAudioFixes--;
+  };
+  process.stdout.pipe(res);
+  process.stderr.on('data', () => { /* Never disclose origin URLs in error logs. */ });
+  process.on('error', () => { cleanup(); if (!res.headersSent) res.status(502).end('Audio conversion failed'); else res.end(); });
+  process.on('close', () => { cleanup(); if (!res.writableEnded) res.end(); });
+  res.on('close', () => { if (!done) process.kill('SIGKILL'); });
+});
+
 // Avoid repeatedly hitting providers that temporarily refuse Render requests.
 // This cache is server-local and automatically expires.
 const stremioProviderCooldown = new Map<string, number>();
@@ -632,7 +687,8 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
         const qualityText = [stream.name, stream.title, stream.description, stream.filename].filter(x => typeof x === 'string').join(' ');
         const quality = /(?:2160p|4k|uhd)/i.test(qualityText) ? '4K' : /1080p/i.test(qualityText) ? '1080p' : /720p/i.test(qualityText) ? '720p' : /480p/i.test(qualityText) ? '480p' : /360p/i.test(qualityText) ? '360p' : 'Auto';
         return [{ provider: provider.hostname, name: String(stream.name || 'Add-on stream').slice(0, 80),
-          title: label, url: url.toString(), quality, streamType: hls ? 'hls' : 'direct-video' }];
+          title: label, url: url.toString(), quality, streamType: hls ? 'hls' : 'direct-video',
+          audioFixUrl: !hls ? audioFixTicket(url.toString()) : undefined }];
       });
       const kinds = { httpsUrls: entries.filter((e: any) => typeof e.url === 'string' && e.url.startsWith('https://')).length,
         torrents: entries.filter((e: any) => Boolean(e.infoHash)).length,
