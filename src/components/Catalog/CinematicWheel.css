@@ -44,3 +44,111 @@
 .flixleo-tv .flixleo-wheel-layout{min-height:510px}
 .flixleo-tv .flixleo-wheel-poster:focus,.flixleo-tv .flixleo-wheel-arrow:focus{outline:4px solid #fbbf24!important;outline-offset:4px}
 @media(prefers-reduced-motion:reduce){.flixleo-wheel-poster,.flixleo-wheel-actions button{transition:none!important}}
+
+/* Mobile Home concept v1. These selectors never affect tablet, desktop or webOS. */
+@media (max-width: 640px) {
+  .flixleo-wheel.flixleo-mobile-home-wheel {
+    margin: -6px -8px 20px;
+    border: 1px solid rgba(132,99,252,.26);
+    border-radius: 26px;
+    background: radial-gradient(ellipse at 50% 38%, #26164e 0%, #0a0d1d 65%, #050812 100%);
+    box-shadow: 0 20px 55px rgba(0,0,0,.48), inset 0 1px rgba(255,255,255,.1);
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-backdrop {
+    opacity: .34;
+    filter: blur(20px) saturate(1.25);
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-vignette {
+    background: linear-gradient(180deg,rgba(5,9,23,.42) 0%,rgba(8,8,24,.18) 39%,#070b18 78%);
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-layout {
+    padding: 23px 10px 28px;
+    gap: 0;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-stage {
+    height: 308px;
+    perspective: 1050px;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-track {
+    overflow: visible;
+    clip-path: inset(-14px 0 3px);
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-poster {
+    top: 18px;
+    width: clamp(128px,41vw,164px);
+    height: clamp(195px,62vw,250px);
+    max-height: none;
+    border-radius: 14px;
+    transform: translateX(calc(-50% + var(--wheel-mobile-shift))) translateZ(var(--wheel-depth)) rotateY(var(--wheel-mobile-rotate)) scale(var(--wheel-mobile-scale));
+    box-shadow: 0 12px 36px #000b, inset 0 1px #fff4;
+    backface-visibility: hidden;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-poster.is-selected {
+    border: 2px solid #b5a0ff;
+    box-shadow: 0 0 0 3px #7861ff55,0 0 31px #8f56ff9c,0 23px 43px #000c;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-halo {
+    left: 5%;right: 5%;bottom: 20px;height: 73px;
+    border: 3px solid #8b5cf6;
+    background: radial-gradient(ellipse, #5a34c343, transparent 70%);
+    box-shadow: 0 0 19px #a66bff, inset 0 0 29px #6b4ff4a8,0 0 40px #5038ed96;
+    transform: perspective(430px) rotateX(72deg);
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-halo::after {
+    content: "";
+    position: absolute;
+    inset: 13px;
+    border: 2px solid #5fc9ffb0;
+    border-radius: 50%;
+    box-shadow: 0 0 17px #6b8aff;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-arrow {
+    top: 45%;
+    width: 34px;height: 34px;
+    border-color: #aa9cff7a;
+    background: #111328cc;
+    box-shadow: 0 0 14px #693ee652;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-dots { bottom: 0;gap: 8px; }
+  .flixleo-mobile-home-wheel .flixleo-wheel-dots button.active {
+    background:#a881ff;
+    box-shadow:0 0 13px #9b5aff;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-copy h1 {
+    font-size: clamp(24px, 7.5vw, 31px);
+    text-shadow:0 2px 20px #090516;
+    margin: 1px 0 4px;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-kicker {
+    color:#b8a1ff;
+    letter-spacing:.2em;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-summary { display:none; }
+  .flixleo-mobile-home-wheel .flixleo-wheel-meta {
+    color:#cbd4ef;
+    margin:8px 0 17px;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-actions {
+    gap:8px;flex-wrap:nowrap;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-actions button {
+    min-width:0;height:46px;
+    border-radius:15px;
+    font-weight:750;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-play {
+    background:linear-gradient(105deg,#635bff,#b62bf0);
+    color:#fff;
+    box-shadow:0 5px 22px #7737fc6e;
+    flex: 1;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-info {
+    flex:1;
+    background:#1a2338c9;
+    border:1px solid #72829f75;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-save {
+    flex:0 0 46px;
+    background:#1b223bbf;
+  }
+}
