@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TmdbArtwork } from './TmdbArtwork';
 import { Play, Info, Bookmark, BookmarkCheck, MoreVertical, Share2 } from 'lucide-react';
-import { MediaItem, getSourceDisplayBadge } from '../../types/stream';
+import { MediaItem } from '../../types/stream';
 
 interface MovieCardProps {
   media: MediaItem;
@@ -31,13 +31,6 @@ export const MovieCard: React.FC<MovieCardProps> = ({
         {/* Gradient Scrim for readable contrast */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-        {/* Source Badge (Top Left - interactive indicator) */}
-        <div className="absolute top-2.5 left-2.5">
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase bg-black/80 backdrop-blur-md text-amber-400 border border-amber-500/30">
-            {getSourceDisplayBadge(media.primarySource)}
-          </span>
-        </div>
-
         {/* Always-visible mobile friendly watchlist menu */}
         <div className="absolute z-30 top-2 right-2">
           <button type="button" aria-label={`More options for ${media.title}`} aria-expanded={menuOpen}
@@ -56,15 +49,6 @@ export const MovieCard: React.FC<MovieCardProps> = ({
             <button type="button" onClick={async e => { e.stopPropagation(); setMenuOpen(false); const url = new URL(window.location.origin); url.searchParams.set('media', media.id); try { if (navigator.share) await navigator.share({ title: media.title + ' · FlixLeo', url: url.toString() }); else { await navigator.clipboard.writeText(url.toString()); window.alert('Movie link copied'); } } catch (err) { if ((err as Error)?.name !== 'AbortError') window.alert('Unable to share this movie'); } }} className="flex items-center gap-2 w-full px-2 py-2 text-xs text-left text-slate-200 hover:bg-slate-700 rounded-md"><Share2 className="h-4 w-4 shrink-0" /> Share</button>
             <button type="button" onClick={e => { e.stopPropagation(); setMenuOpen(false); onOpenDetails(media); }} className="w-full px-2 py-2 text-xs text-left text-slate-300 hover:bg-slate-700 rounded-md">View details</button>
           </div>}
-
-        {/* Resolution indicator (Top Right) */}
-        {media.resolutionBadge && (
-          <div className="absolute top-12 right-2.5">
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-900/90 text-slate-200 border border-slate-700">
-              {media.resolutionBadge.includes('4K') ? '4K UHD' : '1080p'}
-            </span>
-          </div>
-        )}
 
         {/* Hover Quick Actions overlay */}
         <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
