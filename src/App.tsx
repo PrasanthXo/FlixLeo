@@ -454,18 +454,50 @@ export default function App() {
 
   // For You learns from each opened movie or episode, including embedded players.
   // Keep prior resume progress rather than overwriting it with zero.
+  const progressKey = (m: MediaItem) => m.id + (m.playbackSeason !== undefined && m.playbackEpisode !== undefined ? ':s' + m.playbackSeason + 'e' + m.playbackEpisode : '');
   const rememberPlayed = (media: MediaItem) => {
     try {
       const saved = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
       const entries = Array.isArray(saved) ? saved : [];
-      const previous = entries.find(entry => entry?.media?.id === media.id);
+      const previous = entries.find(entry => entry?.media && progressKey(entry.media) === progressKey(media));
       const updated = [
         { media, progress: previous?.progress || 0, duration: previous?.duration || 0, updatedAt: Date.now() },
-        ...entries.filter(entry => entry?.media?.id !== media.id)
+        ...entries.filter(entry => entry?.media && progressKey(entry.media) !== progressKey(media))
       ].slice(0, 20);
       localStorage.setItem('flixleo_continue_watching', JSON.stringify(updated));
       refreshContinueWatching();
     } catch { /* browsing still works without persistent storage */ }
+  };
+
+  const playNextEpisode = async () => {
+    const current = activeMedia;
+    if (!current || current.playbackSeason === undefined || current.playbackEpisode === undefined) return;
+    const tmdb = current.id.match(/^(?:tmdb-|tv-)(\d+)$/)?.[1];
+    if (!tmdb) return;
+    try {
+      const details = current.seasons?.length ? current : await fetch('/api/tmdb/details/tv/' + current.id).then(r => r.json()).then(data => data.item as MediaItem);
+      const episodes = (details?.seasons || []).flatMap(season => season.episodes.map(episode => ({ season: season.number, episode: episode.number })))
+        .filter(ep => ep.season > 0 && (ep.season > current.playbackSeason! || (ep.season === current.playbackSeason && ep.episode > current.playbackEpisode!)))
+        .sort((a, b) => a.season - b.season || a.episode - b.episode);
+      const next = episodes[0];
+      if (!next) return;
+      const params = new URLSearchParams({ type: 'series', tmdb, season: String(next.season), episode: String(next.episode) });
+      const response = await fetch('/api/stremio/streams?' + params);
+      if (!response.ok) return;
+      const data = await response.json();
+      const streams = (Array.isArray(data.streams) ? data.streams : []).filter((stream: any) => typeof stream.url === 'string' && /^https:\/\//.test(stream.url));
+      if (!streams.length) return;
+      const mirrors: StreamMirror[] = streams.map((stream: any, index: number) => ({
+        id: 'stremio-' + index, source: 'custom', label: String(stream.title || stream.name || 'Stremio Stream').replace(/https?:\/\/\S+/g, '').slice(0, 100),
+        quality: stream.quality === '4K' ? '4K UHD' : ['1080p','720p','480p','360p'].includes(stream.quality) ? stream.quality : 'Auto',
+        url: stream.url, audioFixUrl: stream.audioFixUrl, fileSize: stream.fileSize,
+        streamType: stream.streamType === 'hls' ? 'hls' : 'direct-video', isDirect: true
+      }));
+      const nextMedia = { ...current, seasons: details.seasons, mirrors, playbackSeason: next.season, playbackEpisode: next.episode };
+      setActiveMedia(nextMedia);
+      setActiveMirrorId(mirrors[0].id);
+      rememberPlayed(nextMedia);
+    } catch { /* Retain finished episode when the next stream is unavailable. */ }
   };
 
   // Launch Player
@@ -762,11 +794,13 @@ export default function App() {
         {activeMedia && (
           <div className="mb-10 animate-fade-in relative z-30">
             <CinemaPlayer
+              key={activeMedia.id + ':' + (activeMedia.playbackSeason ?? '') + ':' + (activeMedia.playbackEpisode ?? '')}
               media={activeMedia}
               initialMirrorId={activeMirrorId}
               minimizeSignal={minimizeSignal}
               onClose={() => { setActiveMedia(null); refreshContinueWatching(); }}
               onProgressSaved={refreshContinueWatching}
+              onEpisodeEnded={() => { void playNextEpisode(); }}
               onMirrorChange={(mirror) => setActiveMirrorId(mirror.id)}
               hasPlayNext={catalog.length > 1}
               onPlayNext={() => {
@@ -818,6 +852,7 @@ export default function App() {
                   </div>
                   <div className="p-2">
                     <p className="text-sm text-white font-medium truncate">{entry.media.title}</p>
+                    {entry.media.playbackSeason !== undefined && entry.media.playbackEpisode !== undefined && <p className="text-xs font-bold text-amber-300">Season {entry.media.playbackSeason} · Episode {entry.media.playbackEpisode}</p>}
                     <p className="text-xs text-slate-400">{entry.progress >= 5 ? `${Math.floor(entry.progress / 60)} min watched` : 'Recently opened · start playback'}</p>
                   </div>
                 </button>
