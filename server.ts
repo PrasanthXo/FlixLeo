@@ -214,17 +214,27 @@ app.post('/api/resolve', async (req: Request, res: Response) => {
     });
   }
 
-  // 6. Generic HLS / Direct MP4 URL
-  const isHls = trimmed.includes('.m3u8');
+  // 6. Never substitute a demo film for an unknown link.
+  let direct: URL;
+  try {
+    direct = new URL(trimmed);
+    if (!['https:', 'http:'].includes(direct.protocol) || direct.username || direct.password) throw new Error('Unsupported URL');
+  } catch {
+    return res.status(400).json({ success: false, message: 'Provide a valid HTTP(S) video URL.' });
+  }
+  const isHls = /[.]m3u8$/i.test(direct.pathname);
+  if (!isHls && !/[.](mp4|m4v|webm|mov)$/i.test(direct.pathname)) {
+    return res.status(422).json({
+      success: false,
+      message: 'This page is not a direct playable video. Provide a title-specific MP4, WebM or HLS link.',
+      pageUrl: direct.href
+    });
+  }
   return res.json({
-    success: true,
-    source: 'custom',
-    name: 'Custom Cinema Stream',
+    success: true, source: 'custom', name: 'External Video',
     streamType: isHls ? 'hls' : 'direct-video',
-    streamUrl: trimmed.startsWith('http') ? trimmed : 'https://archive.org/download/Charade_1963/Charade.mp4',
-    embedUrl: trimmed,
-    quality: 'High Definition Full Feature',
-    features: ['Direct Playback', 'Custom Stream', 'Continuous Playback']
+    streamUrl: direct.href, quality: 'Source quality (unverified)',
+    features: ['Direct URL', 'No unrelated fallback movie']
   });
 });
 
