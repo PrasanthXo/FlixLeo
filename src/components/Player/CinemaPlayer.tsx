@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
-import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ExternalLink, RefreshCw, Share2, Maximize2, Minimize2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
 interface CinemaPlayerProps {
@@ -15,8 +15,10 @@ interface CinemaPlayerProps {
 }
 
 export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
-  media, initialMirrorId, onClose, onProgressSaved, onMirrorChange
+  media, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved, onMirrorChange
 }) => {
+  const playerAnchorRef = useRef<HTMLDivElement>(null);
+  const [docked, setDocked] = useState(false);
   const mirrors = media.mirrors || [];
   const [index, setIndex] = useState(() => Math.max(0, mirrors.findIndex(m => m.id === initialMirrorId)));
   const [tried, setTried] = useState<number[]>([]);
@@ -28,6 +30,30 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const hlsRef = useRef<Hls | null>(null);
   const lastSaveRef = useRef(0);
   const active = mirrors[index];
+  useEffect(() => {
+    const anchor = playerAnchorRef.current;
+    if (!anchor || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      const entry = entries[0];
+      if (!entry) return;
+      const above = entry.boundingClientRect.bottom < 0;
+      setDocked(!entry.isIntersecting && above);
+    }, { threshold: 0 });
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => { if (minimizeSignal > 0) setDocked(true); }, [minimizeSignal]);
+  const shareMovie = async () => {
+    const link = new URL(window.location.origin);
+    link.searchParams.set('media', media.id);
+    try {
+      if (navigator.share) await navigator.share({ title: media.title + ' · FlixLeo', url: link.toString() });
+      else { await navigator.clipboard.writeText(link.toString()); window.alert('Movie link copied'); }
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') window.alert('Unable to share movie link');
+    }
+  };
+
   const autoAdvance = useCallback(() => {
     setIndex(current => {
       const attempted = new Set([...tried, current]);
@@ -124,15 +150,16 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   };
 
   return (
-    <section className="w-full max-w-5xl mx-auto rounded-2xl overflow-hidden border border-slate-700 bg-[#0b0e15] shadow-xl" aria-label="Movie player">
+    <section ref={playerAnchorRef} className="w-full max-w-5xl mx-auto rounded-2xl border border-slate-700 bg-[#0b0e15] shadow-xl" aria-label="Movie player">
       <div className="flex items-center justify-between gap-3 p-3">
         <div className="min-w-0">
           <h2 className="text-white font-semibold text-sm sm:text-lg truncate">{media.title}</h2>
           <p className="text-slate-400 text-xs truncate">{active?.label || 'No servers available'}</p>
         </div>
-        <button type="button" onClick={() => { saveProgress(); onClose(); }} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white"><ArrowLeft className="h-4 w-4" /> Close</button>
+        <div className="flex items-center gap-2 shrink-0"><button type="button" onClick={() => void shareMovie()} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Share movie"><Share2 className="h-4 w-4" /> Share</button><button type="button" onClick={() => { saveProgress(); onClose(); }} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white"><ArrowLeft className="h-4 w-4" /> Close</button></div>
       </div>
-      <div className="aspect-video w-full bg-black relative">
+      <div className={docked ? "fixed z-[65] right-3 bottom-20 md:bottom-5 w-[min(60vw,240px)] md:w-80 aspect-video rounded-xl overflow-hidden border border-amber-500/60 shadow-2xl bg-black" : "aspect-video w-full bg-black relative"}>
+        {docked && <div className="absolute z-20 right-1 top-1 flex gap-1"><button type="button" onClick={() => { setDocked(false); playerAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
