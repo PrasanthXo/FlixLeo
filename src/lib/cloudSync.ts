@@ -4,6 +4,9 @@ const KEY = 'flixleo_cloud_session';
 export const cloudConfigured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 const base = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
 const apikey = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
+// Explicit production redirect prevents Supabase falling back to localhost:3000.
+const authRedirect = 'https://flixleo.cyou/';
+const redirectQuery = '?redirect_to=' + encodeURIComponent(authRedirect);
 let session: Session | null = null;
 try { session = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { /* ignore */ }
 const persist = (value: Session | null) => {
@@ -37,7 +40,7 @@ export async function cloudSignIn(email: string, password: string) {
 }
 export async function cloudSignUp(email: string, password: string) {
   if (!cloudConfigured) throw new Error('Supabase is not configured yet.');
-  const data = await request('/auth/v1/signup', { method: 'POST', body: JSON.stringify({ email, password }) });
+  const data = await request('/auth/v1/signup' + redirectQuery, { method: 'POST', body: JSON.stringify({ email, password }) });
   if (data.access_token) {
     persist({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user, expires_at: Math.floor(Date.now() / 1000) + data.expires_in });
   }
@@ -46,7 +49,7 @@ export async function cloudSignUp(email: string, password: string) {
 export async function cloudResendVerification(email: string) {
   if (!cloudConfigured) throw new Error('Supabase is not configured yet.');
   if (!email.trim()) throw new Error('Enter your email address first.');
-  await request('/auth/v1/resend', {
+  await request('/auth/v1/resend' + redirectQuery, {
     method: 'POST',
     body: JSON.stringify({ type: 'signup', email: email.trim() })
   });
@@ -66,7 +69,7 @@ export async function cloudChangePassword(password: string) {
 }
 export async function cloudResetPassword(email: string) {
   if (!email.trim()) throw new Error('Enter your email address first.');
-  await request('/auth/v1/recover', { method: 'POST', body: JSON.stringify({ email: email.trim() }) });
+  await request('/auth/v1/recover' + redirectQuery, { method: 'POST', body: JSON.stringify({ email: email.trim() }) });
 }
 export async function cloudSignOut() {
   const token = await accessToken().catch(() => '');
