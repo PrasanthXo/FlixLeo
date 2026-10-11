@@ -1028,6 +1028,8 @@ export default function App() {
         {(['browse', 'movies', 'series'].includes(currentTab)) && sourceFilter === 'all' && !searchQuery && !activeMedia && featuredMedia && (
           <HeroBanner
             media={featuredMedia}
+            items={currentTab === 'series' ? tvShows : tmdbMovies}
+            bookmarkedIds={watchlistIds}
             onPlay={(m) => handlePlayMedia(m)}
             onOpenDetails={(m) => setDetailMedia(m)}
             isBookmarked={watchlistIds.includes(featuredMedia.id)}
