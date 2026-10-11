@@ -70,6 +70,81 @@ app.get('/api/admin/users', async (req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * Short-lived TV device authorization. Pairing is initiated on the TV, approved
+ * on a signed-in phone, and redeemed once by the original TV only.
+ * Magic links are generated server-side; Supabase service keys never reach browsers.
+ */
+const tvPairs = new Map<string, { secret: string; expires: number; consumed: boolean; tokenHash?: string }>();
+const tvPairRequests = new Map<string, { count: number; resetAt: number }>();
+function tvPairRateLimit(req: Request, res: Response, next: () => void) {
+  const ip = String(req.ip || req.socket.remoteAddress || 'unknown');
+  const now = Date.now();
+  const rate = tvPairRequests.get(ip);
+  const item = !rate || rate.resetAt < now ? { count: 1, resetAt: now + 60_000 } : { ...rate, count: rate.count + 1 };
+  tvPairRequests.set(ip, item);
+  if (item.count > 30) { res.status(429).json({ error: 'Too many requests. Try again in one minute.' }); return; }
+  next();
+}
+function cleanTvPairs() {
+  const now = Date.now();
+  for (const [id, pair] of tvPairs) if (pair.expires < now || pair.consumed) tvPairs.delete(id);
+  for (const [ip, rate] of tvPairRequests) if (rate.resetAt < now) tvPairRequests.delete(ip);
+}
+app.post('/api/tv/pair', tvPairRateLimit, (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  cleanTvPairs();
+  if (tvPairs.size >= 500) return res.status(503).json({ error: 'TV pairing is busy. Retry shortly.' });
+  const id = randomUUID();
+  const secret = randomUUID() + randomUUID();
+  tvPairs.set(id, { secret, expires: Date.now() + 5 * 60_000, consumed: false });
+  return res.json({ id, secret, expiresIn: 300, url: 'https://flixleo.cyou/?tv_pair=' + encodeURIComponent(id) });
+});
+app.get('/api/tv/pair/:id', tvPairRateLimit, (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const pair = tvPairs.get(String(req.params.id));
+  if (!pair || pair.expires < Date.now() || pair.consumed) return res.status(410).json({ status: 'expired' });
+  if (req.get('x-tv-pair-secret') !== pair.secret) return res.status(403).json({ error: 'Invalid TV code.' });
+  if (!pair.tokenHash) return res.json({ status: 'pending' });
+  // Single-use redemption: a phone/another device cannot claim this TV session.
+  pair.consumed = true;
+  tvPairs.delete(String(req.params.id));
+  return res.json({ status: 'approved', tokenHash: pair.tokenHash });
+});
+app.post('/api/tv/pair/:id/approve', tvPairRateLimit, async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const pair = tvPairs.get(String(req.params.id));
+  if (!pair || pair.expires < Date.now() || pair.consumed) return res.status(410).json({ error: 'Pairing expired. Refresh the TV code.' });
+  if (pair.tokenHash) return res.status(409).json({ error: 'TV pairing has already been approved.' });
+  const bearer = String(req.headers.authorization || '');
+  if (!/^Bearer [^\\s]+$/.test(bearer)) return res.status(401).json({ error: 'Sign in on your phone first.' });
+  const supabaseUrl = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return res.status(503).json({ error: 'TV sign-in is not configured on this server.' });
+  try {
+    const userResponse = await fetch(supabaseUrl + '/auth/v1/user', {
+      headers: { apikey: serviceKey, Authorization: bearer }
+    });
+    if (!userResponse.ok) return res.status(401).json({ error: 'Your session expired. Sign in again.' });
+    const user: any = await userResponse.json();
+    if (!user?.id || !user?.email || !user?.email_confirmed_at) return res.status(403).json({ error: 'Confirm your email before pairing a TV.' });
+    const linkResponse = await fetch(supabaseUrl + '/auth/v1/admin/generate_link', {
+      method: 'POST',
+      headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'magiclink', email: user.email })
+    });
+    if (!linkResponse.ok) return res.status(502).json({ error: 'Could not authorize the TV. Retry.' });
+    const link: any = await linkResponse.json();
+    const tokenHash = link?.properties?.hashed_token;
+    if (typeof tokenHash !== 'string' || !tokenHash) return res.status(502).json({ error: 'TV authorization failed.' });
+    pair.tokenHash = tokenHash;
+    return res.json({ success: true });
+  } catch {
+    return res.status(502).json({ error: 'TV pairing service temporarily unavailable.' });
+  }
+});
+
 // API: PixelDrain File Info & Stream Resolver
 app.get('/api/pixeldrain/info/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
