@@ -17,7 +17,7 @@ app.use(express.json());
 // Never use the public anon key for privileged Supabase Auth operations.
 app.get('/api/admin/users', async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
-  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const adminEmail = (process.env.FLIXLEO_ADMIN_EMAIL || '').trim().toLowerCase();
   if (!supabaseUrl || !secret || !adminEmail) return res.status(503).json({ error: 'Admin access is not configured.' });
