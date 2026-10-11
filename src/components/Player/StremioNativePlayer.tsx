@@ -12,6 +12,7 @@ const parseSrt = (text: string) => 'WEBVTT\n\n' + text.replace(/\r/g, '').replac
 export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved }) => {
   const sorted = [...mirrors].sort((a, b) => qualitySort(b) - qualitySort(a));
   const [selected, setSelected] = useState(initialMirrorId || sorted[0]?.id || '');
+  const [audioFix, setAudioFix] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerAnchor = useRef<HTMLDivElement>(null);
   const [docked, setDocked] = useState(false);
@@ -95,7 +96,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     setSubtitleMode('auto');
     setSelectedSubtitle('');
     const fail = () => { if (!disposed) { setBuffering(false); setError('Unable to play this stream in your browser.'); } };
-    const url = active.url;
+    const url = audioFix && active.audioFixUrl ? active.audioFixUrl : active.url;
     if (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url)) {
       if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
       else if (Hls.isSupported()) {
@@ -203,7 +204,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       hlsRef.current?.destroy(); hlsRef.current = null;
       video.pause(); video.removeAttribute('src'); video.load();
     };
-  }, [active?.id, active?.url, media.id]);
+  }, [active?.id, active?.url, active?.audioFixUrl, audioFix, media.id]);
   const changeAudio = (id: number) => {
     if (hlsRef.current) { hlsRef.current.audioTrack = id; setAudio(id); return; }
     const native = (videoRef.current as (HTMLVideoElement & { audioTracks?: { length: number; [index: number]: { enabled: boolean } } }) | null)?.audioTracks;
@@ -333,10 +334,15 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       </div>
       {settingsOpen && <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-900 p-3">
         <label className="block text-xs text-slate-300">Video quality / stream
-          <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => setSelected(e.target.value)}>
+          <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => { setAudioFix(false); setSelected(e.target.value); }}>
             {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}</option>)}
           </select>
         </label>
+        {active?.audioFixUrl && <button type="button" onClick={() => setAudioFix(current => !current)}
+          className="w-full rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-left text-xs font-semibold text-amber-300">
+          {audioFix ? 'Use original audio' : 'Audio Fix · Convert audio to AAC (video unchanged)'}
+        </button>}
+        {audioFix && <p className="text-xs text-amber-300">Audio conversion may take time to start. Video codecs must still be browser-compatible.</p>}
         <label className="block text-xs text-slate-300"><span className="inline-flex items-center gap-1"><Volume2 size={14} /> Audio track</span>
           <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={audio} disabled={!audioAvailable} onChange={e => changeAudio(Number(e.target.value))}>
             {!audioAvailable && <option value={-1}>{audioStatus === 'loading' ? 'Detecting audio tracks…' : audioStatus === 'browser-limited' ? 'Audio tracks not exposed by this browser' : 'Original audio · no alternate track detected'}</option>}
