@@ -482,9 +482,10 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`CineHub streaming server active on port ${PORT}`);
+  const server = app.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`FlixLeo server listening on 0.0.0.0:${PORT}`);
   });
+  server.on('error', (error) => { console.error('FlixLeo listen failed:', error); process.exitCode = 1; });
 }
 
-startServer();
+startServer().catch((error) => { console.error('FlixLeo startup failed:', error); process.exitCode = 1; });
