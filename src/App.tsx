@@ -15,6 +15,7 @@ import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
 import { TvSignIn, TvPairApproval } from './components/TvPairing';
 import { TvExperience } from './components/TvExperience';
 import { TvTitleCard } from './components/TvTitleCard';
+import { cloudListApprovedTvs, cloudRevokeTv, cloudCheckTv, type ApprovedTv } from './lib/cloudSync';
 import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudResendVerification, cloudSignOut, cloudUpdateProfile, cloudChangePassword, cloudResetPassword, cloudRecoveryTokenFromUrl, cloudCompleteRecovery, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
 
 // Deduplicate repeated TMDB entries by ID and normalized title/year within each media type.
@@ -256,6 +257,40 @@ export default function App() {
   // Optional Supabase cross-device account. Local storage remains available without login.
   const [cloudUser, setCloudUser] = useState<CloudUser | null>(() => currentCloudUser());
   const [accountOpen, setAccountOpen] = useState(false);
+  const [approvedTvs, setApprovedTvs] = useState<ApprovedTv[]>([]);
+  const [tvListError, setTvListError] = useState('');
+  const [tvListBusy, setTvListBusy] = useState(false);
+  const refreshTvs = async () => {
+    setTvListBusy(true); setTvListError('');
+    try { setApprovedTvs(await cloudListApprovedTvs()); }
+    catch (e) { setTvListError(e instanceof Error ? e.message : 'Could not load approved TVs'); }
+    finally { setTvListBusy(false); }
+  };
+  useEffect(() => {
+    if (accountOpen && cloudUser && accountSection === 'security') void refreshTvs();
+  }, [accountOpen, cloudUser?.id, accountSection]);
+  useEffect(() => {
+    if (!isTvDisplay || !cloudUser) return;
+    const id = localStorage.getItem('flixleo_tv_device_id');
+    if (!id) return;
+    let busy = false;
+    const verify = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        if (!await cloudCheckTv(id)) {
+          localStorage.removeItem('flixleo_tv_device_id');
+          await cloudSignOut();
+          setCloudUser(null); setCloudReady(false); setAccountOpen(true);
+          setTvSignInMode(true);
+        }
+      } catch { /* preserve login during temporary outages; retry on next check */ }
+      finally { busy = false; }
+    };
+    void verify();
+    const timer = window.setInterval(verify, 30000);
+    return () => window.clearInterval(timer);
+  }, [isTvDisplay, cloudUser?.id]);
   const [tvSignInMode, setTvSignInMode] = useState(() =>
     window.location.pathname.toLowerCase().replace(/\/$/, '') === '/tv6' ||
     new URLSearchParams(window.location.search).get('tv') === '1' ||
@@ -775,6 +810,31 @@ export default function App() {
                 )}
                 {accountSection === 'security' && (
                   <div className="space-y-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div><h3 className="font-bold text-white">Approved TVs</h3><p className="text-xs text-slate-400">Manage TVs connected through QR sign-in.</p></div>
+                        <button type="button" disabled={tvListBusy} onClick={() => void refreshTvs()} className="rounded-lg bg-slate-700 px-3 py-2 text-sm text-white">Refresh</button>
+                      </div>
+                      {tvListError && <p role="alert" className="text-rose-300 text-sm">{tvListError}</p>}
+                      {!tvListBusy && !approvedTvs.length && !tvListError && <p className="text-sm text-slate-300">No approved TVs yet.</p>}
+                      {approvedTvs.map(tv => (
+                        <div key={tv.id} className="rounded-xl border border-slate-700 p-3 flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-white">{tv.label}</p>
+                            <p className="text-xs text-slate-400">Approved {new Date(tv.approved_at).toLocaleString()}</p>
+                            <p className="text-xs text-slate-400">{tv.last_seen_at ? 'Last active ' + new Date(tv.last_seen_at).toLocaleString() : 'Not yet active'}</p>
+                            {tv.revoked_at && <p className="text-xs text-rose-300">Revoked</p>}
+                          </div>
+                          {!tv.revoked_at && <button type="button" disabled={tvListBusy} className="rounded-lg border border-rose-500/50 px-3 py-2 font-semibold text-rose-300" onClick={async () => {
+                            if (!window.confirm('Revoke this TV? It will be signed out shortly.')) return;
+                            setTvListBusy(true);
+                            try { await cloudRevokeTv(tv.id); await refreshTvs(); }
+                            catch (e) { setTvListError(e instanceof Error ? e.message : 'Revocation failed'); }
+                            finally { setTvListBusy(false); }
+                          }}>Revoke</button>}
+                        </div>
+                      ))}
+                    </div>
                     <p className="text-sm text-slate-300">Change password for {cloudUser.email}</p>
                     <form onSubmit={e => { e.preventDefault(); void accountAction(async () => { await cloudChangePassword(newPassword); setNewPassword(''); }, 'Password updated.'); }} className="space-y-2">
                       <input type="password" autoComplete="new-password" minLength={8} required value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password (8+ characters)" className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
