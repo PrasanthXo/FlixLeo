@@ -58,6 +58,20 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [subtitleLoading, setSubtitleLoading] = useState(false);
   const active = sorted.find(m => m.id === selected) || sorted[0];
+  const [vlcNotice, setVlcNotice] = useState('');
+  const openInVlc = () => {
+    if (!active?.url || !/^https:\/\//i.test(active.url)) {
+      setVlcNotice('This stream has no VLC-compatible HTTPS link.');
+      return;
+    }
+    // Open only the original source, never the short-lived AAC conversion ticket.
+    // Android Chrome can dispatch this intent to installed VLC.
+    const source = active.url;
+    const intent = 'intent://' + source.slice('https://'.length) +
+      '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
+    setVlcNotice('If VLC does not open, use Copy stream URL and open it in VLC → New stream.');
+    window.location.href = intent;
+  };
   const lastSave = useRef(0);
   const save = () => {
     const video = videoRef.current;
@@ -410,6 +424,21 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
             {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}</option>)}
           </select>
         </label>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={openInVlc}
+            className="rounded-lg border border-orange-400/50 bg-orange-500/15 px-3 py-2 text-xs font-semibold text-orange-200">
+            Open in VLC (4K audio)
+          </button>
+          <button type="button" onClick={async () => {
+            if (!active?.url) return;
+            try { await navigator.clipboard.writeText(active.url); setVlcNotice('Stream URL copied. In VLC, open New stream and paste it.'); }
+            catch { setVlcNotice('Clipboard unavailable. Use a browser that supports copying links.'); }
+          }} className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-200">
+            Copy stream URL
+          </button>
+        </div>
+        {vlcNotice && <p role="status" className="text-xs text-slate-300">{vlcNotice}</p>}
+        <p className="text-xs text-slate-400">VLC is an external app. Some streaming hosts may block playback outside FlixLeo.</p>
         {active?.audioFixUrl && <button type="button" onClick={() => setAudioFix(current => !current)}
           className="w-full rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-left text-xs font-semibold text-amber-300">
           {audioFix ? 'Use original audio' : 'Audio Fix · Convert audio to AAC (video unchanged)'}
