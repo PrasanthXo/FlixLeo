@@ -9,8 +9,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="FlixLeo" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" type="image/svg+xml" href="/flixleo-logo.svg" />
-    <link rel="apple-touch-icon" href="/flixleo-logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="/flixleo-splash-icon.svg" />
+    <link rel="apple-touch-icon" href="/flixleo-splash-icon.svg" />
     <meta name="description" content="High-performance streaming platform for mobile and desktop supporting 4K UHD cinema, Regional South Asian masters, FastStream CDN, and direct cloud playback." />
     <meta property="og:title" content="FlixLeo" />
     <meta property="og:description" content="High-performance streaming platform for mobile and desktop supporting 4K UHD cinema, Regional South Asian masters, FastStream CDN, and direct cloud playback." />
@@ -19,8 +19,23 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      #flixleo-startup{position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 38%,#1d293f 0%,#0b0e14 58%,#05070b 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-family:system-ui,-apple-system,sans-serif;transition:opacity .3s ease,visibility .3s ease}
+      #flixleo-startup.is-ready{opacity:0;visibility:hidden;pointer-events:none}
+      .flixleo-startup-inner{text-align:center;padding:24px}
+      .flixleo-startup-icon{display:block;width:clamp(104px,24vw,154px);height:auto;margin:0 auto 22px;filter:drop-shadow(0 20px 42px rgba(245,158,11,.14))}
+      .flixleo-startup-title{font-weight:800;font-size:clamp(28px,6vw,38px);letter-spacing:-1.4px}
+      .flixleo-startup-sub{margin-top:8px;color:#94a3b8;font-size:12px;letter-spacing:3px;text-transform:uppercase}
+      .flixleo-startup-line{margin:28px auto 0;width:118px;height:3px;background:#263041;border-radius:20px;overflow:hidden}
+      .flixleo-startup-line:before{content:'';display:block;width:42%;height:100%;border-radius:20px;background:linear-gradient(90deg,#f59e0b,#fcd34d);animation:flixleo-loading 1.3s ease-in-out infinite alternate}
+      @keyframes flixleo-loading{from{transform:translateX(0)}to{transform:translateX(138px)}}
+      @media (prefers-reduced-motion:reduce){.flixleo-startup-line:before{animation:none}}
+    </style>
   </head>
   <body class="bg-[#0b0e14] text-slate-100 antialiased selection:bg-amber-500 selection:text-black">
+    <div id="flixleo-startup" role="status" aria-label="Loading FlixLeo">
+      <div class="flixleo-startup-inner"><img class="flixleo-startup-icon" src="/flixleo-splash-icon.svg" alt="" /><div class="flixleo-startup-title">FlixLeo</div><div class="flixleo-startup-sub">Your cinema, reimagined</div><div class="flixleo-startup-line"></div></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
