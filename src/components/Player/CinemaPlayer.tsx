@@ -171,7 +171,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         </div>
         <div className="flex items-center gap-2 shrink-0"><button type="button" onClick={() => void shareMovie()} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Share movie"><Share2 className="h-4 w-4" /> Share</button><button type="button" onClick={() => { saveProgress(); onClose(); }} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white"><ArrowLeft className="h-4 w-4" /> Close</button></div>
       </div>
-      <div className={docked ? "fixed z-[65] right-3 bottom-20 md:bottom-5 w-[min(60vw,240px)] md:w-80 aspect-video rounded-xl overflow-hidden border border-amber-500/60 shadow-2xl bg-black" : "aspect-video w-full bg-black relative"}>
+      <div className={docked ? "fixed z-[65] right-3 bottom-28 md:bottom-8 w-[min(60vw,240px)] md:w-80 aspect-video rounded-xl overflow-hidden border border-amber-500/60 shadow-2xl bg-black" : "aspect-video w-full bg-black relative"}>
         {docked && <div className="absolute z-20 right-1 top-1 flex gap-1"><button type="button" onClick={() => { setDocked(false); playerAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
           : active.streamType === 'embed-iframe'
