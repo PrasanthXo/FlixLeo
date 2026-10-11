@@ -32,6 +32,7 @@ export function TvSignIn({ onSignedIn, onCancel }: { onSignedIn: (user: CloudUse
             if (result.status === 'approved' && result.tokenHash) {
               if (interval) clearInterval(interval);
               const user = await cloudSignInTv(result.tokenHash);
+              if (result.deviceId) localStorage.setItem('flixleo_tv_device_id', result.deviceId);
               if (!stopped) onSignedIn(user);
             } else if (result.status === 'expired') {
               if (interval) clearInterval(interval);
