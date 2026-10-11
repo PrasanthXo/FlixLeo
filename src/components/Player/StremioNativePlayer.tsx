@@ -15,6 +15,9 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const uploadedRef = useRef<string | null>(null);
+  const subtitleController = useRef<AbortController | null>(null);
+  const [audioAvailable, setAudioAvailable] = useState(false);
+  const [subtitleError, setSubtitleError] = useState('');
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(true);
   const [position, setPosition] = useState(0);
@@ -44,7 +47,8 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     const id = media.id.match(/^(?:tmdb-|tv-)(\d+)$/)?.[1];
     if (!id) return;
     setSubtitleLoading(true);
-    fetch('/api/stremio/subtitles?type=' + (media.type === 'tv' ? 'series' : 'movie') + '&tmdb=' + id, { signal: controller.signal })
+    const params = new URLSearchParams({ type: media.type === 'tv' ? 'series' : 'movie', tmdb: id, title: media.title, year: String(media.year || '') });
+    fetch('/api/stremio/subtitles?' + params, { signal: controller.signal })
       .then(response => response.ok ? response.json() : { subtitles: [] })
       .then(data => { if (!controller.signal.aborted) setSubtitles(Array.isArray(data.subtitles) ? data.subtitles : []); })
       .catch(() => {})
@@ -55,7 +59,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     const video = videoRef.current;
     if (!video || !active) return;
     let disposed = false;
-    setError(''); setBuffering(true); setAudioTracks([]); setAudio(-1);
+    setError(''); setBuffering(true); setAudioTracks([]); setAudio(-1); setAudioAvailable(false);
     const fail = () => { if (!disposed) { setBuffering(false); setError('Unable to play this stream in your browser.'); } };
     const url = active.url;
     if (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url)) {
@@ -67,8 +71,9 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           if (disposed) return;
           setAudioTracks(hls.audioTracks.map((t, i) => ({ id: i, name: t.name || t.lang || 'Track ' + (i + 1) })));
           setAudio(hls.audioTrack);
+          setAudioAvailable(hls.audioTracks.length > 1);
         });
-        hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => { if (!disposed) setAudioTracks(hls.audioTracks.map((t, i) => ({ id: i, name: t.name || t.lang || 'Track ' + (i + 1) }))); });
+        hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => { if (!disposed) setAudioTracks(hls.audioTracks.map((t, i) => ({ id: i, name: t.name || t.lang || 'Track ' + (i + 1) }))); setAudioAvailable(hls.audioTracks.length > 1); });
         hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
           if (disposed) return;
           // HLS subtitle renditions can be selected directly within hls.js.
@@ -90,18 +95,32 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         if (p > 5 && p < video.duration - 15) video.currentTime = p;
       } catch { /* ignore */ }
     };
+    const detectNativeAudio = () => {
+      const native = (video as HTMLVideoElement & { audioTracks?: { length: number; [index: number]: { label?: string; language?: string; enabled: boolean } } }).audioTracks;
+      if (native && native.length > 1) {
+        setAudioTracks(Array.from({ length: native.length }, (_, i) => ({ id: i, name: native[i].label || native[i].language || 'Track ' + (i + 1) })));
+        setAudio(Array.from({ length: native.length }, (_, i) => i).find(i => native[i].enabled) ?? 0);
+        setAudioAvailable(true);
+      }
+    };
     video.addEventListener('loadedmetadata', loaded);
+    video.addEventListener('loadedmetadata', detectNativeAudio);
     video.addEventListener('error', fail);
     video.play().catch(() => setPlaying(false));
     return () => {
       disposed = true;
-      video.removeEventListener('loadedmetadata', loaded); video.removeEventListener('error', fail);
+      video.removeEventListener('loadedmetadata', loaded); video.removeEventListener('loadedmetadata', detectNativeAudio); video.removeEventListener('error', fail);
       hlsRef.current?.destroy(); hlsRef.current = null;
       video.pause(); video.removeAttribute('src'); video.load();
     };
   }, [active?.id, active?.url, media.id]);
   const changeAudio = (id: number) => {
-    if (hlsRef.current) { hlsRef.current.audioTrack = id; setAudio(id); }
+    if (hlsRef.current) { hlsRef.current.audioTrack = id; setAudio(id); return; }
+    const native = (videoRef.current as (HTMLVideoElement & { audioTracks?: { length: number; [index: number]: { enabled: boolean } } }) | null)?.audioTracks;
+    if (native && id >= 0 && id < native.length) {
+      for (let i = 0; i < native.length; i++) native[i].enabled = i === id;
+      setAudio(id);
+    }
   };
   const selectSubtitle = (url: string) => {
     setSelectedSubtitle(url);
@@ -163,8 +182,8 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           </select>
         </label>
         <label className="block text-xs text-slate-300"><span className="inline-flex items-center gap-1"><Volume2 size={14} /> Audio track</span>
-          <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={audio} disabled={!audioTracks.length} onChange={e => changeAudio(Number(e.target.value))}>
-            {!audioTracks.length && <option value={-1}>Original (browser default)</option>}
+          <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={audio} disabled={!audioAvailable} onChange={e => changeAudio(Number(e.target.value))}>
+            {!audioAvailable && <option value={-1}>Original audio · no alternate track detected</option>}
             {audioTracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </label>
