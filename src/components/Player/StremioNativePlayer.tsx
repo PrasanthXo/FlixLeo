@@ -27,6 +27,17 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const [audio, setAudio] = useState(-1);
   const [subtitles, setSubtitles] = useState<Track[]>([]);
   const [selectedSubtitle, setSelectedSubtitle] = useState('');
+  const subtitlePreference = useRef<'auto' | 'manual' | 'off'>('auto');
+  const subtitleSelection = useRef('');
+  const selectAutomatically = (value: string) => {
+    if (subtitlePreference.current !== 'auto' || subtitleSelection.current) return;
+    subtitleSelection.current = value;
+    setSelectedSubtitle(value);
+    if (value.startsWith('hls-sub:') && hlsRef.current) {
+      hlsRef.current.subtitleDisplay = true;
+      hlsRef.current.subtitleTrack = Number(value.slice(8));
+    }
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [subtitleLoading, setSubtitleLoading] = useState(false);
   const active = sorted.find(m => m.id === selected) || sorted[0];
@@ -60,6 +71,10 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     if (!video || !active) return;
     let disposed = false;
     setError(''); setBuffering(true); setAudioTracks([]); setAudio(-1); setAudioAvailable(false);
+    setSubtitles(previous => previous.filter(t => !t.url.startsWith('hls-sub:') && !t.url.startsWith('native-sub:')));
+    subtitlePreference.current = 'auto';
+    subtitleSelection.current = '';
+    setSelectedSubtitle('');
     const fail = () => { if (!disposed) { setBuffering(false); setError('Unable to play this stream in your browser.'); } };
     const url = active.url;
     if (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url)) {
@@ -81,6 +96,10 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
             ...previous.filter(t => !t.url.startsWith('hls-sub:')),
             ...hls.subtitleTracks.map((track, i) => ({ url: 'hls-sub:' + i, label: track.name || track.lang || 'Subtitle ' + (i + 1), language: track.lang || 'und' }))
           ]);
+          if (hls.subtitleTracks.length && subtitlePreference.current === 'auto') {
+            const preferred = hls.subtitleTracks.findIndex(track => /^en(?:-|$)/i.test(track.lang || ''));
+            selectAutomatically('hls-sub:' + (preferred >= 0 ? preferred : 0));
+          }
         });
         hls.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) fail(); });
         hls.loadSource(url); hls.attachMedia(video);
@@ -103,12 +122,36 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         setAudioAvailable(true);
       }
     };
+    const detectEmbeddedSubtitles = () => {
+      if (disposed) return;
+      const tracks = Array.from(video.textTracks);
+      const embedded = tracks.map((track, index) => ({ track, index }))
+        .filter(({ track }) => (track.kind === 'subtitles' || track.kind === 'captions') && track.label !== 'Selected subtitles');
+      setSubtitles(previous => [
+        ...previous.filter(t => !t.url.startsWith('native-sub:')),
+        ...embedded.map(({ track, index }) => ({
+          url: 'native-sub:' + index,
+          label: track.label || track.language || 'Embedded subtitle ' + (index + 1),
+          language: track.language || 'und'
+        }))
+      ]);
+      if (embedded.length && subtitlePreference.current === 'auto' && !subtitleSelection.current) {
+        const preferred = embedded.find(({ track }) => /^en(?:-|$)/i.test(track.language || '')) || embedded[0];
+        for (const track of tracks) track.mode = 'disabled';
+        preferred.track.mode = 'showing';
+        selectAutomatically('native-sub:' + preferred.index);
+      }
+    };
+    video.addEventListener('loadedmetadata', detectEmbeddedSubtitles);
+    video.textTracks.addEventListener('addtrack', detectEmbeddedSubtitles);
     video.addEventListener('loadedmetadata', loaded);
     video.addEventListener('loadedmetadata', detectNativeAudio);
     video.addEventListener('error', fail);
     video.play().catch(() => setPlaying(false));
     return () => {
       disposed = true;
+      video.removeEventListener('loadedmetadata', detectEmbeddedSubtitles);
+      video.textTracks.removeEventListener('addtrack', detectEmbeddedSubtitles);
       video.removeEventListener('loadedmetadata', loaded); video.removeEventListener('loadedmetadata', detectNativeAudio); video.removeEventListener('error', fail);
       hlsRef.current?.destroy(); hlsRef.current = null;
       video.pause(); video.removeAttribute('src'); video.load();
@@ -125,9 +168,16 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const selectSubtitle = async (url: string) => {
     subtitleController.current?.abort();
     setSubtitleError('');
-    if (hlsRef.current) hlsRef.current.subtitleTrack = url.startsWith('hls-sub:') ? Number(url.slice(8)) : -1;
-    if (videoRef.current) for (let i = 0; i < videoRef.current.textTracks.length; i++) videoRef.current.textTracks[i].mode = 'disabled';
-    if (!url || url.startsWith('hls-sub:') || url.startsWith('blob:')) {
+    subtitlePreference.current = url ? 'manual' : 'off';
+    subtitleSelection.current = url;
+    if (hlsRef.current) {
+      hlsRef.current.subtitleDisplay = url.startsWith('hls-sub:');
+      hlsRef.current.subtitleTrack = url.startsWith('hls-sub:') ? Number(url.slice(8)) : -1;
+    }
+    if (videoRef.current) for (let i = 0; i < videoRef.current.textTracks.length; i++) {
+      videoRef.current.textTracks[i].mode = url === 'native-sub:' + i ? 'showing' : 'disabled';
+    }
+    if (!url || url.startsWith('hls-sub:') || url.startsWith('native-sub:') || url.startsWith('blob:')) {
       setSelectedSubtitle(url);
       return;
     }
@@ -144,6 +194,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       if (uploadedRef.current) URL.revokeObjectURL(uploadedRef.current);
       const objectUrl = URL.createObjectURL(new Blob([converted], { type: 'text/vtt' }));
       uploadedRef.current = objectUrl;
+      subtitleSelection.current = objectUrl;
       setSelectedSubtitle(objectUrl);
     } catch {
       if (!controller.signal.aborted) setSubtitleError('Could not install online subtitles. Try another track or upload a file.');
