@@ -58,8 +58,8 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
     ]),
     {label:'Top Rated Picks',subtitle:'Popular highly rated titles',list:[...unique].filter(x=>Number.parseFloat(x.imdbRating)>0).sort((x,y)=>Number.parseFloat(y.imdbRating)-Number.parseFloat(x.imdbRating)).slice(0,16)},
     ...['Netflix','STARZ','ZEE5'].flatMap(provider => [
-      {label:provider+' Tamil Movies',subtitle:'Tamil originals · provider discovery',list:combined('tamilProviderMovie:'+provider).filter(item => languageMatch(item.language,'Tamil'))},
-      {label:provider+' Tamil Series',subtitle:'Tamil originals · provider discovery',list:combined('tamilProviderSeries:'+provider).filter(item => languageMatch(item.language,'Tamil'))}
+      {label:provider+' Movies',subtitle:'All languages · provider discovery',list:combined('allProviderMovie:'+provider)},
+      {label:provider+' Series',subtitle:'All languages · provider discovery',list:combined('allProviderSeries:'+provider)}
     ])
   ].filter(row => row.list.length > 0);
   return <div className="flixleo-mobile-collections" aria-label="Explore FlixLeo collections">
