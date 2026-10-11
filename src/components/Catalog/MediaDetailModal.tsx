@@ -59,12 +59,13 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         const streams: StreamMirror[] = (Array.isArray(data.streams) ? data.streams : []).map((stream: any, index: number) => ({
           id: 'stremio-' + index,
           source: 'custom',
-          label: String(stream.provider || 'Stremio').split('.')[0].replace(/[^a-z0-9 -]/gi, ' ').trim() || 'Stremio',
-          quality: /(?:4k|2160p)/i.test(String(stream.title || '')) ? '4K UHD'
-            : /1080p/i.test(String(stream.title || '')) ? '1080p'
-            : /720p/i.test(String(stream.title || '')) ? '720p'
-            : /480p/i.test(String(stream.title || '')) ? '480p'
-            : /360p/i.test(String(stream.title || '')) ? '360p'
+          label: (String(stream.provider || 'Stremio').split('.')[0].replace(/[^a-z0-9 -]/gi, ' ').trim() || 'Stremio') +
+            (String(stream.title || '').match(/(?:WEB[- .]?DL|BluRay|WEBRip|HDR|DV|HEVC|H\.265|H\.264|AV1|MP4|MKV)/i)?.[0] ? ' · ' + String(stream.title).match(/(?:WEB[- .]?DL|BluRay|WEBRip|HDR|DV|HEVC|H\.265|H\.264|AV1|MP4|MKV)/i)![0].toUpperCase() : ''),
+          quality: /(?:4k|2160p)/i.test(String(stream.title || '') + ' ' + String(stream.name || '')) ? '4K UHD'
+            : /1080p/i.test(String(stream.title || '') + ' ' + String(stream.name || '')) ? '1080p'
+            : /720p/i.test(String(stream.title || '') + ' ' + String(stream.name || '')) ? '720p'
+            : /480p/i.test(String(stream.title || '') + ' ' + String(stream.name || '')) ? '480p'
+            : /360p/i.test(String(stream.title || '') + ' ' + String(stream.name || '')) ? '360p'
             : stream.quality === '4K' ? '4K UHD'
             : ['1080p', '720p', '480p', '360p'].includes(stream.quality) ? stream.quality : 'Auto',
           url: stream.url,
@@ -384,7 +385,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                   {orderedMirrors(activeMedia.mirrors).map((mirror: StreamMirror) => (
                     <div
                       key={mirror.id}
-                      className="p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                      className="p-3 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/40 transition-colors flex flex-row items-center justify-between gap-2 group"
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -434,10 +435,10 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           onClick={() => {
                             playSelected(mirror, activeMedia.mirrors);
                           }}
-                          className="px-4 py-2 rounded-lg bg-slate-800 group-hover:bg-amber-500 text-white group-hover:text-black font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md"
+                          className="px-3 py-2 rounded-lg bg-slate-800 group-hover:bg-amber-500 text-white group-hover:text-black font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md"
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
-                          Stream This Mirror
+                          Play
                         </button>
                       </div>
                     </div>
