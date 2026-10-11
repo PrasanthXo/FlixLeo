@@ -3,13 +3,13 @@ import Hls from 'hls.js';
 import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
-type Props = { media: MediaItem; mirrors: StreamMirror[]; initialMirrorId?: string; minimizeSignal?: number; onClose: () => void; onProgressSaved?: () => void };
+type Props = { media: MediaItem; mirrors: StreamMirror[]; initialMirrorId?: string; minimizeSignal?: number; onClose: () => void; onProgressSaved?: () => void; onEpisodeEnded?: () => void };
 type Track = { label: string; language: string; url: string };
 const timeLabel = (n: number) => Number.isFinite(n) ? `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}` : '0:00';
 const qualitySort = (m: StreamMirror) => /4k|2160/i.test(m.quality) ? 2160 : parseInt(m.quality, 10) || 0;
 const parseSrt = (text: string) => 'WEBVTT\n\n' + text.replace(/\r/g, '').replace(/(\d\d:\d\d:\d\d),(\d\d\d)/g, '$1.$2');
 
-export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved }) => {
+export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved, onEpisodeEnded }) => {
   const sorted = [...mirrors].sort((a, b) => qualitySort(b) - qualitySort(a));
   const [selected, setSelected] = useState(initialMirrorId || sorted[0]?.id || '');
   const [audioFix, setAudioFix] = useState(false);
@@ -390,7 +390,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         onWaiting={() => setBuffering(true)}
         onCanPlay={() => setBuffering(false)}
         onTimeUpdate={event => { setPosition(event.currentTarget.currentTime); setDuration(event.currentTarget.duration || 0); save(); }}
-        onEnded={() => { setPlaying(false); save(); }}>
+        onEnded={() => { setPlaying(false); save(); onEpisodeEnded?.(); }}>
         {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>
       {buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
