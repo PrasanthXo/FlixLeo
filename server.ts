@@ -554,8 +554,19 @@ app.get('/api/tmdb/south-indian', async (req: Request, res: Response) => {
       if (languages.includes(movie.original_language) && movie.id) movies.set(String(movie.id), movie);
     }
   }
-  const items = [...movies.values()].sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
-    .map(movie => transformTmdbMovie(movie));
+  // Round-robin language buckets to prevent the most popular language
+  // from dominating the mixed South Indian cinema row.
+  const buckets = languages.map(language => [...movies.values()]
+    .filter(movie => movie.original_language === language)
+    .sort((a, b) => (b.popularity || 0) - (a.popularity || 0)));
+  const mixed: any[] = [];
+  const maxLength = Math.max(0, ...buckets.map(bucket => bucket.length));
+  for (let index = 0; index < maxLength; index++) {
+    for (const bucket of buckets) {
+      if (bucket[index]) mixed.push(bucket[index]);
+    }
+  }
+  const items = mixed.map(movie => transformTmdbMovie(movie));
   return res.json({ success: true, isLive: results.some(result =>
     result.status === 'fulfilled' && Array.isArray(result.value?.results) && result.value.results.length > 0
   ), items, page });
