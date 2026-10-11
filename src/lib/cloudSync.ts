@@ -43,6 +43,14 @@ export async function cloudSignUp(email: string, password: string) {
   }
   return Boolean(data.access_token);
 }
+export async function cloudResendVerification(email: string) {
+  if (!cloudConfigured) throw new Error('Supabase is not configured yet.');
+  if (!email.trim()) throw new Error('Enter your email address first.');
+  await request('/auth/v1/resend', {
+    method: 'POST',
+    body: JSON.stringify({ type: 'signup', email: email.trim() })
+  });
+}
 export async function cloudUpdateProfile(details: { display_name?: string; preferred_language?: string; favorite_languages?: string[]; favorite_genres?: string[]; favorite_artists?: string[] }) {
   const token = await accessToken();
   const result = await request('/auth/v1/user', {
