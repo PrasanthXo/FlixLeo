@@ -427,27 +427,21 @@ export default function App() {
       list = catalog.filter(m => watchlistIds.includes(m.id));
     }
 
-    // Filter by Source (Ultra 4K, Cinema Remux, Cloud Vault, FastStream)
-    if (sourceFilter !== 'all') {
+    // Search all locally loaded catalogues and both live TMDB search endpoints.
+    // Never restrict global search to the current tab, watchlist, or source filter.
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLocaleLowerCase().trim();
+      const local = [...catalog, ...tmdbMovies, ...movieExtra, ...tvShows, ...tvExtra].filter(m =>
+        [m.title, m.originalTitle || '', m.language || '', ...(m.genres || []), ...(m.cast || [])]
+          .some(v => v.toLocaleLowerCase().includes(q))
+      );
+      list = uniqueTitles([...tmdbSearchResults, ...local]);
+    } else if (sourceFilter !== 'all') {
       list = list.filter(m => m.availableSources.includes(sourceFilter));
     }
 
-    // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter(m =>
-        m.title.toLowerCase().includes(q) ||
-        (m.originalTitle && m.originalTitle.toLowerCase().includes(q)) ||
-        m.genres.some(g => g.toLowerCase().includes(q)) ||
-        m.language.toLowerCase().includes(q) ||
-        (m.director && m.director.toLowerCase().includes(q)) ||
-        (m.cast && m.cast.some(c => c.toLowerCase().includes(q))) ||
-        m.availableSources.some(s => s.toLowerCase().includes(q))
-      );
-    }
-
     return uniqueTitles(list);
-  }, [catalog, currentTab, tmdbCategory, tmdbMovies, tvShows, movieExtra, tvExtra, sourceFilter, searchQuery, watchlistIds]);
+  }, [catalog, currentTab, tmdbCategory, tmdbMovies, tvShows, movieExtra, tvExtra, sourceFilter, searchQuery, watchlistIds, tmdbSearchResults]);
 
   // Spotlight media for hero banner
   const featuredMedia = useMemo(() => {
@@ -654,8 +648,16 @@ export default function App() {
           </div>
         )}
 
+            {searchQuery.trim() && (
+              <div className="mb-5" aria-live="polite">
+                <h2 className="text-xl font-bold text-white">Search results for “{searchQuery.trim()}”</h2>
+                {searchLoading && <p className="text-sm text-slate-300 mt-2">Searching movies and series…</p>}
+                {searchError && <p role="status" className="text-sm text-amber-300 mt-2">{searchError}</p>}
+              </div>
+            )}
+
             {/* Quick Filter Bar & Section Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            {!searchQuery.trim() && <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-xl md:text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
                   {currentTab === 'watchlist' ? (
@@ -689,13 +691,13 @@ export default function App() {
                 onSelectSource={(s) => setSourceFilter(s)}
                 counts={sourceCounts}
               />
-            </div>
+            </div>}
 
             {/* Empty State */}
-            {filteredCatalog.length === 0 && (!searchQuery.trim() || tmdbSearchResults.length === 0) ? (
+            {filteredCatalog.length === 0 && !searchLoading ? (
               <div className="py-20 text-center rounded-2xl bg-slate-900/40 border border-slate-800">
                 <Film className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <h3 className="text-base font-bold text-white">{searchQuery ? 'Searching catalogue' : 'No streams found'}</h3>
+                <h3 className="text-base font-bold text-white">{searchQuery ? 'No matching titles' : 'No streams found'}</h3>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
                   {searchQuery
                     ? `No releases match "${searchQuery}". Try searching by actor, director, or hub name.`
@@ -723,39 +725,6 @@ export default function App() {
                 {loadingMore && <p className="text-sm text-slate-300">Loading more {currentTab === 'movies' ? 'movies' : 'series'}…</p>}
                 {loadMoreError && <button type="button" onClick={() => { setLoadMoreError(''); loadingNextRef.current = false; }} className="px-4 py-2 rounded-lg bg-slate-800 text-amber-300">Retry loading more</button>}
                 {!loadingMore && !loadMoreError && !isMoreAvailable && <p className="text-xs text-slate-500">You've reached the end of available titles.</p>}
-              </div>
-            )}
-
-            {/* Live TMDB Global Search Results */}
-            {searchQuery.trim() && (
-              <div className="mt-8 pt-6 border-t border-slate-800">
-                {searchLoading && <p role="status" className="text-sm text-slate-300">Searching movies and series…</p>}
-                {searchError && <p role="alert" className="text-sm text-amber-300">{searchError}</p>}
-                {!searchLoading && tmdbSearchResults.length === 0 && <p className="text-sm text-slate-400">No matching titles in the available catalogue.</p>}
-              </div>
-            )}
-            {searchQuery.trim() && tmdbSearchResults.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-slate-800">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#01b4e4]/20 text-[#01b4e4] border border-[#01b4e4]/30 uppercase">
-                    TMDB
-                  </span>
-                  <h3 className="text-base font-bold text-white">
-                    Movie & Series Search Results ({tmdbSearchResults.length})
-                  </h3>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-6">
-                  {tmdbSearchResults.map((m) => (
-                    <MovieCard
-                      key={m.id}
-                      media={m}
-                      onPlay={(item) => handlePlayMedia(item)}
-                      onOpenDetails={(item) => setDetailMedia(item)}
-                      isBookmarked={watchlistIds.includes(m.id)}
-                      onToggleBookmark={toggleBookmark}
-                    />
-                  ))}
-                </div>
               </div>
             )}
 
