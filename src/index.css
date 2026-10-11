@@ -201,3 +201,29 @@
   width:100%!important;height:100%!important;max-width:none!important;
 }
 .flixleo-tv .tv6-cinema-frame video {object-fit:contain!important;}
+
+
+/* FlixLeo account-only cinematic theme. Leaves regular catalog and TV UI untouched. */
+.flixleo-account-dialog {
+  position:relative;
+  isolation:isolate;
+  background:
+    linear-gradient(145deg,rgba(9,17,31,.82),rgba(7,12,24,.88)),
+    url('/account-cinema-bg.svg') center / cover no-repeat !important;
+  -webkit-backdrop-filter:blur(9px);
+  backdrop-filter:blur(9px);
+  border-color:rgba(173,191,218,.21)!important;
+  box-shadow:0 32px 110px #000d,inset 0 1px 0 #ffffff12,0 0 65px #f9731610;
+}
+.flixleo-account-dialog > div {position:relative;z-index:1;}
+.flixleo-account-dialog .rounded-\[24px\],
+.flixleo-account-dialog .rounded-2xl.bg-gradient-to-br {
+  -webkit-backdrop-filter:blur(5px);
+  backdrop-filter:blur(5px);
+}
+@media (max-width:640px){
+ .flixleo-account-dialog {background-position:center center!important;-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);}
+}
+@media(prefers-reduced-transparency:reduce){
+ .flixleo-account-dialog {background-color:#0b1323!important;}
+}
