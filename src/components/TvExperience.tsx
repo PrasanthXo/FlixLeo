@@ -22,7 +22,9 @@ export function TvExperience({ currentTab, onSelectTab, onOpenProfile }: {
       const target = event.target as HTMLElement | null;
       const editable = target?.matches('input,textarea,select,[contenteditable="true"]');
       if (editable) return;
-      if (event.key === 'Escape' || event.key === 'Backspace' || event.key === 'BrowserBack') {
+      const key = ({37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown',13:'Enter',461:'BrowserBack',10009:'BrowserBack'} as Record<number,string>)[event.keyCode] || event.key;
+      if (key === 'Enter' && target && target !== document.body && !editable && (target.matches('button,a[href]'))) { event.preventDefault(); target.click(); return; }
+      if (key === 'Escape' || key === 'Backspace' || key === 'BrowserBack') {
         const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
         if (dialog) {
           const close = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button')).find(b => /close|back|cancel/i.test(b.getAttribute('aria-label') || b.textContent || ''));
@@ -31,7 +33,7 @@ export function TvExperience({ currentTab, onSelectTab, onOpenProfile }: {
         if (currentTab !== 'browse') { event.preventDefault(); onSelectTab('browse'); }
         return;
       }
-      if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(key)) return;
       const buttons = Array.from(document.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input, select, [tabindex]:not([tabindex="-1"])')).filter(node => {
         const rect = node.getBoundingClientRect();
         const style = getComputedStyle(node);
@@ -44,9 +46,9 @@ export function TvExperience({ currentTab, onSelectTab, onOpenProfile }: {
       const fx = from.left + from.width / 2; const fy = from.top + from.height / 2;
       const match = buttons.map(node => {
         const r = node.getBoundingClientRect(); const dx = r.left + r.width / 2 - fx; const dy = r.top + r.height / 2 - fy;
-        if (event.key === 'ArrowRight' && dx <= 2 || event.key === 'ArrowLeft' && dx >= -2 || event.key === 'ArrowDown' && dy <= 2 || event.key === 'ArrowUp' && dy >= -2) return null;
-        const along = event.key === 'ArrowRight' || event.key === 'ArrowLeft' ? Math.abs(dx) : Math.abs(dy);
-        const across = event.key === 'ArrowRight' || event.key === 'ArrowLeft' ? Math.abs(dy) : Math.abs(dx);
+        if (key === 'ArrowRight' && dx <= 2 || key === 'ArrowLeft' && dx >= -2 || key === 'ArrowDown' && dy <= 2 || key === 'ArrowUp' && dy >= -2) return null;
+        const along = key === 'ArrowRight' || key === 'ArrowLeft' ? Math.abs(dx) : Math.abs(dy);
+        const across = key === 'ArrowRight' || key === 'ArrowLeft' ? Math.abs(dy) : Math.abs(dx);
         return { node, score: along + across * 2.5 };
       }).filter((v): v is { node: HTMLElement; score: number } => Boolean(v)).sort((a,b) => a.score-b.score)[0];
       if (match) { event.preventDefault(); match.node.focus(); match.node.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'smooth'}); }
