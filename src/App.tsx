@@ -29,6 +29,13 @@ function uniqueTitles(items: MediaItem[]): MediaItem[] {
   });
 }
 
+const LANGUAGE_OPTIONS = ['English', 'Tamil', 'Sinhala', 'Hindi', 'Telugu', 'Malayalam', 'Kannada', 'Korean', 'Japanese'];
+const GENRE_OPTIONS = ['Action', 'Comedy', 'Drama', 'Romance', 'Thriller', 'Horror', 'Sci-Fi', 'Adventure', 'Crime', 'Fantasy', 'Animation', 'Mystery'];
+const ARTIST_OPTIONS = ['Vijay', 'Ajith Kumar', 'Rajinikanth', 'Suriya', 'Dhanush', 'Shah Rukh Khan', 'Allu Arjun', 'Prabhas', 'Mahesh Babu', 'Nayanthara', 'Samantha Ruth Prabhu', 'Leonardo DiCaprio', 'Tom Cruise', 'Keanu Reeves', 'Zendaya'];
+function languageMatches(actual: string, preference: string) {
+  const lookup: Record<string, string> = { English: 'en', Tamil: 'ta', Sinhala: 'si', Hindi: 'hi', Telugu: 'te', Malayalam: 'ml', Kannada: 'kn', Korean: 'ko', Japanese: 'ja' };
+  return actual.toLowerCase() === preference.toLowerCase() || actual.toLowerCase() === lookup[preference];
+}
 export default function App() {
   // Catalog State
   const [catalog, setCatalog] = useState<MediaItem[]>(MEDIA_CATALOG);
@@ -245,6 +252,21 @@ export default function App() {
   const [cloudUser, setCloudUser] = useState<CloudUser | null>(() => currentCloudUser());
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountEmail, setAccountEmail] = useState('');
+  const [authTab, setAuthTab] = useState<'signin' | 'signup'>('signin');
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [favoriteLanguages, setFavoriteLanguages] = useState<string[]>(() => currentCloudUser()?.user_metadata?.favorite_languages || []);
+  const [favoriteGenres, setFavoriteGenres] = useState<string[]>(() => currentCloudUser()?.user_metadata?.favorite_genres || []);
+  const [favoriteArtists, setFavoriteArtists] = useState<string[]>(() => currentCloudUser()?.user_metadata?.favorite_artists || []);
+  const togglePreference = (value: string, selected: string[], update: (next: string[]) => void) => update(selected.includes(value) ? selected.filter(v => v !== value) : [...selected, value]);
+  const savePreferences = async () => {
+    setAccountBusy(true); setAccountNotice('');
+    try {
+      const user = await cloudUpdateProfile({ favorite_languages: favoriteLanguages, favorite_genres: favoriteGenres, favorite_artists: favoriteArtists });
+      setCloudUser(user); setOnboardingOpen(false); setAccountSection('overview');
+      setAccountNotice('Your For You catalog is personalized.');
+    } catch (error) { setAccountNotice(error instanceof Error ? error.message : 'Could not save preferences.'); }
+    finally { setAccountBusy(false); }
+  };
   const [accountPassword, setAccountPassword] = useState('');
   const [signupAgreed, setSignupAgreed] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
@@ -309,16 +331,27 @@ export default function App() {
       if (mode === 'signup') {
         if (!signupAgreed) throw new Error('Please read and accept the Terms and Privacy Policy to create an account.');
         const active = await cloudSignUp(accountEmail.trim(), accountPassword);
-        if (!active) { setAccountNotice('Check your email to verify your account, then sign in.'); return; }
+        if (!active) { setAuthTab('signin'); setAccountNotice('Account created. Check your email for verification, then sign in.'); return; }
       } else { await cloudSignIn(accountEmail.trim(), accountPassword); }
       setCloudReady(false);
       setCloudUser(currentCloudUser());
       setProfileName(currentCloudUser()?.user_metadata?.display_name || '');
       setPreferredLanguage(currentCloudUser()?.user_metadata?.preferred_language || 'all');
+      const metadata = currentCloudUser()?.user_metadata;
+      setFavoriteLanguages(metadata?.favorite_languages || []);
+      setFavoriteGenres(metadata?.favorite_genres || []);
+      setFavoriteArtists(metadata?.favorite_artists || []);
+      setOnboardingOpen(!(metadata?.favorite_languages?.length || metadata?.favorite_genres?.length || metadata?.favorite_artists?.length));
       setAccountSection('overview');
       setAccountPassword('');
     } catch (error) {
-      setAccountNotice(error instanceof Error ? error.message : 'Authentication failed.');
+      const message = error instanceof Error ? error.message : 'Authentication failed.';
+      if (mode === 'signup' && /already registered|already exists|user already/i.test(message)) {
+        setAuthTab('signin');
+        setAccountNotice('This email already has an account. Please sign in.');
+      } else if (mode === 'signin' && /invalid login credentials|user not found/i.test(message)) {
+        setAccountNotice('Email or password is incorrect. If you are new, choose Create account.');
+      } else setAccountNotice(message);
     } finally { setAccountBusy(false); }
   };
 
@@ -480,27 +513,24 @@ export default function App() {
     return uniqueTitles(list);
   }, [catalog, currentTab, tmdbCategory, tmdbMovies, tvShows, movieExtra, tvExtra, sourceFilter, searchQuery, watchlistIds, tmdbSearchResults]);
 
-  // Rank unseen movies and series by recent language and genre preferences.
+  // Personalize using explicit favorites and recent viewing without changing playback.
   const forYouTitles = useMemo(() => {
     const candidates = uniqueTitles([...tmdbMovies, ...tvShows, ...movieExtra, ...tvExtra, ...catalog]);
     const watchedIds = new Set(recentPlayed.map(media => media.id));
     const history = recentPlayed.slice(0, 12);
-    const recommendations = candidates
-      .filter(media => !watchedIds.has(media.id))
-      .map(media => {
-        const score = history.reduce((sum, watched, index) => {
-          const recency = Math.max(1, 12 - index);
-          const sameLanguage = media.language && watched.language &&
-            media.language.toLocaleLowerCase() === watched.language.toLocaleLowerCase() ? 4 : 0;
-          const watchedGenres = new Set((watched.genres || []).map(g => g.toLocaleLowerCase()));
-          const genreMatches = (media.genres || []).filter(g => watchedGenres.has(g.toLocaleLowerCase())).length;
-          return sum + recency * (sameLanguage + genreMatches * 3);
-        }, 0);
-        return { media, score };
-      })
-      .sort((a,b) => b.score - a.score || Number(b.media.year || 0) - Number(a.media.year || 0));
-    return recommendations.slice(0, 16).map(entry => entry.media);
-  }, [tmdbMovies, tvShows, movieExtra, tvExtra, catalog, recentPlayed]);
+    return candidates.filter(media => !watchedIds.has(media.id)).map(media => {
+      const languageScore = favoriteLanguages.some(lang => languageMatches(String(media.language || ''), lang)) ? 35 : 0;
+      const genreScore = (media.genres || []).filter(genre => favoriteGenres.some(favorite => favorite.toLowerCase() === genre.toLowerCase())).length * 20;
+      const artistScore = (media.cast || []).filter(actor => favoriteArtists.some(favorite => actor.toLowerCase().includes(favorite.toLowerCase()))).length * 25;
+      const historyScore = history.reduce((sum, watched, index) => {
+        const recency = Math.max(1, 12 - index);
+        const sameLanguage = media.language && watched.language && media.language.toLowerCase() === watched.language.toLowerCase() ? 4 : 0;
+        const watchedGenres = new Set((watched.genres || []).map(g => g.toLowerCase()));
+        return sum + recency * (sameLanguage + (media.genres || []).filter(g => watchedGenres.has(g.toLowerCase())).length * 3);
+      }, 0);
+      return { media, score: languageScore + genreScore + artistScore + historyScore };
+    }).sort((a, b) => b.score - a.score || Number(b.media.year || 0) - Number(a.media.year || 0)).slice(0, 16).map(item => item.media);
+  }, [tmdbMovies, tvShows, movieExtra, tvExtra, catalog, recentPlayed, favoriteLanguages, favoriteGenres, favoriteArtists]);
 
   // Spotlight media for hero banner
   const featuredMedia = useMemo(() => {
@@ -549,6 +579,20 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+                <button type="button" onClick={() => { setOnboardingOpen(true); setAccountNotice(''); }} className="w-full text-sm text-amber-300 text-left hover:underline">Edit movie languages, favorite artists &amp; genres →</button>
+                {onboardingOpen && <div className="space-y-4 rounded-xl border border-amber-500/30 bg-slate-900 p-3">
+                  <h3 className="font-semibold text-white">Make For You yours</h3>
+                  <p className="text-xs text-slate-400">Tap your favorites. No typing needed. You can change them anytime.</p>
+                  {([{ title: 'Languages', options: LANGUAGE_OPTIONS, selected: favoriteLanguages, setSelected: setFavoriteLanguages },
+                    { title: 'Genres', options: GENRE_OPTIONS, selected: favoriteGenres, setSelected: setFavoriteGenres },
+                    { title: 'Actors & artists', options: ARTIST_OPTIONS, selected: favoriteArtists, setSelected: setFavoriteArtists }]).map(group => (
+                    <div key={group.title}><p className="text-xs text-slate-300 mb-2 font-semibold">{group.title}</p>
+                      <div className="flex flex-wrap gap-2">{group.options.map(value => <button key={value} type="button" aria-pressed={group.selected.includes(value)}
+                        onClick={() => togglePreference(value, group.selected, group.setSelected)}
+                        className={`rounded-full border px-3 py-1.5 text-xs ${group.selected.includes(value) ? 'bg-amber-500 text-black border-amber-500' : 'bg-slate-800 text-slate-200 border-slate-700'}`}>{group.selected.includes(value) ? '✓ ' : '+ '}{value}</button>)}</div>
+                    </div>))}
+                  <button type="button" onClick={() => void savePreferences()} disabled={accountBusy} className="w-full bg-amber-500 rounded-lg text-black font-bold p-3 disabled:opacity-50">Save my For You preferences</button>
+                </div>}
                 <div className="grid grid-cols-3 gap-2">
                   <button type="button" onClick={() => setAccountSection('overview')} className={`rounded-lg py-2 text-sm ${accountSection === 'overview' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>My activity</button>
                   <button type="button" onClick={() => setAccountSection('profile')} className={`rounded-lg py-2 text-sm ${accountSection === 'profile' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>Profile</button>
@@ -592,20 +636,23 @@ export default function App() {
                 <button type="button" onClick={() => { void accountAction(async () => { await cloudSignOut(); setCloudUser(null); setCloudReady(false); setAccountSection('overview'); }, 'Signed out. Your cloud data remains in your account.'); }} disabled={accountBusy} className="w-full rounded-lg border border-rose-500/40 py-2.5 text-rose-300 disabled:opacity-50">Sign out</button>
               </div>
             ) : (
-              <form onSubmit={e => { e.preventDefault(); void submitAccount('signin'); }} className="space-y-3">
-                <p className="text-sm text-slate-400">Create a free FlixLeo account to save your watchlist and continue watching across devices.</p>
-                <input type="email" required autoComplete="email" placeholder="Email" value={accountEmail} onChange={e => setAccountEmail(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
-                <input type="password" required minLength={8} autoComplete="current-password" placeholder="Password (8+ characters)" value={accountPassword} onChange={e => setAccountPassword(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
-                <label className="flex gap-2 items-start text-xs text-slate-300 cursor-pointer">
-                  <input type="checkbox" checked={signupAgreed} onChange={e => setSignupAgreed(e.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-500 shrink-0" />
-                  <span>I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-amber-300 underline">Terms &amp; Conditions</a> and <a href="/privacy.html" target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-amber-300 underline">Privacy Policy</a> when creating an account.</span>
-                </label>
-                <div className="flex gap-2">
-                  <button type="submit" disabled={accountBusy} className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-black disabled:opacity-50">Sign in</button>
-                  <button type="button" disabled={accountBusy || !signupAgreed || !accountEmail.trim() || accountPassword.length < 8} onClick={() => void submitAccount('signup')} className="rounded-lg bg-slate-700 px-4 py-2 text-white disabled:opacity-50">Create account</button>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-900 p-1" role="tablist" aria-label="Account access">
+                  <button type="button" role="tab" aria-selected={authTab === 'signin'} onClick={() => { setAuthTab('signin'); setAccountNotice(''); }} className={`rounded-lg p-2 font-semibold ${authTab === 'signin' ? 'bg-amber-500 text-black' : 'text-slate-300'}`}>Sign in</button>
+                  <button type="button" role="tab" aria-selected={authTab === 'signup'} onClick={() => { setAuthTab('signup'); setAccountNotice(''); }} className={`rounded-lg p-2 font-semibold ${authTab === 'signup' ? 'bg-amber-500 text-black' : 'text-slate-300'}`}>Create account</button>
                 </div>
-                <button type="button" disabled={accountBusy || !accountEmail.trim()} onClick={() => void accountAction(() => cloudResetPassword(accountEmail), 'Password reset email requested. Check your inbox.')} className="text-sm text-amber-300 hover:underline disabled:opacity-50">Forgot password?</button>
-              </form>
+                <p className="text-sm text-slate-400">{authTab === 'signup' ? 'Create an account, then choose your favorite languages, actors and genres.' : 'Welcome back. Your saved titles and preferences will be restored.'}</p>
+                <form onSubmit={e => { e.preventDefault(); void submitAccount(authTab); }} className="space-y-3">
+                  <input type="email" required autoComplete="email" placeholder="Email" value={accountEmail} onChange={e => setAccountEmail(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
+                  <input type="password" required minLength={authTab === 'signup' ? 8 : 1} autoComplete={authTab === 'signup' ? 'new-password' : 'current-password'} placeholder={authTab === 'signup' ? 'Create password (8+ characters)' : 'Password'} value={accountPassword} onChange={e => setAccountPassword(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
+                  {authTab === 'signup' && <label className="flex gap-2 items-start text-xs text-slate-300 cursor-pointer">
+                    <input type="checkbox" checked={signupAgreed} onChange={e => setSignupAgreed(e.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-500 shrink-0" />
+                    <span>I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-amber-300 underline">Terms &amp; Conditions</a> and <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-amber-300 underline">Privacy Policy</a>.</span>
+                  </label>}
+                  <button type="submit" disabled={accountBusy || (authTab === 'signup' && !signupAgreed)} className="w-full bg-amber-500 text-black font-bold rounded-lg p-3 disabled:opacity-50">{accountBusy ? 'Please wait…' : authTab === 'signin' ? 'Sign in' : 'Create account'}</button>
+                </form>
+                {authTab === 'signin' && <button type="button" disabled={accountBusy || !accountEmail.trim()} onClick={() => void accountAction(() => cloudResetPassword(accountEmail), 'Password reset email requested. Check your inbox.')} className="text-sm text-amber-300 hover:underline disabled:opacity-50">Forgot password?</button>}
+              </div>
             )}
             {accountNotice && <p role="status" className="mt-4 text-sm text-amber-200">{accountNotice}</p>}
           </div>
