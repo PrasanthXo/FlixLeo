@@ -7,7 +7,7 @@ const STREAM_HLS = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
 const STREAM_FEATURE_DIRECT_4 = 'https://archive.org/download/CarnivalOfSouls/Carnival_Of_Souls_512kb.mp4';
 
 // Real Blockbuster Catalog powered by TMDB IDs & Real Embed/Direct Streams
-export const MEDIA_CATALOG: MediaItem[] = [
+const RAW_MEDIA_CATALOG: MediaItem[] = [
   {
     id: 'tmdb-693134',
     title: 'Dune: Part Two',
@@ -423,6 +423,13 @@ export const MEDIA_CATALOG: MediaItem[] = [
     mirrors: []
   }
 ];
+
+// Only title-specific sources belong in the playable catalogue.
+// Shared public-domain demo MP4 files are not the listed commercial titles.
+export const MEDIA_CATALOG: MediaItem[] = RAW_MEDIA_CATALOG.map(item => ({
+  ...item,
+  mirrors: item.mirrors.filter(m => !m.id.endsWith('-direct')),
+}));
 
 export const SOURCE_METADATA = {
   all: {
