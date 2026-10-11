@@ -118,3 +118,38 @@
 .flixleo-tv main .grid.grid-cols-2 > div {border:1px solid #283348!important;border-radius:14px!important;background:#101724!important;}
 .flixleo-tv main .grid.grid-cols-2 > div img {width:100%!important;}
 .flixleo-tv button:focus,.flixleo-tv a:focus {outline:4px solid #fbbf24!important;outline-offset:2px!important;}
+
+/* Stable 1080p-focused webOS layout, using old WebKit-compatible properties. */
+.flixleo-tv { font-size:20px!important; overflow-x:hidden; }
+.flixleo-tv .tv6-poster-row,.flixleo-tv .tv6-resume-row {
+  display:-webkit-flex!important;display:flex!important;overflow-x:auto!important;
+  gap:22px!important;padding:12px 6px 24px!important;
+}
+.flixleo-tv .tv6-poster-item {display:block!important;-webkit-flex:0 0 205px!important;flex:0 0 205px!important;width:205px!important;min-width:205px!important;}
+.flixleo-tv .tv6-title {
+  display:block!important;width:100%!important;min-width:0!important;text-align:left!important;
+  padding:0!important;overflow:hidden!important;background:#141b29!important;
+  border:2px solid #344055!important;border-radius:16px!important;color:#fff!important;
+}
+.flixleo-tv .tv6-title-art {display:block!important;width:100%!important;height:270px!important;overflow:hidden!important;background:#222e41!important;}
+.flixleo-tv .tv6-title-art img,.flixleo-tv .tv6-title-art [role="img"] {display:block!important;width:100%!important;height:100%!important;object-fit:cover!important;}
+.flixleo-tv .tv6-title-info {padding:12px!important;display:block!important;min-height:72px!important;}
+.flixleo-tv .tv6-title-info strong {display:block!important;font-size:18px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
+.flixleo-tv .tv6-title-info span {display:block!important;margin-top:8px!important;color:#fbbf24!important;font-size:16px!important;}
+.flixleo-tv .tv6-catalog-grid {display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:22px!important;}
+.flixleo-tv .tv6-catalog-grid .tv6-title {min-width:0!important;}
+.flixleo-tv .tv6-resume-tile {
+  display:block!important;-webkit-flex:0 0 280px!important;flex:0 0 280px!important;
+  width:280px!important;min-width:280px!important;overflow:hidden!important;
+  background:#111c2c!important;color:white!important;border:2px solid #344055!important;
+  border-radius:16px!important;text-align:left!important;
+}
+.flixleo-tv .tv6-resume-tile .aspect-video {height:158px!important;width:100%!important;position:relative!important;}
+.flixleo-tv .tv6-resume-tile img {width:100%!important;height:100%!important;object-fit:cover!important;}
+.flixleo-tv .tv6-resume-tile p {font-size:18px!important;line-height:1.4!important;white-space:normal!important;}
+.flixleo-tv section[aria-label="Continue Watching"],.flixleo-tv section[aria-label="For You recommendations"] {margin-bottom:40px!important;}
+.flixleo-tv main section h2 {font-size:30px!important;}
+.flixleo-tv > div[role="presentation"] {position:fixed!important;z-index:9999!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;display:flex!important;align-items:center!important;justify-content:center!important;}
+.flixleo-tv > div[role="presentation"] > [role="dialog"] {width:640px!important;max-width:90vw!important;margin:auto!important;}
+.flixleo-tv .tv6-title:focus,.flixleo-tv .tv6-resume-tile:focus {border-color:#fbbf24!important;outline:5px solid #fbbf24!important;outline-offset:2px!important;transform:scale(1.025);}
+@media(max-width:1100px){.flixleo-tv .tv6-catalog-grid {grid-template-columns:repeat(4,minmax(0,1fr))!important;}}
