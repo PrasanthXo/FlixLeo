@@ -1,16 +1,16 @@
 import React from 'react';
-import { Home, Film, Tv, Link as LinkIcon, Bookmark } from 'lucide-react';
+import { Home, Film, Tv, UserRound } from 'lucide-react';
 
 interface MobileBottomNavProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
-  bookmarkCount: number;
+  onOpenProfile: () => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   currentTab,
   onSelectTab,
-  bookmarkCount
+  onOpenProfile
 }) => {
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0d14]/95 backdrop-blur-lg border-t border-slate-800/80 px-2 pb-safe">
@@ -75,29 +75,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           </span>
         </button>
 
-        {/* Tab 4: Watchlist */}
+        {/* Tab 4: Profile */}
         <button
-          onClick={() => onSelectTab('watchlist')}
-          className="relative flex flex-col items-center justify-center min-h-[44px] py-1 transition-colors"
-          aria-label="Watchlist"
+          type="button"
+          onClick={onOpenProfile}
+          className="flex flex-col items-center justify-center min-h-[44px] py-1 transition-colors"
+          aria-label="Open profile"
         >
-          <Bookmark
-            className={`w-5 h-5 transition-transform ${
-              currentTab === 'watchlist' ? 'text-amber-400 scale-110' : 'text-slate-400'
-            }`}
-          />
-          {bookmarkCount > 0 && (
-            <span className="absolute top-1 right-3 w-3.5 h-3.5 rounded-full bg-amber-500 text-black text-[8px] font-extrabold flex items-center justify-center">
-              {bookmarkCount}
-            </span>
-          )}
-          <span
-            className={`text-[9px] font-medium tracking-tight mt-1 ${
-              currentTab === 'watchlist' ? 'text-amber-400 font-semibold' : 'text-slate-400'
-            }`}
-          >
-            List
-          </span>
+          <UserRound className="w-5 h-5 text-slate-400" />
+          <span className="text-[9px] font-medium tracking-tight mt-1 text-slate-400">Profile</span>
         </button>
       </div>
     </div>
