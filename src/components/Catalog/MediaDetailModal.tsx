@@ -115,6 +115,23 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     return () => { cancelled = true; };
   }, [media]);
 
+  React.useEffect(() => {
+    if (!isOpen || !media || !tmdbId) return;
+    const controller = new AbortController();
+    const type = isSeries ? 'tv' : 'movie';
+    fetch(`/api/tmdb/${type}/${tmdbId}`, { signal: controller.signal })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        if (controller.signal.aborted || !data?.success || !data.item) return;
+        const credits = data.item as MediaItem;
+        setDetailedMedia(previous => previous?.id === media.id
+          ? { ...previous, director: credits.director, cast: credits.cast }
+          : previous);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [isOpen, media, tmdbId, isSeries]);
+
   if (!isOpen || !media) return null;
 
   const activeMedia = detailedMedia || media;
@@ -247,13 +264,13 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
 
           {/* Cast & Audio Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {activeMedia.director && (
+            {activeMedia.director && activeMedia.director !== 'Cinema Director' && (
               <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                <span className="text-slate-400 font-medium">Director:</span>{' '}
+                <span className="text-slate-400 font-medium">{isSeries ? 'Created by:' : 'Director:'}</span>{' '}
                 <span className="text-slate-200 font-semibold">{activeMedia.director}</span>
               </div>
             )}
-            {activeMedia.cast && (
+            {activeMedia.cast?.length && !activeMedia.cast.some(name => ['Lead Cast', 'Co-Star', 'Ensemble'].includes(name)) && (
               <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
                 <span className="text-slate-400 font-medium">Starring:</span>{' '}
                 <span className="text-slate-200">{activeMedia.cast.join(', ')}</span>
