@@ -27,6 +27,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const [audio, setAudio] = useState(-1);
   const [subtitles, setSubtitles] = useState<Track[]>([]);
   const [selectedSubtitle, setSelectedSubtitle] = useState('');
+  const [subtitleMode, setSubtitleMode] = useState<'auto' | 'on' | 'off'>('auto');
   const subtitlePreference = useRef<'auto' | 'manual' | 'off'>('auto');
   const subtitleSelection = useRef('');
   const selectAutomatically = (value: string) => {
@@ -74,6 +75,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     setSubtitles(previous => previous.filter(t => !t.url.startsWith('hls-sub:') && !t.url.startsWith('native-sub:')));
     subtitlePreference.current = 'auto';
     subtitleSelection.current = '';
+    setSubtitleMode('auto');
     setSelectedSubtitle('');
     const fail = () => { if (!disposed) { setBuffering(false); setError('Unable to play this stream in your browser.'); } };
     const url = active.url;
@@ -169,6 +171,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     subtitleController.current?.abort();
     setSubtitleError('');
     subtitlePreference.current = url ? 'manual' : 'off';
+    setSubtitleMode(url ? 'on' : 'off');
     subtitleSelection.current = url;
     if (hlsRef.current) {
       hlsRef.current.subtitleDisplay = url.startsWith('hls-sub:');
@@ -200,6 +203,31 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       if (!controller.signal.aborted) setSubtitleError('Could not install online subtitles. Try another track or upload a file.');
     } finally { if (!controller.signal.aborted) setSubtitleLoading(false); }
   };
+  const changeSubtitleMode = (mode: 'auto' | 'on' | 'off') => {
+    setSubtitleMode(mode);
+    subtitleController.current?.abort();
+    if (mode === 'off') {
+      void selectSubtitle('');
+      return;
+    }
+    subtitlePreference.current = mode === 'auto' ? 'auto' : 'manual';
+    subtitleSelection.current = '';
+    const available = subtitles.filter(track => track.url.startsWith('native-sub:') || track.url.startsWith('hls-sub:'));
+    const preferred = available.find(track => /^en(?:-|$)/i.test(track.language)) || available[0];
+    if (preferred) {
+      if (mode === 'auto') {
+        selectAutomatically(preferred.url);
+        if (preferred.url.startsWith('native-sub:') && videoRef.current) {
+          const index = Number(preferred.url.slice('native-sub:'.length));
+          Array.from(videoRef.current.textTracks).forEach((track, i) => { track.mode = i === index ? 'showing' : 'disabled'; });
+        }
+      } else void selectSubtitle(preferred.url);
+    } else {
+      setSelectedSubtitle('');
+      if (hlsRef.current) { hlsRef.current.subtitleTrack = -1; hlsRef.current.subtitleDisplay = false; }
+      if (videoRef.current) Array.from(videoRef.current.textTracks).forEach(track => { track.mode = 'disabled'; });
+    }
+  };
   const uploadSubtitle = async (file: File | undefined) => {
     if (!file || !/\.(srt|vtt)$/i.test(file.name)) return;
     const text = await file.text();
@@ -224,7 +252,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         onCanPlay={() => setBuffering(false)}
         onTimeUpdate={event => { setPosition(event.currentTarget.currentTime); setDuration(event.currentTarget.duration || 0); save(); }}
         onEnded={() => { setPlaying(false); save(); }}>
-        {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
+        {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>
       {buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
       {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 p-3 text-xs text-amber-300">{error}</div>}
@@ -255,7 +283,14 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
             {audioTracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </label>
-        <label className="block text-xs text-slate-300">Subtitles {subtitleLoading ? '· Searching…' : ''}
+        <div className="space-y-2">
+          <span className="block text-xs text-slate-300">Subtitle display</span>
+          <div role="group" aria-label="Subtitle display mode" className="grid grid-cols-3 gap-2">
+            {(['auto', 'on', 'off'] as const).map(mode => <button key={mode} type="button" aria-pressed={subtitleMode === mode} onClick={() => changeSubtitleMode(mode)} className={`rounded-lg border px-3 py-2 text-sm font-medium ${subtitleMode === mode ? 'border-amber-500 bg-amber-500/20 text-amber-300' : 'border-slate-700 bg-slate-800 text-slate-300'}`}>{mode === 'auto' ? 'Auto' : mode === 'on' ? 'On' : 'Off'}</button>)}
+          </div>
+          <p className="text-xs text-slate-400">{subtitleMode === 'auto' ? 'Automatically display supported embedded subtitles when detected.' : subtitleMode === 'on' ? 'Subtitles enabled when an available track is selected.' : 'Subtitles are turned off.'}</p>
+        </div>
+        <label className="block text-xs text-slate-300">Subtitle language / track {subtitleLoading ? '· Searching…' : ''}
           <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={selectedSubtitle} onChange={e => void selectSubtitle(e.target.value)}>
             <option value="">Off</option>
             {selectedSubtitle.startsWith('blob:') && <option value={selectedSubtitle}>Installed subtitle</option>}
