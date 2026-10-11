@@ -57,7 +57,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
       {label:provider+' Series',subtitle:'Discover titles listed by provider · US region',list:combined('providerSeries:'+provider)}
     ]),
     {label:'Top Rated Picks',subtitle:'Popular highly rated titles',list:[...unique].filter(x=>Number.parseFloat(x.imdbRating)>0).sort((x,y)=>Number.parseFloat(y.imdbRating)-Number.parseFloat(x.imdbRating)).slice(0,16)}
-  ];
+  ].filter(row => row.list.length > 0);
   return <div className="flixleo-mobile-collections" aria-label="Explore FlixLeo collections">
     <div className="flixleo-mobile-collections-intro"><Sparkles size={17}/> Explore your universe</div>
     {rows.map(row => <section key={row.label} className="flixleo-mobile-collection" aria-label={row.label}>
