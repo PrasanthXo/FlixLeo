@@ -120,7 +120,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   };
 
   const qualityRank = (mirror: StreamMirror) => {
-    const label = (mirror.quality + ' ' + mirror.label).toLowerCase();
+    const label = mirror.quality.toLowerCase();
     if (/4k|2160p/.test(label)) return 2160;
     if (/1080p/.test(label)) return 1080;
     if (/720p/.test(label)) return 720;
