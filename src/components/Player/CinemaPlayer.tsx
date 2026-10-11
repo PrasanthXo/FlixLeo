@@ -12,6 +12,7 @@ import { MediaItem, StreamMirror, QualityOption, getSourceDisplayBadge } from '.
 interface CinemaPlayerProps {
   media: MediaItem;
   initialMirrorId?: string;
+  minimizeSignal?: number;
   onClose: () => void;
   onProgressSaved?: () => void;
   onMirrorChange?: (mirror: StreamMirror) => void;
@@ -22,6 +23,7 @@ interface CinemaPlayerProps {
 export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   media,
   initialMirrorId,
+  minimizeSignal = 0,
   onClose,
   onProgressSaved,
   onMirrorChange,
@@ -134,6 +136,14 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     }
     setIsMiniPlayer(minimized);
   };
+
+  const lastMinimizeSignal = useRef(minimizeSignal);
+  useEffect(() => {
+    if (minimizeSignal !== lastMinimizeSignal.current) {
+      lastMinimizeSignal.current = minimizeSignal;
+      setDocked(true);
+    }
+  }, [minimizeSignal]);
 
   // Format time (hh:mm:ss or mm:ss)
   const formatTime = (secs: number) => {
