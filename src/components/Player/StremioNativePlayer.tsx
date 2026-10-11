@@ -100,7 +100,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     if (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url)) {
       if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
       else if (Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true });
+        const hls = new Hls({ enableWorker: true, startLevel: -1, maxBufferLength: 20, maxMaxBufferLength: 45, backBufferLength: 20, capLevelToPlayerSize: true, startFragPrefetch: true });
         hlsRef.current = hls;
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (disposed) return;
@@ -298,7 +298,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Expand mini player" onClick={() => { setDocked(false); playerAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
-      <video ref={videoRef} playsInline preload="metadata" className="h-full w-full object-contain"
+      <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
         onPlay={() => { setPlaying(true); setBuffering(false); }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBuffering(true)}
