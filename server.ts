@@ -579,17 +579,45 @@ app.get('/api/tmdb/home-collections', async (_req: Request, res: Response) => {
   if (homeCollectionsCache.value && Date.now() - homeCollectionsCache.time < 15 * 60 * 1000) {
     return res.json({ success: true, collections: homeCollectionsCache.value, cached: true });
   }
-  const requests: Array<{key:string; params:Record<string,string>}> = [
-    ...Object.entries({Action:'28', 'Sci-Fi':'878', Thriller:'53', Comedy:'35', Drama:'18', Romance:'10749', Horror:'27', Adventure:'12'}).map(([key,id]) => ({key:'genre:'+key,params:{with_genres:id}})),
-    ...Object.entries({Tamil:'ta',English:'en',Hindi:'hi',Sinhala:'si',Telugu:'te',Malayalam:'ml',Kannada:'kn',Korean:'ko'}).map(([key,code]) => ({key:'language:'+key,params:{with_original_language:code}}))
+  const movieGenres: Record<string,string> = {
+    Action:'28', 'Sci-Fi':'878', Thriller:'53', Comedy:'35', Drama:'18',
+    Romance:'10749', Horror:'27', Adventure:'12', Fantasy:'14', Mystery:'9648',
+    Crime:'80', Animation:'16', Family:'10751', Documentary:'99', War:'10752',
+    History:'36', Music:'10402'
+  };
+  const tvGenres: Record<string,string> = {
+    Action:'10759','Sci-Fi':'10765',Thriller:'9648',Comedy:'35',Drama:'18',
+    Romance:'18',Horror:'10765',Adventure:'10759',Fantasy:'10765',
+    Mystery:'9648',Crime:'80',Animation:'16',Family:'10751',Documentary:'99'
+  };
+  const languages: Record<string,string> = {
+    Tamil:'ta',English:'en',Hindi:'hi',Sinhala:'si',Telugu:'te',
+    Malayalam:'ml',Kannada:'kn',Korean:'ko',Japanese:'ja'
+  };
+  // TMDB watch-provider IDs, shown as *discovery metadata*, not a promise of streams.
+  const providers: Record<string,string> = {
+    Netflix:'8', 'Amazon Prime Video':'9', 'Disney Plus':'337',
+    'Apple TV':'350'
+  };
+  const requests: Array<{key:string; endpoint:string; params:Record<string,string>; tv?:boolean}> = [
+    ...Object.entries(movieGenres).map(([key,id]) => ({key:'genre:'+key,endpoint:'/discover/movie',params:{with_genres:id}})),
+    ...Object.entries(tvGenres).map(([key,id]) => ({key:'seriesGenre:'+key,endpoint:'/discover/tv',params:{with_genres:id},tv:true})),
+    ...Object.entries(languages).map(([key,code]) => ({key:'language:'+key,endpoint:'/discover/movie',params:{with_original_language:code}})),
+    {key:'anime:movies',endpoint:'/discover/movie',params:{with_genres:'16',with_original_language:'ja'}},
+    {key:'anime:series',endpoint:'/discover/tv',params:{with_genres:'16',with_original_language:'ja'},tv:true},
+    ...Object.entries(providers).flatMap(([key,id]) => [
+      {key:'providerMovie:'+key,endpoint:'/discover/movie',params:{with_watch_providers:id,watch_region:'US'}},
+      {key:'providerSeries:'+key,endpoint:'/discover/tv',params:{with_watch_providers:id,watch_region:'US'},tv:true}
+    ])
   ];
-  const fetched = await Promise.allSettled(requests.map(({params}) =>
-    fetchFromTmdb('/discover/movie',{...params,sort_by:'popularity.desc',page:'1'})
+  const fetched = await Promise.allSettled(requests.map(({endpoint,params}) =>
+    fetchFromTmdb(endpoint,{...params,sort_by:'popularity.desc',page:'1'})
   ));
   const collections: Record<string, any[]> = {};
   fetched.forEach((result,i) => {
     const raw = result.status === 'fulfilled' && Array.isArray(result.value?.results) ? result.value.results : [];
-    collections[requests[i].key] = raw.filter((movie:any) => movie?.id).map((movie:any) => transformTmdbMovie(movie));
+    collections[requests[i].key] = raw.filter((item:any) => item?.id)
+      .map((item:any) => requests[i].tv ? transformTmdbTvShow(item) : transformTmdbMovie(item));
   });
   homeCollectionsCache.value = collections;
   homeCollectionsCache.time = Date.now();
