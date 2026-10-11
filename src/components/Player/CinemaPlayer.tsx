@@ -574,7 +574,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   // Floating Mini-Player View
   if (isMiniPlayer) {
     return (
-      <div className="fixed bottom-20 right-4 md:bottom-6 md:right-6 w-80 md:w-96 z-50 rounded-2xl overflow-hidden shadow-2xl border border-amber-500/50 bg-[#0a0d14] animate-fade-in group">
+      <div className="fixed bottom-20 right-3 md:bottom-6 md:right-6 w-[min(58vw,220px)] md:w-80 z-40 rounded-xl overflow-hidden shadow-2xl border border-amber-500/50 bg-[#0a0d14] animate-fade-in group">
         <div className="relative aspect-video bg-black flex items-center justify-center">
           {selectedMirror.streamType === 'embed-iframe' ? (
             <iframe
