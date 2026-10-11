@@ -84,6 +84,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
             : stream.quality === '4K' ? '4K UHD'
             : ['1080p', '720p', '480p', '360p'].includes(stream.quality) ? stream.quality : 'Auto',
           url: stream.url,
+          audioFixUrl: stream.audioFixUrl,
           streamType: stream.streamType === 'hls' ? 'hls' : 'direct-video',
           isDirect: true
         }));
