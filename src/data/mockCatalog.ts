@@ -428,7 +428,7 @@ const RAW_MEDIA_CATALOG: MediaItem[] = [
 // Shared public-domain demo MP4 files are not the listed commercial titles.
 export const MEDIA_CATALOG: MediaItem[] = RAW_MEDIA_CATALOG.map(item => ({
   ...item,
-  mirrors: item.mirrors.filter(m => !m.id.endsWith('-direct')),
+  mirrors: item.mirrors.filter(m => !m.id.endsWith('-direct') && !/^https?:\/\/embed\.su(?:\/|$)/i.test(m.url)),
 }));
 
 export const SOURCE_METADATA = {
