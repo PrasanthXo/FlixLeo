@@ -539,6 +539,76 @@ app.get('/api/tmdb/movie/:id', async (req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * Optional Stremio protocol integration. Server-operator configured HTTPS add-ons only.
+ * This endpoint deliberately excludes torrents, magnets, embeds and off-site page links:
+ * browsers can only use direct, CORS-enabled HLS or video sources.
+ */
+app.get('/api/stremio/streams', async (req: Request, res: Response) => {
+  const type = req.query.type;
+  const tmdb = String(req.query.tmdb || '');
+  const season = Number(req.query.season);
+  const episode = Number(req.query.episode);
+  if ((type !== 'movie' && type !== 'series') || !/^\d{1,12}$/.test(tmdb) ||
+      (type === 'series' && (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 1))) {
+    return res.status(400).json({ error: 'Invalid title or episode' });
+  }
+  const configured = (process.env.STREMIO_ADDON_URLS || '').split(',').map(x => x.trim()).filter(Boolean).slice(0, 5);
+  if (!configured.length) return res.json({ streams: [], configured: false });
+  const providerUrls = configured.flatMap(value => {
+    try {
+      const parsed = new URL(value.replace(/\/manifest\.json$/, '').replace(/\/$/, ''));
+      // Only URLs explicitly configured by the server operator are queried.
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.port ||
+          !parsed.hostname.includes('.') || /^(localhost|.*\.local|.*\.internal)$/i.test(parsed.hostname)) return [];
+      return [{ base: parsed.toString().replace(/\/$/, ''), hostname: parsed.hostname }];
+    } catch { return []; }
+  });
+  try {
+    const tmdbRecord = await fetchFromTmdb('/' + (type === 'movie' ? 'movie' : 'tv') + '/' + tmdb + '/external_ids');
+    const imdb = tmdbRecord?.imdb_id;
+    if (typeof imdb !== 'string' || !/^tt\d{5,12}$/.test(imdb)) {
+      return res.json({ streams: [], message: 'IMDb ID unavailable' });
+    }
+    const target = type === 'movie' ? imdb : imdb + ':' + season + ':' + episode;
+    const responses = await Promise.allSettled(providerUrls.map(async provider => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6500);
+      try {
+        const response = await fetch(provider.base + '/stream/' + type + '/' + encodeURIComponent(target) + '.json', {
+          signal: controller.signal, redirect: 'error',
+          headers: { Accept: 'application/json' }
+        });
+        if (!response.ok || Number(response.headers.get('content-length') || 0) > 1048576) return [];
+        const raw = await response.text();
+        if (raw.length > 1048576) return [];
+        const payload = JSON.parse(raw);
+        return (Array.isArray(payload.streams) ? payload.streams : []).slice(0, 30).flatMap((stream: any) => {
+          if (typeof stream.url !== 'string') return [];
+          let parsed: URL;
+          try { parsed = new URL(stream.url); } catch { return []; }
+          if (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
+              /^(localhost|.*\.local|.*\.internal)$/i.test(parsed.hostname)) return [];
+          const pathname = parsed.pathname.toLowerCase();
+          const hls = /\.m3u8$/.test(pathname);
+          const video = /\.(mp4|webm|m4v|mov)$/.test(pathname);
+          if (!hls && !video) return [];
+          const text = String(stream.title || '').slice(0, 160);
+          const quality = /2160p|4k/i.test(text) ? '4K' : /1080p/i.test(text) ? '1080p' : /720p/i.test(text) ? '720p' : 'Auto';
+          return [{ provider: provider.hostname, name: String(stream.name || 'Stremio source').slice(0, 80),
+            title: text, url: parsed.toString(), quality, streamType: hls ? 'hls' : 'direct-video' }];
+        });
+      } finally { clearTimeout(timeout); }
+    }));
+    const streams = responses.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    return res.json({ streams: streams.slice(0, 60), configured: true });
+  } catch {
+    return res.status(502).json({ error: 'Could not check streaming providers' });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
