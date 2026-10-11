@@ -76,7 +76,7 @@ app.get('/api/admin/users', async (req: Request, res: Response) => {
  * on a signed-in phone, and redeemed once by the original TV only.
  * Magic links are generated server-side; Supabase service keys never reach browsers.
  */
-const tvPairs = new Map<string, { secret: string; expires: number; consumed: boolean; tokenHash?: string }>();
+const tvPairs = new Map<string, { secret: string; expires: number; consumed: boolean; tokenHash?: string; deviceId?: string }>();
 const tvPairRequests = new Map<string, { count: number; resetAt: number }>();
 function tvPairRateLimit(req: Request, res: Response, next: () => void) {
   const ip = String(req.ip || req.socket.remoteAddress || 'unknown');
@@ -110,7 +110,7 @@ app.get('/api/tv/pair/:id', tvPairRateLimit, (req: Request, res: Response) => {
   // Single-use redemption: a phone/another device cannot claim this TV session.
   pair.consumed = true;
   tvPairs.delete(String(req.params.id));
-  return res.json({ status: 'approved', tokenHash: pair.tokenHash });
+  return res.json({ status: 'approved', tokenHash: pair.tokenHash, deviceId: pair.deviceId });
 });
 app.post('/api/tv/pair/:id/approve', tvPairRateLimit, async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -149,11 +149,93 @@ app.post('/api/tv/pair/:id/approve', tvPairRateLimit, async (req: Request, res: 
       console.error('TV authorization: Supabase generate_link returned no verification token (keys:', Object.keys(link || {}).join(','), 'properties:', Object.keys(link?.properties || {}).join(','), ')');
       return res.status(502).json({ error: 'Supabase did not provide a TV login token. Please retry.' });
     }
+    const deviceId = randomUUID();
+    const saved = await fetch(supabaseUrl + '/rest/v1/flixleo_tv_devices', {
+      method: 'POST',
+      headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ id: deviceId, user_id: user.id, label: 'FlixLeo TV', approved_at: new Date().toISOString() })
+    });
+    if (!saved.ok) {
+      console.error('TV devices table is unavailable:', saved.status);
+      return res.status(503).json({ error: 'TV device storage is not ready. Configure the TV devices table.' });
+    }
+    pair.deviceId = deviceId;
     pair.tokenHash = tokenHash;
     return res.json({ success: true });
   } catch {
     return res.status(502).json({ error: 'TV pairing service temporarily unavailable.' });
   }
+});
+
+
+function tvAdminConfig() {
+  return { url: (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\\/$/, ''),
+    key: process.env.SUPABASE_SERVICE_ROLE_KEY || '' };
+}
+async function verifiedTvUser(req: Request) {
+  const { url, key } = tvAdminConfig();
+  if (!url || !key) return null;
+  const auth = String(req.headers.authorization || '');
+  if (!auth.startsWith('Bearer ')) return null;
+  const response = await fetch(url + '/auth/v1/user', { headers: { apikey: key, Authorization: auth } });
+  if (!response.ok) return null;
+  const user: any = await response.json();
+  return user?.email_confirmed_at && user?.id ? user : null;
+}
+app.get('/api/tv/devices', tvPairRateLimit, async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const user = await verifiedTvUser(req);
+    if (!user) return res.status(401).json({ error: 'Sign in again.' });
+    const { url, key } = tvAdminConfig();
+    const response = await fetch(url + '/rest/v1/flixleo_tv_devices?user_id=eq.' + encodeURIComponent(user.id) + '&select=id,label,approved_at,last_seen_at,revoked_at&order=approved_at.desc', {
+      headers: { apikey: key, Authorization: 'Bearer ' + key }
+    });
+    if (!response.ok) return res.status(503).json({ error: 'TV device storage unavailable.' });
+    const devices = await response.json();
+    return res.json({ devices: Array.isArray(devices) ? devices : [] });
+  } catch { return res.status(502).json({ error: 'Unable to load approved TVs.' }); }
+});
+app.post('/api/tv/devices/:id/revoke', tvPairRateLimit, async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const user = await verifiedTvUser(req);
+    if (!user) return res.status(401).json({ error: 'Sign in again.' });
+    const id = String(req.params.id || '');
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ error: 'Invalid device.' });
+    const { url, key } = tvAdminConfig();
+    const response = await fetch(url + '/rest/v1/flixleo_tv_devices?id=eq.' + encodeURIComponent(id) + '&user_id=eq.' + encodeURIComponent(user.id), {
+      method: 'PATCH',
+      headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ revoked_at: new Date().toISOString() })
+    });
+    if (!response.ok) return res.status(503).json({ error: 'Could not revoke this TV.' });
+    const rows: any = await response.json();
+    if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'Device not found.' });
+    return res.json({ success: true });
+  } catch { return res.status(502).json({ error: 'Could not revoke this TV.' }); }
+});
+app.post('/api/tv/devices/:id/check', tvPairRateLimit, async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const user = await verifiedTvUser(req);
+    if (!user) return res.status(401).json({ authorized: false });
+    const id = String(req.params.id || '');
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(403).json({ authorized: false });
+    const { url, key } = tvAdminConfig();
+    const response = await fetch(url + '/rest/v1/flixleo_tv_devices?id=eq.' + encodeURIComponent(id) + '&user_id=eq.' + encodeURIComponent(user.id) + '&select=id,revoked_at&limit=1', {
+      headers: { apikey: key, Authorization: 'Bearer ' + key }
+    });
+    if (!response.ok) return res.status(503).json({ error: 'TV authorization temporarily unavailable.' });
+    const rows: any = await response.json();
+    if (!rows?.length || rows[0].revoked_at) return res.status(403).json({ authorized: false });
+    // Best-effort heartbeat, never block valid device access on a heartbeat failure.
+    void fetch(url + '/rest/v1/flixleo_tv_devices?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH', headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ last_seen_at: new Date().toISOString() })
+    }).catch(() => {});
+    return res.json({ authorized: true });
+  } catch { return res.status(502).json({ error: 'TV authorization check failed.' }); }
 });
 
 // API: PixelDrain File Info & Stream Resolver
