@@ -343,7 +343,7 @@ export default function App() {
   const [signupAgreed, setSignupAgreed] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountNotice, setAccountNotice] = useState('');
-  const [accountSection, setAccountSection] = useState<'overview' | 'profile' | 'security' | 'appearance'>('overview');
+
   const [profileAccent, setProfileAccent] = useState(() => { try { return localStorage.getItem('flixleo_profile_accent') || '#f59e0b'; } catch { return '#f59e0b'; } });
   const [profileName, setProfileName] = useState(() => currentCloudUser()?.user_metadata?.display_name || '');
   const [preferredLanguage, setPreferredLanguage] = useState(() => currentCloudUser()?.user_metadata?.preferred_language || 'all');
