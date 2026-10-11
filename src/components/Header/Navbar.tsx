@@ -63,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         {/* Desktop uses the same five destinations as the mobile bottom navigation. */}
-        <nav aria-label="Main navigation" className="hidden md:flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/70 p-1 shadow-inner shadow-black/20">
+        <nav aria-label="Main navigation" className="hidden lg:flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/70 p-1 shadow-inner shadow-black/20">
           {([
             { tab: 'browse', title: 'Home', Icon: Home },
             { tab: 'movies', title: 'Movies', Icon: Film },
@@ -103,7 +103,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onSelectTab('watchlist')}
             aria-label={`Open watchlist (${bookmarkCount} saved)`}
             title="My Watchlist"
-            className={`hidden md:flex items-center justify-center relative h-10 w-10 rounded-xl border transition-colors ${
+            className={`hidden lg:flex items-center justify-center relative h-10 w-10 rounded-xl border transition-colors ${
               currentTab === 'watchlist'
                 ? 'border-amber-500/50 bg-amber-500/15 text-amber-400'
                 : 'border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
