@@ -15,6 +15,7 @@ export interface StreamMirror {
   downloadUrl?: string;
   isDirect: boolean;
   audioTrack?: string;
+  audioFixUrl?: string;
 }
 
 export interface SubtitleTrack {
