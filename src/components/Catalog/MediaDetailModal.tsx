@@ -4,7 +4,7 @@ import {
   X, Play, Bookmark, BookmarkCheck, Download,
   Volume2, Globe, Server, Star
 } from 'lucide-react';
-import { MediaItem, StreamMirror, getSourceDisplayBadge } from '../../types/stream';
+import { MediaItem, StreamMirror } from '../../types/stream';
 
 interface MediaDetailModalProps {
   media: MediaItem | null;
@@ -111,16 +111,6 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
           {/* Hero text overlay inside banner */}
           <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className={`px-2 py-0.5 rounded text-[11px] font-bold border uppercase ${getSourceBadge(activeMedia.primarySource)}`}>
-                  {getSourceDisplayBadge(activeMedia.primarySource)}
-                </span>
-                {activeMedia.resolutionBadge && (
-                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-bold">
-                    {activeMedia.resolutionBadge}
-                  </span>
-                )}
-              </div>
               <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
                 {activeMedia.title}
               </h2>
