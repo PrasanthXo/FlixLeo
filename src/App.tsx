@@ -3,7 +3,7 @@ import {
   Film, Search, Sparkles, Bookmark, Link as LinkIcon,
   Play, RefreshCw, Layers, CheckCircle2, Tv
 } from 'lucide-react';
-import { MediaItem, SourceType } from './types/stream';
+import { MediaItem, SourceType, StreamMirror } from './types/stream';
 import { MEDIA_CATALOG, SOURCE_METADATA } from './data/mockCatalog';
 import { Navbar } from './components/Header/Navbar';
 import { MobileBottomNav } from './components/MobileBottomNav';
