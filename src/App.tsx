@@ -756,7 +756,13 @@ export default function App() {
     return result;
   }, [tmdbMovies, tvShows, catalog]);
   const mobileWheelFeatured = mobileWheelItems[0] || featuredMedia;
-  const showMixedMobileWheel = !isTvDisplay && currentTab === 'browse';
+  const [isMobileHomeViewport, setIsMobileHomeViewport] = useState(() => window.innerWidth <= 640);
+  useEffect(() => {
+    const updateMobileViewport = () => setIsMobileHomeViewport(window.innerWidth <= 640);
+    window.addEventListener('resize', updateMobileViewport);
+    return () => window.removeEventListener('resize', updateMobileViewport);
+  }, []);
+  const showMixedMobileWheel = !isTvDisplay && isMobileHomeViewport && currentTab === 'browse';
 
   return (
     <div className={`${isTvDisplay ? "flixleo-tv" : ""} min-h-screen bg-[#080a0f] text-slate-100 flex flex-col selection:bg-amber-500 selection:text-black`}>
