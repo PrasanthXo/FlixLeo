@@ -15,8 +15,6 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   onSelectTab,
-  searchQuery,
-  onSearchChange,
   bookmarkCount
 }) => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -115,18 +113,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Zone 3: Search */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Quick Search Input */}
-          <div className="relative w-28 min-[380px]:w-36 sm:w-48 lg:w-60">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              aria-label="Search movies and TV series"
-              type="search"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search movies & series..."
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
-            />
-          </div>
           {!installed && (
             <button type="button" onClick={() => void requestInstall()} title="Install FlixLeo web app" aria-label="Install FlixLeo web app"
               className="flex items-center justify-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-2.5 sm:px-3 py-2 text-amber-300 hover:bg-amber-500/25 transition-colors shrink-0 text-xs font-semibold">
