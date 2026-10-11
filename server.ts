@@ -545,6 +545,9 @@ app.get('/api/tmdb/movie/:id', async (req: Request, res: Response) => {
  * This endpoint deliberately excludes torrents, magnets, embeds and off-site page links:
  * browsers can only use direct, CORS-enabled HLS or video sources.
  */
+// Avoid repeatedly hitting providers that temporarily refuse Render requests.
+// This cache is server-local and automatically expires.
+const stremioProviderCooldown = new Map<string, number>();
 app.get('/api/stremio/streams', async (req: Request, res: Response) => {
   // Some mobile link handlers encode the ampersand into the type value.
   // Parse it safely without weakening title/episode validation.
@@ -580,6 +583,12 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
   const target = type === 'movie' ? imdb : imdb + ':' + season + ':' + episode;
   const diagnostics: { provider: string; status: string; returned?: number; compatible?: number }[] = [];
   const results = await Promise.all(providers.map(async provider => {
+    const cooldownUntil = stremioProviderCooldown.get(provider.hostname) || 0;
+    if (cooldownUntil > Date.now()) {
+      diagnostics.push({ provider: provider.hostname, status: 'Access denied (HTTP 403); retry later' });
+      return [];
+    }
+    if (cooldownUntil) stremioProviderCooldown.delete(provider.hostname);
     const controller = new AbortController();
     // WebStreamr can need longer to aggregate multiple upstream sources.
     const providerTimeoutMs = provider.hostname.includes('webstreamr') || provider.hostname.includes('baby-beamup.club') ? 18000 : 7500;
@@ -587,7 +596,15 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
     try {
       const response = await fetch(provider.base + '/stream/' + type + '/' + encodeURIComponent(target) + '.json',
         { signal: controller.signal, redirect: 'error', headers: { Accept: 'application/json' } });
-      if (!response.ok) { diagnostics.push({ provider: provider.hostname, status: 'HTTP ' + response.status }); return []; }
+      if (!response.ok) {
+        if (response.status === 403) {
+          stremioProviderCooldown.set(provider.hostname, Date.now() + 2 * 60 * 1000);
+          diagnostics.push({ provider: provider.hostname, status: 'Access denied (HTTP 403); provider must allow server requests' });
+        } else {
+          diagnostics.push({ provider: provider.hostname, status: 'HTTP ' + response.status });
+        }
+        return [];
+      }
       if (Number(response.headers.get('content-length') || 0) > 1048576) {
         diagnostics.push({ provider: provider.hostname, status: 'Response too large' }); return [];
       }
