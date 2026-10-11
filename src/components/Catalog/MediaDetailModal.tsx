@@ -159,14 +159,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 {isBookmarked ? <BookmarkCheck className="w-5 h-5" /> : <Bookmark className="w-5 h-5" />}
               </button>
               <button
-                onClick={() => {
-                  onPlayMedia(activeMedia);
-                  onClose();
-                }}
+                onClick={() => document.getElementById('flixleo-quality-selector')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
                 className="py-2.5 px-6 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm flex items-center gap-2 shadow-lg transition-transform active:scale-95"
               >
                 <Play className="w-4 h-4 fill-current" />
-                Play Default
+                Choose Quality
               </button>
             </div>
           </div>
@@ -299,7 +296,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               </div>
             ) : (
               <div>
-                <div className="flex items-center justify-between mb-3">
+                <div id="flixleo-quality-selector" className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Server className="w-4 h-4 text-amber-400" />
                     Select Streaming Mirror & Server Source ({activeMedia.mirrors.length} Available)
