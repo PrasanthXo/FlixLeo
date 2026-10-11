@@ -3,6 +3,7 @@ import Hls from 'hls.js';
 import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
+const resumeKey = (m: MediaItem) => m.id + (m.playbackSeason !== undefined && m.playbackEpisode !== undefined ? ':s' + m.playbackSeason + 'e' + m.playbackEpisode : '');
 type Props = { media: MediaItem; mirrors: StreamMirror[]; initialMirrorId?: string; minimizeSignal?: number; onClose: () => void; onProgressSaved?: () => void; onEpisodeEnded?: () => void };
 type Track = { label: string; language: string; url: string };
 const timeLabel = (n: number) => Number.isFinite(n) ? `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}` : '0:00';
@@ -80,7 +81,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     try {
       const data = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
       const rows = Array.isArray(data) ? data : [];
-      localStorage.setItem('flixleo_continue_watching', JSON.stringify([{ media, progress: video.currentTime, duration: video.duration || 0, updatedAt: Date.now() }, ...rows.filter((r: any) => r?.media?.id !== media.id)].slice(0, 20)));
+      localStorage.setItem('flixleo_continue_watching', JSON.stringify([{ media, progress: video.currentTime, duration: video.duration || 0, updatedAt: Date.now() }, ...rows.filter((r: any) => !r?.media || resumeKey(r.media) !== resumeKey(media))].slice(0, 20)));
       onProgressSaved?.();
     } catch { /* storage is optional */ }
   };
@@ -212,7 +213,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       if (disposed) return;
       try {
         const rows = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
-        const match = Array.isArray(rows) ? rows.find((r: any) => r?.media?.id === media.id) : null;
+        const match = Array.isArray(rows) ? rows.find((r: any) => r?.media && resumeKey(r.media) === resumeKey(media)) : null;
         const p = Number(match?.progress || 0);
         if (p > 5 && p < video.duration - 15) video.currentTime = p;
       } catch { /* ignore */ }
