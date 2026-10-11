@@ -10,6 +10,8 @@ interface NavbarProps {
   selectedSourceFilter: SourceType | 'all';
   onSelectSourceFilter: (source: SourceType | 'all') => void;
   bookmarkCount: number;
+  onOpenAccount: () => void;
+  accountLabel: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -17,7 +19,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectTab,
   searchQuery,
   onSearchChange,
-  bookmarkCount
+  bookmarkCount,
+  onOpenAccount,
+  accountLabel
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full bg-[#080a0f]/90 backdrop-blur-md border-b border-slate-800/80">
@@ -82,8 +86,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: 1 Primary Action (with compact inline search) */}
+        {/* Zone 3: Search and account */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button type="button" onClick={onOpenAccount} title={accountLabel} aria-label="Account and cloud sync" className="rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-2 text-xs text-amber-300 hover:border-amber-500 shrink-0">Account</button>
           {/* Quick Search Input */}
           <div className="relative w-36 min-[380px]:w-44 sm:w-48 lg:w-60">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
