@@ -12,6 +12,7 @@ import { HeroBanner } from './components/Catalog/HeroBanner';
 import { MovieCard } from './components/Catalog/MovieCard';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
+import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudSignOut, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
 
 // Deduplicate repeated TMDB entries by ID and normalized title/year within each media type.
 function uniqueTitles(items: MediaItem[]): MediaItem[] {
@@ -237,6 +238,71 @@ export default function App() {
     }
   }, [watchlistIds]);
 
+  // Optional Supabase cross-device account. Local storage remains available without login.
+  const [cloudUser, setCloudUser] = useState<CloudUser | null>(() => currentCloudUser());
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountEmail, setAccountEmail] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountNotice, setAccountNotice] = useState('');
+  const [cloudReady, setCloudReady] = useState(false);
+  const cloudLoadingRef = useRef(false);
+  const cloudSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const makeLocalSnapshot = React.useCallback((): CloudRecord => {
+    let history: CloudRecord['history'] = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
+      history = Array.isArray(parsed) ? parsed : [];
+    } catch { /* unavailable */ }
+    return { watchlist: (() => {
+      try {
+        const ids = JSON.parse(localStorage.getItem('cinehub_watchlist') || '[]');
+        return Array.isArray(ids) ? ids : [];
+      } catch { return []; }
+    })(), history, updatedAt: Date.now() };
+  }, []);
+  const loadCloud = React.useCallback(async () => {
+    if (!currentCloudUser() || cloudLoadingRef.current) return;
+    cloudLoadingRef.current = true;
+    setCloudReady(false);
+    try {
+      const merged = mergeCloudData(makeLocalSnapshot(), await cloudRead());
+      localStorage.setItem('cinehub_watchlist', JSON.stringify(merged.watchlist));
+      localStorage.setItem('flixleo_continue_watching', JSON.stringify(merged.history));
+      setWatchlistIds(merged.watchlist);
+      refreshContinueWatching();
+      await cloudWrite(merged);
+      setCloudReady(true);
+      setAccountNotice('Your watchlist and Continue Watching are synced.');
+    } catch (error) {
+      setAccountNotice(error instanceof Error ? error.message : 'Cloud sync failed; your local data is safe.');
+    } finally { cloudLoadingRef.current = false; }
+  }, [makeLocalSnapshot, refreshContinueWatching]);
+  useEffect(() => { if (cloudUser) void loadCloud(); }, [cloudUser, loadCloud]);
+  useEffect(() => {
+    if (!cloudUser || !cloudReady) return;
+    if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current);
+    cloudSyncTimer.current = setTimeout(() => {
+      void cloudWrite(makeLocalSnapshot()).catch(() => setAccountNotice('Cloud sync failed; local data is still saved.'));
+    }, 1200);
+    return () => { if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current); };
+  }, [cloudUser, cloudReady, watchlistIds, continueWatching, makeLocalSnapshot]);
+  const submitAccount = async (mode: 'signin' | 'signup') => {
+    setAccountBusy(true);
+    setAccountNotice('');
+    try {
+      if (mode === 'signup') {
+        const active = await cloudSignUp(accountEmail.trim(), accountPassword);
+        if (!active) { setAccountNotice('Check your email to verify your account, then sign in.'); return; }
+      } else { await cloudSignIn(accountEmail.trim(), accountPassword); }
+      setCloudReady(false);
+      setCloudUser(currentCloudUser());
+      setAccountPassword('');
+    } catch (error) {
+      setAccountNotice(error instanceof Error ? error.message : 'Authentication failed.');
+    } finally { setAccountBusy(false); }
+  };
+
   // Search live TMDB movies and television together, with cancellation for fast typing.
   useEffect(() => {
     const q = searchQuery.trim();
@@ -394,7 +460,43 @@ export default function App() {
         selectedSourceFilter={sourceFilter}
         onSelectSourceFilter={setSourceFilter}
         bookmarkCount={watchlistIds.length}
+        onOpenAccount={() => setAccountOpen(true)}
+        accountLabel={cloudUser?.email || 'Sign in'}
       />
+
+      {accountOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAccountOpen(false); }}>
+          <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#10151f] p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">FlixLeo Account</h2>
+              <button onClick={() => setAccountOpen(false)} className="text-slate-300 hover:text-white" aria-label="Close account window">✕</button>
+            </div>
+            {!cloudConfigured ? (
+              <p className="text-sm text-amber-300">Cloud accounts are not configured yet. The site owner needs to set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY on Render and run supabase/schema.sql. Your local data is unaffected.</p>
+            ) : cloudUser ? (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-200">Signed in as <strong>{cloudUser.email}</strong></p>
+                <p className="text-sm text-slate-400">{cloudReady ? 'Cloud sync active' : 'Cloud sync connecting or waiting for retry'}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => void loadCloud()} disabled={accountBusy} className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-black">Sync now</button>
+                  <button onClick={() => { void cloudSignOut().then(() => { setCloudUser(null); setCloudReady(false); setAccountNotice('Signed out. Local data remains on this device.'); }); }} className="rounded-lg bg-slate-700 px-4 py-2 text-white">Sign out</button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={e => { e.preventDefault(); void submitAccount('signin'); }} className="space-y-3">
+                <p className="text-sm text-slate-400">Sign in on your other devices to sync your watchlist and playback progress.</p>
+                <input type="email" required autoComplete="email" placeholder="Email" value={accountEmail} onChange={e => setAccountEmail(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
+                <input type="password" required minLength={6} autoComplete="current-password" placeholder="Password" value={accountPassword} onChange={e => setAccountPassword(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
+                <div className="flex gap-2">
+                  <button type="submit" disabled={accountBusy} className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-black disabled:opacity-50">Sign in</button>
+                  <button type="button" disabled={accountBusy || !accountEmail || accountPassword.length < 6} onClick={() => void submitAccount('signup')} className="rounded-lg bg-slate-700 px-4 py-2 text-white disabled:opacity-50">Create account</button>
+                </div>
+              </form>
+            )}
+            {accountNotice && <p role="status" className="mt-4 text-sm text-amber-200">{accountNotice}</p>}
+          </div>
+        </div>
+      )}
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12">
