@@ -69,6 +69,14 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           setAudio(hls.audioTrack);
         });
         hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => { if (!disposed) setAudioTracks(hls.audioTracks.map((t, i) => ({ id: i, name: t.name || t.lang || 'Track ' + (i + 1) }))); });
+        hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+          if (disposed) return;
+          // HLS subtitle renditions can be selected directly within hls.js.
+          setSubtitles(previous => [
+            ...previous.filter(t => !t.url.startsWith('hls-sub:')),
+            ...hls.subtitleTracks.map((track, i) => ({ url: 'hls-sub:' + i, label: track.name || track.lang || 'Subtitle ' + (i + 1), language: track.lang || 'und' }))
+          ]);
+        });
         hls.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) fail(); });
         hls.loadSource(url); hls.attachMedia(video);
       } else fail();
@@ -97,9 +105,12 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   };
   const selectSubtitle = (url: string) => {
     setSelectedSubtitle(url);
+    if (hlsRef.current) {
+      hlsRef.current.subtitleTrack = url.startsWith('hls-sub:') ? Number(url.slice(8)) : -1;
+    }
     if (videoRef.current) {
       for (let i = 0; i < videoRef.current.textTracks.length; i++) videoRef.current.textTracks[i].mode = 'disabled';
-      if (url) setTimeout(() => { const track = videoRef.current?.textTracks[0]; if (track) track.mode = 'showing'; }, 100);
+      if (url && !url.startsWith('hls-sub:')) setTimeout(() => { const track = videoRef.current?.textTracks[0]; if (track) track.mode = 'showing'; }, 100);
     }
   };
   const uploadSubtitle = async (file: File | undefined) => {
@@ -119,14 +130,14 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       <p className="text-xs text-slate-300">{media.year} · {media.duration}</p>
     </div>
     <div className="relative aspect-video bg-black">
-      <video ref={videoRef} playsInline preload="metadata" crossOrigin="anonymous" className="h-full w-full object-contain"
+      <video ref={videoRef} playsInline preload="metadata" className="h-full w-full object-contain"
         onPlay={() => { setPlaying(true); setBuffering(false); }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBuffering(true)}
         onCanPlay={() => setBuffering(false)}
         onTimeUpdate={event => { setPosition(event.currentTarget.currentTime); setDuration(event.currentTarget.duration || 0); save(); }}
         onEnded={() => { setPlaying(false); save(); }}>
-        {selectedSubtitle && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
+        {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>
       {buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
       {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 p-3 text-xs text-amber-300">{error}</div>}
