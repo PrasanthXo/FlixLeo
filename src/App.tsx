@@ -257,6 +257,7 @@ export default function App() {
   // Optional Supabase cross-device account. Local storage remains available without login.
   const [cloudUser, setCloudUser] = useState<CloudUser | null>(() => currentCloudUser());
   const [accountOpen, setAccountOpen] = useState(false);
+  const [accountSection, setAccountSection] = useState<'overview' | 'profile' | 'security' | 'appearance'>('overview');
   const [approvedTvs, setApprovedTvs] = useState<ApprovedTv[]>([]);
   const [tvListError, setTvListError] = useState('');
   const [tvListBusy, setTvListBusy] = useState(false);
