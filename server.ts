@@ -194,7 +194,7 @@ app.post('/api/resolve', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, source: '4khdhub', message: 'Enter a valid HTTP(S) URL.' });
     }
 
-    if (!/\\.(mp4|m3u8|webm|m4v)(?:$|[?#])/i.test(parsed.pathname + parsed.search + parsed.hash)) {
+    if (!/[.](mp4|m3u8|webm|m4v)(?:$|[?#])/i.test(parsed.pathname + parsed.search + parsed.hash)) {
       return res.status(422).json({
         success: false,
         source: '4khdhub',
@@ -207,7 +207,7 @@ app.post('/api/resolve', async (req: Request, res: Response) => {
       success: true,
       source: '4khdhub',
       name: 'External Video Stream',
-      streamType: /\\.m3u8(?:$|[?#])/i.test(parsed.pathname + parsed.search) ? 'hls' : 'direct-video',
+      streamType: /[.]m3u8(?:$|[?#])/i.test(parsed.pathname + parsed.search) ? 'hls' : 'direct-video',
       streamUrl: parsed.toString(),
       quality: 'Source quality (unverified)',
       features: ['Direct media URL']
