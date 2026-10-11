@@ -435,6 +435,7 @@ export default function App() {
 
   // Switch tabs
   const handleSelectTab = (tab: string) => {
+    if (tab !== 'search' && searchQuery) setSearchQuery('');
     if (activeMedia) setMinimizeSignal(n => n + 1);
     if (['streamhub', 'vault', 'remux', 'fastedge'].includes(tab)) {
       setCurrentTab('browse');
@@ -830,6 +831,20 @@ export default function App() {
               ))}
             </div>
           </section>
+        )}
+
+        {/* Search tab uses the existing global TMDB and catalog search logic. */}
+        {currentTab === 'search' && (
+          <div className="mb-7 rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5">
+            <label htmlFor="flixleo-global-search" className="mb-3 block text-lg font-bold text-white">Search movies &amp; series</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <input id="flixleo-global-search" type="search" autoFocus
+                value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
+                placeholder="Search movies, series, actors..." aria-label="Search movies and TV series"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 outline-none focus:border-amber-400" />
+            </div>
+          </div>
         )}
 
         {/* Spotlight Hero Banner */}
