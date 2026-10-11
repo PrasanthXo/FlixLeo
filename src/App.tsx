@@ -13,6 +13,7 @@ import { MovieCard } from './components/Catalog/MovieCard';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
 import { TvSignIn, TvPairApproval } from './components/TvPairing';
+import { TvExperience } from './components/TvExperience';
 import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudResendVerification, cloudSignOut, cloudUpdateProfile, cloudChangePassword, cloudResetPassword, cloudRecoveryTokenFromUrl, cloudCompleteRecovery, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
 
 // Deduplicate repeated TMDB entries by ID and normalized title/year within each media type.
@@ -38,6 +39,7 @@ function languageMatches(actual: string, preference: string) {
   return actual.toLowerCase() === preference.toLowerCase() || actual.toLowerCase() === lookup[preference];
 }
 export default function App() {
+  const [isTvDisplay] = useState(() => window.location.pathname.toLowerCase().replace(/\/$/, '') === '/tv6' || /smart-tv|smarttv|hbbtv|netcast|web0s|webos|tizen|android tv|googletv|aft[a-z]|bravia|viera|roku|vidaa/i.test(navigator.userAgent));
   // Catalog State
   const [catalog, setCatalog] = useState<MediaItem[]>(MEDIA_CATALOG);
   const [currentTab, setCurrentTab] = useState<string>('browse');
@@ -667,7 +669,8 @@ export default function App() {
   }, [catalog, currentTab, tmdbMovies, tvShows]);
 
   return (
-    <div className="min-h-screen bg-[#080a0f] text-slate-100 flex flex-col selection:bg-amber-500 selection:text-black">
+    <div className={`${isTvDisplay ? "flixleo-tv" : ""} min-h-screen bg-[#080a0f] text-slate-100 flex flex-col selection:bg-amber-500 selection:text-black`}>
+      {isTvDisplay && <TvExperience currentTab={currentTab} onSelectTab={handleSelectTab} onOpenProfile={() => { setAccountSection('overview'); setAccountOpen(true); }} />}
       {/* Top Navigation Bar */}
       <Navbar
         currentTab={currentTab}
