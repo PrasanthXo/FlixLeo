@@ -554,8 +554,6 @@ export default function App() {
         selectedSourceFilter={sourceFilter}
         onSelectSourceFilter={setSourceFilter}
         bookmarkCount={watchlistIds.length}
-        onOpenAccount={() => setAccountOpen(true)}
-        accountLabel={cloudUser?.email || 'Sign in'}
       />
 
       {accountOpen && (
