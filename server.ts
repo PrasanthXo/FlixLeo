@@ -561,6 +561,30 @@ app.get('/api/tmdb/south-indian', async (req: Request, res: Response) => {
   ), items, page });
 });
 
+// Stage 2 mobile Home discovery: independent feeds for each requested row.
+// In-memory cache limits calls to TMDB when many users visit the Home page.
+const homeCollectionsCache: { time: number; value: Record<string, any[]> | null } = { time: 0, value: null };
+app.get('/api/tmdb/home-collections', async (_req: Request, res: Response) => {
+  if (homeCollectionsCache.value && Date.now() - homeCollectionsCache.time < 15 * 60 * 1000) {
+    return res.json({ success: true, collections: homeCollectionsCache.value, cached: true });
+  }
+  const requests: Array<{key:string; params:Record<string,string>}> = [
+    ...Object.entries({Action:'28', 'Sci-Fi':'878', Thriller:'53', Comedy:'35', Drama:'18', Romance:'10749', Horror:'27', Adventure:'12'}).map(([key,id]) => ({key:'genre:'+key,params:{with_genres:id}})),
+    ...Object.entries({Tamil:'ta',English:'en',Hindi:'hi',Sinhala:'si',Telugu:'te',Malayalam:'ml',Kannada:'kn',Korean:'ko'}).map(([key,code]) => ({key:'language:'+key,params:{with_original_language:code}}))
+  ];
+  const fetched = await Promise.allSettled(requests.map(({params}) =>
+    fetchFromTmdb('/discover/movie',{...params,sort_by:'popularity.desc',page:'1'})
+  ));
+  const collections: Record<string, any[]> = {};
+  fetched.forEach((result,i) => {
+    const raw = result.status === 'fulfilled' && Array.isArray(result.value?.results) ? result.value.results : [];
+    collections[requests[i].key] = raw.filter((movie:any) => movie?.id).map((movie:any) => transformTmdbMovie(movie));
+  });
+  homeCollectionsCache.value = collections;
+  homeCollectionsCache.time = Date.now();
+  return res.json({ success: true, collections });
+});
+
 // API: TMDB Live Search
 app.get('/api/tmdb/search', async (req: Request, res: Response) => {
   const query = (req.query.q as string || '').trim();
