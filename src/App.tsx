@@ -1022,7 +1022,7 @@ export default function App() {
                   <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sky-400 text-sm">Ultra 4K & HDR Cinema</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300">4K UHD</span>
+                      
                     </div>
                     <p className="text-slate-400 leading-relaxed text-[11px]">
                       True 2160p HEVC 10-bit prints, Dolby Atmos surround tracks, and Dual Audio Hindi & English stems.
