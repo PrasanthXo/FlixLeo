@@ -793,7 +793,24 @@ export default function App() {
                   className="group text-left w-40 sm:w-48 shrink-0 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500 focus-visible:outline-2 focus-visible:outline-amber-400"
                   aria-label={`Resume ${entry.media.title}`}>
                   <div className="relative aspect-video bg-slate-950">
-                    {entry.media.backdropUrl && <img src={entry.media.backdropUrl} alt="" loading="lazy" className="w-full h-full object-cover" />}
+                    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-950 to-black text-slate-500">
+                      <span className="text-xs font-medium text-center px-3">{entry.media.title}</span>
+                    </div>
+                    {(entry.media.backdropUrl || entry.media.posterUrl) && <img
+                      src={entry.media.backdropUrl || entry.media.posterUrl}
+                      alt=""
+                      loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={event => {
+                        const img = event.currentTarget;
+                        if (img.dataset.fallback !== 'poster' && entry.media.posterUrl && img.src !== entry.media.posterUrl) {
+                          img.dataset.fallback = 'poster';
+                          img.src = entry.media.posterUrl;
+                        } else {
+                          img.style.display = 'none';
+                        }
+                      }}
+                    />}
                     <span className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/80 text-amber-300 text-xs font-bold">{entry.progress >= 5 ? '▶ Resume' : '▶ Continue'}</span>
                     <div className="absolute bottom-0 left-0 right-0 bg-slate-700 h-1">
                       <div className="bg-amber-500 h-full" style={{ width: `${entry.duration > 0 ? Math.min(100, Math.round(entry.progress / entry.duration * 100)) : 0}%` }} />
