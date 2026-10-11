@@ -4,7 +4,7 @@ import {
   X, Play, Bookmark, BookmarkCheck, Download,
   Volume2, Globe, Server, Star
 } from 'lucide-react';
-import { MediaItem, StreamMirror } from '../../types/stream';
+import { MediaItem, StreamMirror, getSourceDisplayBadge } from '../../types/stream';
 
 interface MediaDetailModalProps {
   media: MediaItem | null;
