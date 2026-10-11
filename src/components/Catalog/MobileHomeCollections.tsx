@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import type { MediaItem } from '../../types/stream';
+import { TmdbArtwork } from './TmdbArtwork';
 import './MobileHomeCollections.css';
 
 type Props = {
@@ -15,7 +16,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], recent, o
   const unique = useMemo(() => {
     const seen = new Set<string>();
     return items.filter(item => {
-      if (!item?.id || !item.posterUrl || seen.has(item.id)) return false;
+      if (!item?.id || seen.has(item.id)) return false;
       seen.add(item.id);
       return true;
     });
@@ -27,8 +28,6 @@ export function MobileHomeCollections({ items, southIndianMovies = [], recent, o
   const southIndianSelection = [...southIndianMovies, ...movie].filter(item => ['Tamil','Telugu','Malayalam','Kannada'].some(language => languageMatch(item.language, language))).filter((item, i, all) => all.findIndex(x => x.id === item.id) === i);
   const series = unique.filter(x => x.type === 'tv' || x.id.startsWith('tv-'));
   const rows: { label:string; subtitle:string; list: MediaItem[]; kind?: 'continue' }[] = [
-    { label:'Continue Watching',subtitle:'Pick up where you left off',list:recent.map(x => x.media).filter(Boolean),kind:'continue'},
-    { label:'For You',subtitle:'Discover your next favourite',list:unique.slice(4,19)},
     { label:'Trending Movies',subtitle:'Big-screen favourites',list:movie.slice(0,16)},
     { label:'Popular Series',subtitle:'Stories worth following',list:series.slice(0,16)},
     { label:'South Indian Movies',subtitle:'Tamil • Telugu • Malayalam • Kannada cinema',list:southIndianSelection.slice(0,24)},
@@ -46,7 +45,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], recent, o
           const progress = visibleRecent.get(item.id);
           return <div className="flixleo-mobile-collection-card" key={item.id}>
             <button type="button" onClick={() => onOpen(item)} aria-label={`More about ${item.title}`} className="flixleo-mobile-collection-poster">
-              <img src={item.posterUrl} alt="" loading="lazy" referrerPolicy="no-referrer"/>
+              <TmdbArtwork media={item} kind="poster" alt={item.title} loading="lazy" referrerPolicy="no-referrer" className="flixleo-mobile-collection-artwork"/>
               {row.kind === 'continue' && progress && progress.duration > 0 && <span className="flixleo-mobile-collection-progress"><span style={{width:`${Math.max(0,Math.min(100, progress.progress / progress.duration * 100))}%`}} /></span>}
             </button>
             <div className="flixleo-mobile-collection-card-foot"><span title={item.title}>{item.title}</span><button type="button" onClick={() => onPlay(item)} aria-label={`Play ${item.title}`}><Play size={12} fill="currentColor"/></button></div>
