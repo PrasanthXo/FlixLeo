@@ -581,7 +581,9 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
   const diagnostics: { provider: string; status: string; returned?: number; compatible?: number }[] = [];
   const results = await Promise.all(providers.map(async provider => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 7500);
+    // WebStreamr can need longer to aggregate multiple upstream sources.
+    const providerTimeoutMs = provider.hostname.includes('webstreamr') || provider.hostname.includes('baby-beamup.club') ? 18000 : 7500;
+    const timeout = setTimeout(() => controller.abort(), providerTimeoutMs);
     try {
       const response = await fetch(provider.base + '/stream/' + type + '/' + encodeURIComponent(target) + '.json',
         { signal: controller.signal, redirect: 'error', headers: { Accept: 'application/json' } });
