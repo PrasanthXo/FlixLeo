@@ -744,27 +744,27 @@ export default function App() {
       )}
       {accountOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-lg p-3 sm:p-6" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAccountOpen(false); }}>
-          <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="tv6-account-dialog w-full max-w-xl max-h-[92dvh] overflow-y-auto rounded-[28px] border border-white/10 bg-[#0d111c] p-4 sm:p-7 shadow-[0_24px_100px_rgba(0,0,0,.75)]">
-            <div className="flex justify-between items-center mb-4">
-              <div><p className="text-[10px] font-bold uppercase tracking-[.3em] text-slate-400">Your space</p><h2 className="text-2xl font-extrabold tracking-tight text-white">FlixLeo <span style={{color: profileAccent}}>Account</span></h2></div>
-              <button onClick={() => setAccountOpen(false)} className="text-slate-300 hover:text-white" aria-label="Close account window">✕</button>
+          <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="tv6-account-dialog flixleo-account-dialog w-full max-w-xl max-h-[92dvh] overflow-y-auto rounded-[30px] border border-white/10 bg-[#090f1b] p-4 sm:p-7 shadow-[0_28px_110px_rgba(0,0,0,.85)]">
+            <div className="flex justify-between items-start gap-4 mb-5">
+              <div><p className="text-[11px] font-bold uppercase tracking-[.35em] text-slate-400 mb-1">Your space</p><h2 className="text-[clamp(1.6rem,6vw,2.4rem)] leading-tight font-black tracking-tight text-white">FlixLeo <span style={{color: profileAccent}}>Account</span></h2><p className="text-xs sm:text-sm text-slate-400 mt-2">Manage your account, preferences and devices</p></div>
+              <button onClick={() => setAccountOpen(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-slate-800/80 text-slate-200 hover:bg-slate-700 hover:text-white" aria-label="Close account window">✕</button>
             </div>
             {!cloudConfigured ? (
               <p className="text-sm text-amber-300">Account service unavailable. Please contact support.</p>
             ) : cloudUser ? (
               <div className="space-y-4">
                 {phonePairId && <TvPairApproval id={phonePairId} user={cloudUser} onComplete={completeTvPair} />}
-                <div className="rounded-2xl bg-gradient-to-br from-white/10 via-slate-800/60 to-slate-950 p-5 border border-white/10 shadow-inner">
+                <div className="rounded-[24px] bg-gradient-to-br from-slate-800/90 via-[#131d30] to-[#11101a] p-4 sm:p-5 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,.09)]">
                   <div className="flex gap-3 items-center">
-                    <div style={{ backgroundColor: profileAccent }} className="h-14 w-14 shrink-0 rounded-2xl text-black font-extrabold grid place-items-center text-2xl shadow-lg">{(profileName || cloudUser.email || 'F').charAt(0).toUpperCase()}</div>
+                    <div style={{ backgroundColor: profileAccent }} className="h-16 w-16 shrink-0 rounded-[22px] text-black font-extrabold grid place-items-center text-3xl shadow-lg">{(profileName || cloudUser.email || 'F').charAt(0).toUpperCase()}</div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-white truncate">{profileName || cloudUser.email?.split('@')[0] || 'FlixLeo member'}</p>
+                      <p className="font-bold text-lg text-white truncate">{profileName || cloudUser.email?.split('@')[0] || 'FlixLeo member'}</p>
                       <p className="text-xs text-slate-300 truncate">{cloudUser.email}</p>
                       <p className={`text-xs mt-1 ${cloudReady ? 'text-emerald-400' : 'text-amber-300'}`}>{cloudReady ? '● Cloud sync active' : '○ Cloud sync pending'}</p>
                     </div>
                   </div>
                 </div>
-                <button type="button" onClick={() => { setOnboardingOpen(true); setAccountNotice(''); }} className="w-full text-sm text-amber-300 text-left hover:underline">Edit movie languages, favorite artists &amp; genres →</button>
+                <button type="button" onClick={() => { setOnboardingOpen(true); setAccountNotice(''); }} className="w-full flex items-center gap-3 rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-950/50 to-slate-900/70 px-4 py-3.5 text-left hover:border-amber-400/60"><span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-500/15 text-xl">✦</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-white">Personalize your experience</span><span className="block text-xs text-slate-300">Movie languages, favorite artists &amp; genres</span></span><span className="text-amber-400 text-xl" aria-hidden="true">›</span></button>
                 {onboardingOpen && <div className="space-y-4 rounded-xl border border-amber-500/30 bg-slate-900 p-3">
                   <h3 className="font-semibold text-white">Make For You yours</h3>
                   <p className="text-xs text-slate-400">Tap your favorites. No typing needed. You can change them anytime.</p>
@@ -778,11 +778,11 @@ export default function App() {
                     </div>))}
                   <button type="button" onClick={() => void savePreferences()} disabled={accountBusy} className="w-full bg-amber-500 rounded-lg text-black font-bold p-3 disabled:opacity-50">Save my For You preferences</button>
                 </div>}
-                <div className="grid grid-cols-4 gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-1.5">
-                  <button type="button" onClick={() => setAccountSection('overview')} className={`rounded-xl py-2.5 text-xs sm:text-sm ${accountSection === 'overview' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>My activity</button>
-                  <button type="button" onClick={() => setAccountSection('profile')} className={`rounded-xl py-2.5 text-xs sm:text-sm ${accountSection === 'profile' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>Profile</button>
-                  <button type="button" onClick={() => setAccountSection('security')} className={`rounded-xl py-2.5 text-xs sm:text-sm ${accountSection === 'security' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>Security</button>
-                  <button type="button" onClick={() => setAccountSection('appearance')} className={`rounded-xl py-2.5 text-xs sm:text-sm ${accountSection === 'appearance' ? 'bg-white text-slate-950 font-bold' : 'text-slate-300 hover:bg-white/10'}`}>Style</button>
+                <div className="grid grid-cols-4 gap-1 rounded-[22px] border border-white/10 bg-[#111b29] p-1.5">
+                  <button type="button" onClick={() => setAccountSection('overview')} className={`rounded-2xl min-h-12 px-1 py-3 text-[11px] sm:text-sm transition-colors ${accountSection === 'overview' ? 'bg-gradient-to-b from-amber-400 to-orange-500 text-black font-extrabold shadow-[0_4px_18px_rgba(245,158,11,.22)]' : 'bg-slate-800/70 text-slate-200 hover:bg-slate-700'}`}>My activity</button>
+                  <button type="button" onClick={() => setAccountSection('profile')} className={`rounded-2xl min-h-12 px-1 py-3 text-[11px] sm:text-sm transition-colors ${accountSection === 'profile' ? 'bg-gradient-to-b from-amber-400 to-orange-500 text-black font-extrabold shadow-[0_4px_18px_rgba(245,158,11,.22)]' : 'bg-slate-800/70 text-slate-200 hover:bg-slate-700'}`}>Profile</button>
+                  <button type="button" onClick={() => setAccountSection('security')} className={`rounded-2xl min-h-12 px-1 py-3 text-[11px] sm:text-sm transition-colors ${accountSection === 'security' ? 'bg-gradient-to-b from-amber-400 to-orange-500 text-black font-extrabold shadow-[0_4px_18px_rgba(245,158,11,.22)]' : 'bg-slate-800/70 text-slate-200 hover:bg-slate-700'}`}>Security</button>
+                  <button type="button" onClick={() => setAccountSection('appearance')} className={`rounded-2xl min-h-12 px-1 py-3 text-[11px] sm:text-sm transition-colors ${accountSection === 'appearance' ? 'bg-gradient-to-b from-amber-400 to-orange-500 text-black font-extrabold' : 'text-slate-300 hover:bg-white/10'}`}>Style</button>
                 </div>
                 {accountSection === 'appearance' && <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4"><div><h3 className="font-bold text-white">Make it yours</h3><p className="text-xs text-slate-400 mt-1">Pick your account accent. Saved on this device.</p></div><div className="flex flex-wrap gap-3">{['#f59e0b','#a855f7','#06b6d4','#22c55e','#f43f5e','#e2e8f0'].map(color => <button type="button" key={color} aria-label={`Choose ${color} accent`} aria-pressed={profileAccent === color} onClick={() => { setProfileAccent(color); try { localStorage.setItem('flixleo_profile_accent', color); } catch {} }} style={{backgroundColor:color}} className={`h-11 w-11 rounded-2xl transition-transform ${profileAccent === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0d111c] scale-105' : 'opacity-70 hover:opacity-100'}`}/>)}</div><button type="button" onClick={() => setAccountSection('profile')} className="w-full rounded-xl border border-white/15 bg-white/10 p-3 text-sm font-semibold text-white">Edit display name and language →</button></div>}
                 {accountSection === 'overview' && (
@@ -812,12 +812,12 @@ export default function App() {
                 )}
                 {accountSection === 'security' && (
                   <div className="space-y-3">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div><h3 className="font-bold text-white">Approved TVs</h3><p className="text-xs text-slate-400">Manage TVs connected through QR sign-in.</p></div>
-                        <div className="flex shrink-0 flex-wrap gap-2">
-                          <button type="button" aria-expanded={showTvHelp} aria-controls="flixleo-tv-help" onClick={() => setShowTvHelp(value => !value)} className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm font-bold text-amber-300">? Help</button>
-                          <button type="button" disabled={tvListBusy} onClick={() => void refreshTvs()} className="rounded-lg bg-slate-700 px-3 py-2 text-sm text-white">Refresh</button>
+                    <div className="rounded-[24px] border border-white/10 bg-gradient-to-br from-slate-800/70 to-[#101827] p-4 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3"><span aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-amber-500/15 text-2xl text-amber-400">▣</span><div><h3 className="font-bold text-lg text-white">Approved TVs</h3><p className="text-xs text-slate-400">Manage TVs connected through QR sign-in.</p></div></div>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" aria-expanded={showTvHelp} aria-controls="flixleo-tv-help" onClick={() => setShowTvHelp(value => !value)} className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs sm:text-sm font-bold text-amber-300 hover:bg-amber-500/20">? Help</button>
+                          <button type="button" disabled={tvListBusy} onClick={() => void refreshTvs()} className="rounded-xl border border-white/10 bg-slate-700/80 px-3 py-2 text-xs sm:text-sm text-white hover:bg-slate-600">Refresh</button>
                         </div>
                       </div>
                       {showTvHelp && <div id="flixleo-tv-help" className="rounded-xl border border-amber-500/20 bg-slate-950/70 p-4 space-y-3 text-sm text-slate-200">
@@ -834,7 +834,7 @@ export default function App() {
                         <p className="text-slate-400">To disconnect a TV later, tap <strong className="text-rose-300">Revoke</strong> next to it. Use a new QR code to connect it again.</p>
                       </div>}
                       {tvListError && <p role="alert" className="text-rose-300 text-sm">{tvListError}</p>}
-                      {!tvListBusy && !approvedTvs.length && !tvListError && <p className="text-sm text-slate-300">No approved TVs yet.</p>}
+                      {!tvListBusy && !approvedTvs.length && !tvListError && <div className="flex items-center gap-3 rounded-2xl border border-slate-700/60 bg-[#0c1625]/70 p-4"><span aria-hidden="true" className="text-2xl text-slate-400">▢</span><div><p className="text-sm font-semibold text-white">No approved TVs yet</p><p className="text-xs text-slate-400 mt-1">When you sign in on a TV, it will appear here.</p></div></div>}
                       {approvedTvs.map(tv => (
                         <div key={tv.id} className="rounded-xl border border-slate-700 p-3 flex items-center justify-between gap-3">
                           <div className="min-w-0">
@@ -853,15 +853,15 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-                    <p className="text-sm text-slate-300">Change password for {cloudUser.email}</p>
+                    <p className="text-sm font-bold text-white">🔒 Change password <span className="block text-xs font-normal text-slate-400 mt-1">Update the password for {cloudUser.email}</span></p>
                     <form onSubmit={e => { e.preventDefault(); void accountAction(async () => { await cloudChangePassword(newPassword); setNewPassword(''); }, 'Password updated.'); }} className="space-y-2">
-                      <input type="password" autoComplete="new-password" minLength={8} required value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password (8+ characters)" className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
-                      <button disabled={accountBusy} className="w-full rounded-lg bg-amber-500 p-3 text-black font-semibold disabled:opacity-50">Update password</button>
+                      <input type="password" autoComplete="new-password" minLength={8} required value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password (8+ characters)" className="w-full rounded-2xl bg-[#0d1627] border border-slate-600/60 p-4 text-white outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20" />
+                      <button disabled={accountBusy} className="w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-4 text-black font-extrabold disabled:opacity-50 hover:brightness-110">Update password</button>
                     </form>
-                    <button type="button" disabled={accountBusy} onClick={() => void accountAction(() => cloudResetPassword(cloudUser.email || ''), 'Password reset email requested. Check your inbox.')} className="w-full rounded-lg border border-slate-600 p-3 text-white">Email password reset link</button>
+                    <button type="button" disabled={accountBusy} onClick={() => void accountAction(() => cloudResetPassword(cloudUser.email || ''), 'Password reset email requested. Check your inbox.')} className="w-full rounded-2xl border border-slate-600/70 bg-slate-800/40 p-4 text-left text-white hover:bg-slate-700/50">✉ &nbsp; Email password reset link</button>
                   </div>
                 )}
-                <button type="button" onClick={() => { void accountAction(async () => { await cloudSignOut(); setCloudUser(null); setCloudReady(false); setAccountSection('overview'); }, 'Signed out. Your cloud data remains in your account.'); }} disabled={accountBusy} className="w-full rounded-lg border border-rose-500/40 py-2.5 text-rose-300 disabled:opacity-50">Sign out</button>
+                <button type="button" onClick={() => { void accountAction(async () => { await cloudSignOut(); setCloudUser(null); setCloudReady(false); setAccountSection('overview'); }, 'Signed out. Your cloud data remains in your account.'); }} disabled={accountBusy} className="w-full rounded-2xl border border-rose-500/50 bg-rose-950/20 py-3.5 font-semibold text-rose-300 hover:bg-rose-950/40 disabled:opacity-50">↪ &nbsp; Sign out</button>
               </div>
             ) : tvSignInMode ? (
               <TvSignIn onCancel={() => setTvSignInMode(false)} onSignedIn={user => {
