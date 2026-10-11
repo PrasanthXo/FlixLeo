@@ -59,8 +59,16 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         const streams: StreamMirror[] = (Array.isArray(data.streams) ? data.streams : []).map((stream: any, index: number) => ({
           id: 'stremio-' + index,
           source: 'custom',
-          label: (String(stream.provider || 'Stremio').split('.')[0].replace(/[^a-z0-9 -]/gi, ' ').trim() || 'Stremio') +
-            (String(stream.title || '').match(/(?:WEB[- .]?DL|BluRay|WEBRip|HDR|DV|HEVC|H\.265|H\.264|AV1|MP4|MKV)/i)?.[0] ? ' · ' + String(stream.title).match(/(?:WEB[- .]?DL|BluRay|WEBRip|HDR|DV|HEVC|H\.265|H\.264|AV1|MP4|MKV)/i)![0].toUpperCase() : ''),
+          label: (() => {
+            const original = String(stream.title || stream.name || '').trim();
+            // Display original add-on titles, never URLs, hosts or signed tokens.
+            const safeTitle = original
+              .replace(/(?:https?:\/\/|www\.)\S+/gi, '')
+              .replace(/\b(?:magnet:\?\S+|intent:\/\/\S+)\b/gi, '')
+              .replace(/\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|site|club|fun|tv|xyz)\b/gi, '')
+              .trim();
+            return safeTitle || String(stream.name || 'Stremio Stream').replace(/(?:https?:\/\/|www\.)\S+/gi, '').trim() || 'Stremio Stream';
+          })(),
           quality: /(?:4k|2160p)/i.test(String(stream.title || '') + ' ' + String(stream.name || '')) ? '4K UHD'
             : /1080p/i.test(String(stream.title || '') + ' ' + String(stream.name || '')) ? '1080p'
             : /720p/i.test(String(stream.title || '') + ' ' + String(stream.name || '')) ? '720p'
