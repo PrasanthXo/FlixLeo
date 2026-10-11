@@ -271,7 +271,8 @@ export default function App() {
   const [signupAgreed, setSignupAgreed] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountNotice, setAccountNotice] = useState('');
-  const [accountSection, setAccountSection] = useState<'overview' | 'profile' | 'security'>('overview');
+  const [accountSection, setAccountSection] = useState<'overview' | 'profile' | 'security' | 'appearance'>('overview');
+  const [profileAccent, setProfileAccent] = useState(() => { try { return localStorage.getItem('flixleo_profile_accent') || '#f59e0b'; } catch { return '#f59e0b'; } });
   const [profileName, setProfileName] = useState(() => currentCloudUser()?.user_metadata?.display_name || '');
   const [preferredLanguage, setPreferredLanguage] = useState(() => currentCloudUser()?.user_metadata?.preferred_language || 'all');
   const [newPassword, setNewPassword] = useState('');
@@ -563,19 +564,19 @@ export default function App() {
       />
 
       {accountOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAccountOpen(false); }}>
-          <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 bg-[#10151f] p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-lg p-3 sm:p-6" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAccountOpen(false); }}>
+          <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="w-full max-w-xl max-h-[92dvh] overflow-y-auto rounded-[28px] border border-white/10 bg-[#0d111c] p-4 sm:p-7 shadow-[0_24px_100px_rgba(0,0,0,.75)]">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-white">FlixLeo Account</h2>
+              <div><p className="text-[10px] font-bold uppercase tracking-[.3em] text-slate-400">Your space</p><h2 className="text-2xl font-extrabold tracking-tight text-white">FlixLeo <span style={{color: profileAccent}}>Account</span></h2></div>
               <button onClick={() => setAccountOpen(false)} className="text-slate-300 hover:text-white" aria-label="Close account window">✕</button>
             </div>
             {!cloudConfigured ? (
               <p className="text-sm text-amber-300">Account service unavailable. Please contact support.</p>
             ) : cloudUser ? (
               <div className="space-y-4">
-                <div className="rounded-xl bg-gradient-to-r from-amber-500/15 to-slate-800 p-4 border border-amber-500/20">
+                <div className="rounded-2xl bg-gradient-to-br from-white/10 via-slate-800/60 to-slate-950 p-5 border border-white/10 shadow-inner">
                   <div className="flex gap-3 items-center">
-                    <div className="h-12 w-12 rounded-full bg-amber-500 text-black font-extrabold grid place-items-center text-xl">{(profileName || cloudUser.email || 'F').charAt(0).toUpperCase()}</div>
+                    <div style={{ backgroundColor: profileAccent }} className="h-14 w-14 shrink-0 rounded-2xl text-black font-extrabold grid place-items-center text-2xl shadow-lg">{(profileName || cloudUser.email || 'F').charAt(0).toUpperCase()}</div>
                     <div className="min-w-0">
                       <p className="font-semibold text-white truncate">{profileName || cloudUser.email?.split('@')[0] || 'FlixLeo member'}</p>
                       <p className="text-xs text-slate-300 truncate">{cloudUser.email}</p>
@@ -597,11 +598,13 @@ export default function App() {
                     </div>))}
                   <button type="button" onClick={() => void savePreferences()} disabled={accountBusy} className="w-full bg-amber-500 rounded-lg text-black font-bold p-3 disabled:opacity-50">Save my For You preferences</button>
                 </div>}
-                <div className="grid grid-cols-3 gap-2">
-                  <button type="button" onClick={() => setAccountSection('overview')} className={`rounded-lg py-2 text-sm ${accountSection === 'overview' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>My activity</button>
-                  <button type="button" onClick={() => setAccountSection('profile')} className={`rounded-lg py-2 text-sm ${accountSection === 'profile' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>Profile</button>
-                  <button type="button" onClick={() => setAccountSection('security')} className={`rounded-lg py-2 text-sm ${accountSection === 'security' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>Security</button>
+                <div className="grid grid-cols-4 gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-1.5">
+                  <button type="button" onClick={() => setAccountSection('overview')} className={`rounded-xl py-2.5 text-xs sm:text-sm ${accountSection === 'overview' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>My activity</button>
+                  <button type="button" onClick={() => setAccountSection('profile')} className={`rounded-xl py-2.5 text-xs sm:text-sm ${accountSection === 'profile' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>Profile</button>
+                  <button type="button" onClick={() => setAccountSection('security')} className={`rounded-xl py-2.5 text-xs sm:text-sm ${accountSection === 'security' ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-white'}`}>Security</button>
+                  <button type="button" onClick={() => setAccountSection('appearance')} className={`rounded-xl py-2.5 text-xs sm:text-sm ${accountSection === 'appearance' ? 'bg-white text-slate-950 font-bold' : 'text-slate-300 hover:bg-white/10'}`}>Style</button>
                 </div>
+                {accountSection === 'appearance' && <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4"><div><h3 className="font-bold text-white">Make it yours</h3><p className="text-xs text-slate-400 mt-1">Pick your account accent. Saved on this device.</p></div><div className="flex flex-wrap gap-3">{['#f59e0b','#a855f7','#06b6d4','#22c55e','#f43f5e','#e2e8f0'].map(color => <button type="button" key={color} aria-label={`Choose ${color} accent`} aria-pressed={profileAccent === color} onClick={() => { setProfileAccent(color); try { localStorage.setItem('flixleo_profile_accent', color); } catch {} }} style={{backgroundColor:color}} className={`h-11 w-11 rounded-2xl transition-transform ${profileAccent === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0d111c] scale-105' : 'opacity-70 hover:opacity-100'}`}/>)}</div><button type="button" onClick={() => setAccountSection('profile')} className="w-full rounded-xl border border-white/15 bg-white/10 p-3 text-sm font-semibold text-white">Edit display name and language →</button></div>}
                 {accountSection === 'overview' && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
