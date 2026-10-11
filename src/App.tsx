@@ -819,7 +819,7 @@ export default function App() {
             </div>
             <div className="flex gap-3 overflow-x-auto pb-3">
               {continueWatching.map(entry => (
-                <button key={entry.media.id} type="button"
+                <button key={entry.media.id + ':s' + (entry.media.playbackSeason ?? '') + 'e' + (entry.media.playbackEpisode ?? '')} type="button"
                   onClick={() => {
                     handlePlayMedia(entry.media);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
