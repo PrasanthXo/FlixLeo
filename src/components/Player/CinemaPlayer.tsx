@@ -166,6 +166,11 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
             : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onTimeUpdate={saveProgress} onEnded={saveProgress} className="h-full w-full object-contain" />}
       </div>
       <div className="p-3 sm:p-4 space-y-3">
+        {/^(tamil|ta)(?:\\b|\\s|\\W)/i.test(media.language.trim()) && <div className="rounded-lg border border-amber-500/40 bg-slate-900 p-3">
+          <p className="text-sm font-semibold text-white">Tamil movies · Einthusan preferred</p>
+          <p className="mt-1 text-xs text-slate-300">Browse the official Einthusan Tamil catalogue first. FlixLeo cannot confirm a matching movie or embed permission automatically; existing in-player servers remain available below.</p>
+          <a className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-black" href="https://einthusan.tv/launcher/?lang=tamil" target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /> Browse Einthusan Tamil</a>
+        </div>}
         {qualityLevels.length > 0 && <label className="flex items-center gap-2 text-sm text-white">Video quality
           <select aria-label="Video quality" className="rounded bg-slate-800 border border-slate-600 p-2 text-white" value={selectedQuality} onChange={e => { const level = Number(e.target.value); setSelectedQuality(level); if (hlsRef.current) hlsRef.current.currentLevel = level; }}>
             <option value={-1}>Auto (adaptive)</option>
