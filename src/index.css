@@ -41,3 +41,32 @@
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 16px);
 }
+/* TV-only presentation: no desktop or mobile selectors are changed. */
+.flixleo-tv { font-size: 18px; min-height: 100vh; }
+.flixleo-tv > header:not(.flixleo-tv-nav) { display:none; }
+.flixleo-tv > .fixed.bottom-0, .flixleo-tv > nav.fixed { display:none !important; }
+.flixleo-tv-nav {
+  position: sticky; top:0; z-index:45; display:flex; align-items:center;
+  justify-content:space-between; gap:2rem; padding:16px 3.5vw;
+  background:rgba(8,10,15,.97); border-bottom:1px solid #334155;
+}
+.flixleo-tv-brand { display:flex; gap:12px; align-items:center; font-size:26px; font-weight:850; color:white; flex-shrink:0; }
+.flixleo-tv-brand img { width:44px; height:44px; border-radius:12px; }
+.flixleo-tv-nav nav { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-end; }
+.flixleo-tv-nav nav button { display:flex; align-items:center; gap:10px; padding:13px 18px; border-radius:14px; font-size:17px; font-weight:700; color:#d1d5db; }
+.flixleo-tv-nav nav button[aria-current="page"] { color:#090909; background:#f59e0b; }
+.flixleo-tv main { width:100%; max-width:1800px; padding:35px 4vw 85px; }
+.flixleo-tv main .grid.grid-cols-2 { grid-template-columns:repeat(5,minmax(0,1fr)); gap:22px; }
+.flixleo-tv main h1, .flixleo-tv main h2 { font-size:clamp(25px,2.2vw,38px); line-height:1.2; }
+.flixleo-tv main button { min-height:48px; }
+.flixleo-tv [role="dialog"] { max-width:min(94vw,920px); }
+.flixleo-tv :is(button,a,input,select,textarea,[tabindex]):focus-visible,
+.flixleo-tv :is(button,a,input,select,textarea,[tabindex]):focus {
+  outline:4px solid #fbbf24 !important; outline-offset:4px; box-shadow:0 0 0 7px #0008; }
+.flixleo-tv :is(button,a):focus { transform:scale(1.025); }
+.flixleo-tv footer { font-size:15px; }
+@media(max-width:950px) {
+ .flixleo-tv-nav { padding:12px 2vw; gap:12px; }
+ .flixleo-tv-nav nav button { padding:10px; font-size:15px; }
+ .flixleo-tv main .grid.grid-cols-2 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
