@@ -207,6 +207,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <label className="block text-xs text-slate-300">Subtitles {subtitleLoading ? '· Searching…' : ''}
           <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={selectedSubtitle} onChange={e => void selectSubtitle(e.target.value)}>
             <option value="">Off</option>
+            {selectedSubtitle.startsWith('blob:') && <option value={selectedSubtitle}>Installed subtitle</option>}
             {subtitles.map(t => <option key={t.url} value={t.url}>{t.label} ({t.language})</option>)}
           </select>
         </label>
