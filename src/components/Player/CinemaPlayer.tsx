@@ -19,7 +19,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
 }) => {
   const playerAnchorRef = useRef<HTMLDivElement>(null);
   const [docked, setDocked] = useState(false);
-  const mirrors = media.mirrors || [];
+  // Older saved catalogue entries can still contain the defunct embed.su mirror.
+  const mirrors = (media.mirrors || []).filter(m => !/^https?:\/\/embed\.su(?:\/|$)/i.test(m.url));
   const [index, setIndex] = useState(() => Math.max(0, mirrors.findIndex(m => m.id === initialMirrorId)));
   const [tried, setTried] = useState<number[]>([]);
   const [error, setError] = useState('');
