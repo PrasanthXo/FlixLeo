@@ -49,6 +49,22 @@ export default function App() {
   const [sourceFilter, setSourceFilter] = useState<SourceType | 'all'>('all');
   const [tmdbCategory, setTmdbCategory] = useState<'trending' | 'popular' | 'top_rated' | 'indian' | 'all'>('trending');
   const [tmdbMovies, setTmdbMovies] = useState<MediaItem[]>([]);
+  const [southIndianMovies, setSouthIndianMovies] = useState<MediaItem[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/tmdb/indian?page=1', { signal: controller.signal })
+      .then(response => response.ok ? response.json() : Promise.reject(new Error('Catalog unavailable')))
+      .then(data => {
+        if (Array.isArray(data.items)) {
+          setSouthIndianMovies(uniqueTitles(data.items.filter((item: MediaItem) =>
+            item.type !== 'tv' && !item.id.startsWith('tv-') &&
+            ['ta','te','ml','kn','tamil','telugu','malayalam','kannada'].includes((item.language || '').toLowerCase())
+          )));
+        }
+      }).catch(() => {});
+    return () => controller.abort();
+  }, []);
+
   const [isLoadingTmdb, setIsLoadingTmdb] = useState<boolean>(false);
   const [isTmdbLive, setIsTmdbLive] = useState<boolean>(true);
 
@@ -1039,6 +1055,17 @@ export default function App() {
           />
         )}
 
+        {/* Mobile Home-only curated discovery, immediately under the hero rather than after the long grid. */}
+        {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
+          <MobileHomeCollections
+            items={uniqueTitles([...tmdbMovies, ...tvShows, ...southIndianMovies, ...catalog])}
+            southIndianMovies={southIndianMovies}
+            recent={continueWatching}
+            onOpen={setDetailMedia}
+            onPlay={handlePlayMedia}
+          />
+        )}
+
         {/* TMDB Movie Catalogs Selector */}
         {(currentTab === 'browse' || currentTab === 'movies') && !searchQuery && (
           <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-slate-900/90 via-[#0a101d] to-slate-950 border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -1206,14 +1233,6 @@ export default function App() {
               </div>
             )}
 
-            {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
-              <MobileHomeCollections
-                items={uniqueTitles([...tmdbMovies, ...tvShows, ...catalog])}
-                recent={continueWatching}
-                onOpen={setDetailMedia}
-                onPlay={handlePlayMedia}
-              />
-            )}
 
             {tabCanLoadMore && liveFeedReady && (
               <div ref={loadMoreRef} className="py-8 text-center" aria-live="polite">
