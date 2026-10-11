@@ -246,6 +246,7 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountEmail, setAccountEmail] = useState('');
   const [accountPassword, setAccountPassword] = useState('');
+  const [signupAgreed, setSignupAgreed] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountNotice, setAccountNotice] = useState('');
   const [accountSection, setAccountSection] = useState<'overview' | 'profile' | 'security'>('overview');
@@ -306,6 +307,7 @@ export default function App() {
     setAccountNotice('');
     try {
       if (mode === 'signup') {
+        if (!signupAgreed) throw new Error('Please read and accept the Terms and Privacy Policy to create an account.');
         const active = await cloudSignUp(accountEmail.trim(), accountPassword);
         if (!active) { setAccountNotice('Check your email to verify your account, then sign in.'); return; }
       } else { await cloudSignIn(accountEmail.trim(), accountPassword); }
@@ -593,10 +595,14 @@ export default function App() {
               <form onSubmit={e => { e.preventDefault(); void submitAccount('signin'); }} className="space-y-3">
                 <p className="text-sm text-slate-400">Create a free FlixLeo account to save your watchlist and continue watching across devices.</p>
                 <input type="email" required autoComplete="email" placeholder="Email" value={accountEmail} onChange={e => setAccountEmail(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
-                <input type="password" required minLength={6} autoComplete="current-password" placeholder="Password" value={accountPassword} onChange={e => setAccountPassword(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
+                <input type="password" required minLength={8} autoComplete="current-password" placeholder="Password (8+ characters)" value={accountPassword} onChange={e => setAccountPassword(e.target.value)} className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-white" />
+                <label className="flex gap-2 items-start text-xs text-slate-300 cursor-pointer">
+                  <input type="checkbox" checked={signupAgreed} onChange={e => setSignupAgreed(e.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-500 shrink-0" />
+                  <span>I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-amber-300 underline">Terms &amp; Conditions</a> and <a href="/privacy.html" target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-amber-300 underline">Privacy Policy</a> when creating an account.</span>
+                </label>
                 <div className="flex gap-2">
                   <button type="submit" disabled={accountBusy} className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-black disabled:opacity-50">Sign in</button>
-                  <button type="button" disabled={accountBusy || !accountEmail || accountPassword.length < 6} onClick={() => void submitAccount('signup')} className="rounded-lg bg-slate-700 px-4 py-2 text-white disabled:opacity-50">Create account</button>
+                  <button type="button" disabled={accountBusy || !signupAgreed || !accountEmail.trim() || accountPassword.length < 8} onClick={() => void submitAccount('signup')} className="rounded-lg bg-slate-700 px-4 py-2 text-white disabled:opacity-50">Create account</button>
                 </div>
                 <button type="button" disabled={accountBusy || !accountEmail.trim()} onClick={() => void accountAction(() => cloudResetPassword(accountEmail), 'Password reset email requested. Check your inbox.')} className="text-sm text-amber-300 hover:underline disabled:opacity-50">Forgot password?</button>
               </form>
