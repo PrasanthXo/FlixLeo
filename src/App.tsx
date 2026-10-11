@@ -557,7 +557,8 @@ export default function App() {
           .some(v => v.toLocaleLowerCase().includes(q))
       );
       list = uniqueTitles([...tmdbSearchResults, ...local]);
-    } else if (sourceFilter !== 'all') {
+    } else if (sourceFilter !== 'all' && currentTab === 'browse') {
+      // Only the legacy Browse source view uses this filter; never hide saved titles.
       list = list.filter(m => m.availableSources.includes(sourceFilter));
     }
 
