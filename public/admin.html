@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FlixLeo Admin</title><style>body{margin:0;background:#090c13;color:#e5e7eb;font:15px system-ui,sans-serif}main{max-width:1050px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center}a{color:#fbbf24}input,button{font:inherit;border-radius:9px;padding:11px;border:1px solid #475569;background:#131b29;color:white}button{cursor:pointer}button.primary{background:#fbbf24;color:#121212;border:0;font-weight:bold}.row{display:flex;gap:10px;flex-wrap:wrap}.panel{background:#101723;border:1px solid #334155;border-radius:16px;padding:20px;margin:18px 0}input{max-width:100%;box-sizing:border-box}table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}td,th{text-align:left;padding:12px;border-bottom:1px solid #334155}th{color:#fbbf24}.scroll{overflow:auto}#notice{min-height:20px;color:#fbbf24}.metric{font-size:25px;font-weight:800}small{color:#94a3b8}</style></head><body><main><header><h1>FlixLeo Admin</h1><a href="/">Back to FlixLeo</a></header><div class="panel"><h2>Administrator sign in</h2><p>Only your verified administrator account can view registered users.</p><form id="login" class="row"><input id="email" type="email" placeholder="Admin email" required autocomplete="email"><input id="password" type="password" placeholder="Password" required autocomplete="current-password"><button class="primary">Sign in</button><button type="button" id="signout">Sign out</button></form><p id="notice" role="status"></p></div><section class="panel" id="dashboard" hidden><div class="row" style="justify-content:space-between"><div><small>Registered users</small><div class="metric" id="total">—</div></div><div><small>Page</small><div class="metric" id="page">1</div></div></div><div class="row" style="margin:18px 0"><input id="filter" type="search" placeholder="Filter loaded emails"><button id="reload">Refresh</button><button id="previous">Previous</button><button id="next">Next</button></div><div class="scroll"><table><thead><tr><th>Email</th><th>Verified</th><th>Registered</th><th>Last sign-in</th><th>Watchlist items</th></tr></thead><tbody id="rows"></tbody></table></div><p><small>Shows accounts in Supabase Auth. Email search filters the currently loaded page.</small></p></section></main><script>
+const supabase='https://wiqbexdddwlxmujlqiwe.supabase.co';
+const key='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpcWJleGRkZHdseG11amxxaXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2ODY3MDksImV4cCI6MjEwNzI2MjcwOX0.PcMmCthz9g2Cc0d1iaWWp9uSnwYvXuK5f4LYF3CjMPE';
+let session=null,page=1,records=[];
+const $=id=>document.getElementById(id);
+const notice=s=>{$('notice').textContent=s};
+const date=v=>v?new Date(v).toLocaleString():'—';
+async function load(){
+ if(!session)return;
+ notice('Loading account records…');
+ const res=await fetch('/api/admin/users?page='+page,{headers:{Authorization:'Bearer '+session}});
+ const data=await res.json();
+ if(!res.ok){$('dashboard').hidden=true;throw Error(data.error||'Access denied')}
+ records=data.users||[];$('dashboard').hidden=false;
+ $('total').textContent=data.total===null?'Not provided':data.total.toLocaleString();
+ $('page').textContent=page;$('next').disabled=!data.hasMore;
+ $('previous').disabled=page===1;paint();notice('Admin access verified.');
+}
+function paint(){const q=$('filter').value.trim().toLowerCase();const items=records.filter(u=>u.email.toLowerCase().includes(q));$('rows').replaceChildren();for(const u of items){const tr=document.createElement('tr');for(const v of [u.email,u.confirmed?'Yes':'No',date(u.created_at),date(u.last_sign_in_at),String(u.watchlist_count)]){const td=document.createElement('td');td.textContent=v;tr.append(td)}$('rows').append(tr)}}
+$('login').addEventListener('submit',async e=>{e.preventDefault();notice('Signing in…');try{const res=await fetch(supabase+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:key,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})});const data=await res.json();if(!res.ok)throw Error(data.error_description||data.message||'Sign in failed');session=data.access_token;$('password').value='';page=1;await load()}catch(err){notice(err.message)}});
+$('signout').onclick=()=>{session=null;records=[];$('dashboard').hidden=true;notice('Signed out.')};
+$('filter').oninput=paint;
+$('reload').onclick=()=>load().catch(e=>notice(e.message));
+$('previous').onclick=()=>{if(page>1){page--;load().catch(e=>notice(e.message))}};
+$('next').onclick=()=>{page++;load().catch(e=>notice(e.message))};
+</script></body></html>
