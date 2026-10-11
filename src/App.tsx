@@ -1103,6 +1103,8 @@ export default function App() {
             recent={continueWatching}
             onOpen={setDetailMedia}
             onPlay={handlePlayMedia}
+            bookmarkedIds={watchlistIds}
+            onToggleBookmark={toggleBookmark}
           />
         )}
 
