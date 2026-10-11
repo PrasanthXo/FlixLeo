@@ -227,3 +227,6 @@
 @media(prefers-reduced-transparency:reduce){
  .flixleo-account-dialog {background-color:#0b1323!important;}
 }
+
+/* Stage 2 mobile Home: remove the old Movie Catalogs selector and its entire legacy grid below. */
+@media(max-width:640px){.flixleo-mobile-home-hide-legacy{display:none!important}}
