@@ -81,9 +81,9 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
           isDirect: true
         }));
         setAddonStreams(streams);
-        if (!streams.length) setAddonError(data.message || (Array.isArray(data.diagnostics) ? data.diagnostics.map((d: any) => String(d.provider) + ': ' + String(d.status)).join(' · ') : 'No compatible direct streams returned'));
+        if (!streams.length) setAddonError('No streams available');
       })
-      .catch(error => { if (!controller.signal.aborted) setAddonError(error.message || 'Provider lookup failed'); })
+      .catch(error => { if (!controller.signal.aborted) setAddonError('No streams available'); })
       .finally(() => { if (!controller.signal.aborted) setAddonLoading(false); });
     return () => controller.abort();
   }, [isOpen, tmdbId, isSeries, selectedSeasonNumber, selectedEpisodeNumber]);
