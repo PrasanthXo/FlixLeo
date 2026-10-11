@@ -445,6 +445,8 @@ export default function App() {
       setSourceFilter('all');
     } else {
       setCurrentTab(tab);
+      // Server filters must not hide titles on Watchlist, Search or other tabs.
+      setSourceFilter('all');
     }
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -626,6 +628,7 @@ export default function App() {
         selectedSourceFilter={sourceFilter}
         onSelectSourceFilter={setSourceFilter}
         bookmarkCount={watchlistIds.length}
+        onOpenProfile={() => { setAccountSection('overview'); setAccountOpen(true); }}
       />
 
       {(recoveryToken || recoveryError || recoveryDone) && (
@@ -964,38 +967,54 @@ export default function App() {
                   ) : (
                     <>
                       <Sparkles className="w-5 h-5 text-amber-400" />
-                      <span>Featured Multi-Source Streams</span>
-                      <span className="text-xs font-mono text-slate-500 font-normal">({filteredCatalog.length} releases)</span>
+                      <span>{currentTab === 'movies' ? 'Explore Movies' : currentTab === 'series' ? 'Explore Series' : currentTab === 'search' ? 'Discover Titles' : 'Discover on FlixLeo'}</span>
+                      <span className="text-xs font-mono text-slate-500 font-normal">({filteredCatalog.length} titles)</span>
                     </>
                   )}
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Native playback across Ultra 4K UHD, South Asian cinema, FastStream edge nodes, and Cloud Vault mirrors.
+                <p className="text-xs text-slate-400 mt-1">
+                  {currentTab === 'watchlist'
+                    ? 'Movies and series you saved for later.'
+                    : currentTab === 'search'
+                      ? 'Search across movies and TV series.'
+                      : 'Explore movies and series. Select a title to view available playback options.'}
                 </p>
               </div>
 
               {/* Source Filter Segmented Buttons */}
-              <SourceFilterBar
-                selectedSource={sourceFilter}
-                onSelectSource={(s) => setSourceFilter(s)}
-                counts={sourceCounts}
-              />
+              {sourceFilter !== 'all' && currentTab === 'browse' && (
+                <SourceFilterBar
+                  selectedSource={sourceFilter}
+                  onSelectSource={(s) => setSourceFilter(s)}
+                  counts={sourceCounts}
+                />
+              )}
             </div>}
 
-            {/* Empty State */}
+            {/* Saved titles are a watchlist, not a list of streaming servers. */}
             {filteredCatalog.length === 0 && !searchLoading ? (
-              <div className="py-20 text-center rounded-2xl bg-slate-900/40 border border-slate-800">
-                <Film className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <h3 className="text-base font-bold text-white">{searchQuery ? 'No matching titles' : 'No streams found'}</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-                  {searchQuery
-                    ? `No releases match "${searchQuery}". Try searching by actor, director, or hub name.`
-                    : 'No items in this category yet.'}
+              <div className="py-16 sm:py-20 px-5 text-center rounded-3xl bg-gradient-to-b from-slate-900/60 to-[#0b0f19] border border-white/10">
+                {currentTab === 'watchlist' ? <Bookmark className="w-11 h-11 text-amber-400/70 mx-auto mb-4" /> : <Film className="w-11 h-11 text-slate-500 mx-auto mb-4" />}
+                <h3 className="text-lg font-bold text-white">
+                  {currentTab === 'watchlist' ? 'Your watchlist is empty' : searchQuery ? 'No matching titles' : 'No titles available'}
+                </h3>
+                <p className="text-sm text-slate-400 max-w-md mx-auto mt-2">
+                  {currentTab === 'watchlist'
+                    ? 'Save a movie or series using the bookmark option and it will appear here.'
+                    : searchQuery
+                      ? `Nothing matches “${searchQuery}”. Try a different title or actor.`
+                      : 'There are no titles in this section yet.'}
                 </p>
+                {currentTab === 'watchlist' && (
+                  <button type="button" onClick={() => handleSelectTab('browse')}
+                    className="mt-6 rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-amber-400 transition-colors">
+                    Browse titles
+                  </button>
+                )}
               </div>
             ) : (
-              /* Movie Grid (Responsive from mobile 2-col to desktop 4-5 col) */
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-6">
+              /* Same responsive title grid for mobile and desktop. */
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-5">
                 {filteredCatalog.map((media) => (
                   <MovieCard
                     key={media.id}
@@ -1017,84 +1036,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Source Network Feature Highlights (When viewing Browse home) */}
-            {currentTab === 'browse' && sourceFilter === 'all' && !searchQuery && (
-              <section className="mt-14 pt-10 border-t border-slate-800/80">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Layers className="w-5 h-5 text-amber-400" />
-                      Supported Stream Protocol Integration
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Unified streaming engine supporting multi-server failover and high-bitrate mirrors
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-                  {/* Ultra 4K */}
-                  <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sky-400 text-sm">Ultra 4K & HDR Cinema</span>
-                      
-                    </div>
-                    <p className="text-slate-400 leading-relaxed text-[11px]">
-                      True 2160p HEVC 10-bit prints, Dolby Atmos surround tracks, and Dual Audio Hindi & English stems.
-                    </p>
-                    <div className="pt-2 flex items-center gap-1.5 text-emerald-400 text-[11px]">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>HDR10 & HEVC Hardware Accelerated</span>
-                    </div>
-                  </div>
-
-                  {/* South Asian Cinema */}
-                  <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-pink-400 text-sm">South Asian Cinema</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-300">REGIONAL</span>
-                    </div>
-                    <p className="text-slate-400 leading-relaxed text-[11px]">
-                      Premier South Asian cinema destination. Official master prints for Tamil, Telugu, Hindi, and Malayalam.
-                    </p>
-                    <div className="pt-2 flex items-center gap-1.5 text-emerald-400 text-[11px]">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Original Audio & Embedded Subtitles</span>
-                    </div>
-                  </div>
-
-                  {/* FastStream Edge */}
-                  <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-emerald-400 text-sm">FastStream Edge CDN</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300">LOW LATENCY</span>
-                    </div>
-                    <p className="text-slate-400 leading-relaxed text-[11px]">
-                      Direct edge CDN streaming nodes. Zero buffering with instant adaptive bitrate hopping and sub-second seeking.
-                    </p>
-                    <div className="pt-2 flex items-center gap-1.5 text-emerald-400 text-[11px]">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Sub-Second Seeking & 60FPS</span>
-                    </div>
-                  </div>
-
-                  {/* PixelDrain Cloud Vault */}
-                  <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-purple-400 text-sm">Cloud Vault Direct</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300">CLOUD VAULT</span>
-                    </div>
-                    <p className="text-slate-400 leading-relaxed text-[11px]">
-                      Direct cloud streaming via high-speed API. Direct MP4 stream piping with resumable download generation.
-                    </p>
-                    <div className="pt-2 flex items-center gap-1.5 text-emerald-400 text-[11px]">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Resume Stream & Direct Downloads</span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
       </main>
 
       {/* Footer (Anti-Slop compliant, quiet links & copyright) */}
@@ -1103,16 +1044,10 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-300">FlixLeo</span>
             <span aria-hidden="true">·</span>
-            <span>Mobile & Desktop Multi-Source Cinema Engine</span>
+            <span>Movies and Series</span>
           </div>
-          <div className="flex items-center gap-4 text-slate-400">
-            <span>Ultra 4K UHD</span>
-            <span aria-hidden="true">·</span>
-            <span>Cinema Master</span>
-            <span aria-hidden="true">·</span>
-            <span>FastStream Edge</span>
-            <span aria-hidden="true">·</span>
-            <span>Cloud Vault</span>
+          <div className="flex items-center gap-3 text-slate-400">
+            <span>Your cinema, anywhere.</span>
           </div>
         </div>
       </footer>
