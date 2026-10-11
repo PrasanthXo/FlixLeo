@@ -688,8 +688,15 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
         const label = String(stream.title || '').slice(0, 160);
         const qualityText = [stream.name, stream.title, stream.description, stream.filename].filter(x => typeof x === 'string').join(' ');
         const quality = /(?:2160p|4k|uhd)/i.test(qualityText) ? '4K' : /1080p/i.test(qualityText) ? '1080p' : /720p/i.test(qualityText) ? '720p' : /480p/i.test(qualityText) ? '480p' : /360p/i.test(qualityText) ? '360p' : 'Auto';
+        const sizeFromBytes = Number(stream.size || stream.fileSizeBytes || 0);
+        const sizeText = [stream.title, stream.name, stream.description, stream.filename, stream.fileSize]
+          .filter((s: unknown): s is string => typeof s === 'string')
+          .join(' ').match(/(?:^|[^\d])([0-9]+(?:\.[0-9]+)?)\s*(GiB|GB|MiB|MB|TiB|TB)\b/i);
+        const fileSize = Number.isFinite(sizeFromBytes) && sizeFromBytes > 0
+          ? (sizeFromBytes >= 1073741824 ? (sizeFromBytes / 1073741824).toFixed(2) + ' GB' : (sizeFromBytes / 1048576).toFixed(1) + ' MB')
+          : sizeText ? sizeText[1] + ' ' + sizeText[2].toUpperCase() : undefined;
         return [{ provider: provider.hostname, name: String(stream.name || 'Add-on stream').slice(0, 80),
-          title: label, url: url.toString(), quality, streamType: hls ? 'hls' : 'direct-video',
+          title: label, url: url.toString(), quality, fileSize, streamType: hls ? 'hls' : 'direct-video',
           audioFixUrl: !hls && quality === '4K' ? audioFixTicket(url.toString()) : undefined }];
       });
       const kinds = { httpsUrls: entries.filter((e: any) => typeof e.url === 'string' && e.url.startsWith('https://')).length,
