@@ -474,7 +474,7 @@ app.get('/api/tmdb/details/tv/:id', async (req: Request, res: Response) => {
   const cleanId = String(req.params.id).replace(/^(tv-|tmdb-)/, '');
   if (!/^[0-9]+$/.test(cleanId)) return res.status(400).json({ success: false, message: 'Invalid series ID' });
   try {
-    const details = await fetchFromTmdb(`/tv/${cleanId}`);
+    const details = await fetchFromTmdb(`/tv/${cleanId}`, { append_to_response: 'credits' });
     if (!details) return res.status(503).json({ success: false, message: 'TMDB is not configured' });
     const item = transformTmdbTvShow(details);
     const seasons = await Promise.all((details.seasons || [])
