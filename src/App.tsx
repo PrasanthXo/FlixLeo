@@ -259,6 +259,7 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountSection, setAccountSection] = useState<'overview' | 'profile' | 'security' | 'appearance'>('overview');
   const [approvedTvs, setApprovedTvs] = useState<ApprovedTv[]>([]);
+  const [showTvHelp, setShowTvHelp] = useState(false);
   const [tvListError, setTvListError] = useState('');
   const [tvListBusy, setTvListBusy] = useState(false);
   const refreshTvs = async () => {
@@ -814,8 +815,24 @@ export default function App() {
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <div><h3 className="font-bold text-white">Approved TVs</h3><p className="text-xs text-slate-400">Manage TVs connected through QR sign-in.</p></div>
-                        <button type="button" disabled={tvListBusy} onClick={() => void refreshTvs()} className="rounded-lg bg-slate-700 px-3 py-2 text-sm text-white">Refresh</button>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          <button type="button" aria-expanded={showTvHelp} aria-controls="flixleo-tv-help" onClick={() => setShowTvHelp(value => !value)} className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm font-bold text-amber-300">? Help</button>
+                          <button type="button" disabled={tvListBusy} onClick={() => void refreshTvs()} className="rounded-lg bg-slate-700 px-3 py-2 text-sm text-white">Refresh</button>
+                        </div>
                       </div>
+                      {showTvHelp && <div id="flixleo-tv-help" className="rounded-xl border border-amber-500/20 bg-slate-950/70 p-4 space-y-3 text-sm text-slate-200">
+                        <h4 className="text-base font-bold text-white">How to sign in on your TV</h4>
+                        <ol className="list-decimal space-y-2 pl-5">
+                          <li>Open the internet browser on your Smart TV.</li>
+                          <li>Enter <strong className="text-amber-300">flixleo.cyou/Tv6</strong> in the TV address bar.</li>
+                          <li>Wait for the TV to display a QR sign-in code.</li>
+                          <li>On your phone, sign in to FlixLeo and scan the QR code with your camera.</li>
+                          <li>Tap <strong className="text-white">Approve TV sign-in</strong> on your phone. Only approve a TV you recognize.</li>
+                          <li>Return to your TV. It should sign in automatically. Here in Security, tap <strong>Refresh</strong> to see your connected TV.</li>
+                        </ol>
+                        <a href="https://flixleo.cyou/Tv6" target="_blank" rel="noopener noreferrer" className="inline-block break-all font-bold text-amber-300 underline">TV login link: https://flixleo.cyou/Tv6</a>
+                        <p className="text-slate-400">To disconnect a TV later, tap <strong className="text-rose-300">Revoke</strong> next to it. Use a new QR code to connect it again.</p>
+                      </div>}
                       {tvListError && <p role="alert" className="text-rose-300 text-sm">{tvListError}</p>}
                       {!tvListBusy && !approvedTvs.length && !tvListError && <p className="text-sm text-slate-300">No approved TVs yet.</p>}
                       {approvedTvs.map(tv => (
