@@ -353,7 +353,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                     <style>{`@keyframes flixleo-source-scan {0%{transform:translateX(-100%)} 100%{transform:translateX(300%)}}`}</style>
                     <p className="mt-2 text-[11px] text-slate-400">Playback unlocks after all add-ons respond or the lookup times out.</p>
                   </div>)}
-                      {addonError && <p className="text-xs text-slate-500">{addonError}</p>}
+                      {addonError && <p role="alert" className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-center text-xl font-black uppercase tracking-wide text-red-500">{addonError}</p>}
                       {orderedMirrors(selectedEpisode.mirrors).map(mirror => (
                         <div key={mirror.id} className="flex items-center gap-2">
                           <button
@@ -420,7 +420,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                     <style>{`@keyframes flixleo-source-scan {0%{transform:translateX(-100%)} 100%{transform:translateX(300%)}}`}</style>
                     <p className="mt-2 text-[11px] text-slate-400">Existing sources remain available while add-ons respond.</p>
                   </div>)}
-                  {addonError && <p className="text-xs text-slate-500">{addonError}</p>}
+                  {addonError && <p role="alert" className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-center text-xl font-black uppercase tracking-wide text-red-500">{addonError}</p>}
                   {orderedMirrors(activeMedia.mirrors).map((mirror: StreamMirror) => (
                     <div
                       key={mirror.id}
