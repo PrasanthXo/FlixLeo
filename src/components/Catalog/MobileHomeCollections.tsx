@@ -56,7 +56,11 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
       {label:provider+' Movies',subtitle:'Discover titles listed by provider · US region',list:combined('providerMovie:'+provider)},
       {label:provider+' Series',subtitle:'Discover titles listed by provider · US region',list:combined('providerSeries:'+provider)}
     ]),
-    {label:'Top Rated Picks',subtitle:'Popular highly rated titles',list:[...unique].filter(x=>Number.parseFloat(x.imdbRating)>0).sort((x,y)=>Number.parseFloat(y.imdbRating)-Number.parseFloat(x.imdbRating)).slice(0,16)}
+    {label:'Top Rated Picks',subtitle:'Popular highly rated titles',list:[...unique].filter(x=>Number.parseFloat(x.imdbRating)>0).sort((x,y)=>Number.parseFloat(y.imdbRating)-Number.parseFloat(x.imdbRating)).slice(0,16)},
+    ...['Netflix','STARZ','ZEE5'].flatMap(provider => [
+      {label:provider+' Tamil Movies',subtitle:'Tamil originals · provider discovery',list:combined('tamilProviderMovie:'+provider).filter(item => languageMatch(item.language,'Tamil'))},
+      {label:provider+' Tamil Series',subtitle:'Tamil originals · provider discovery',list:combined('tamilProviderSeries:'+provider).filter(item => languageMatch(item.language,'Tamil'))}
+    ])
   ].filter(row => row.list.length > 0);
   return <div className="flixleo-mobile-collections" aria-label="Explore FlixLeo collections">
     <div className="flixleo-mobile-collections-intro"><Sparkles size={17}/> Explore your universe</div>
