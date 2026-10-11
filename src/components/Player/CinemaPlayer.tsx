@@ -134,6 +134,19 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     };
   }, [index, active?.id, active?.url, active?.streamType]);
 
+  const restoreProgress = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      const entries = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
+      const resume = Array.isArray(entries) ? entries.find((entry: any) => entry?.media?.id === media.id) : null;
+      const position = Number(resume?.progress || 0);
+      if (position >= 5 && Number.isFinite(position) && (!Number.isFinite(video.duration) || position < video.duration - 15)) {
+        video.currentTime = position;
+      }
+    } catch { /* start at beginning */ }
+  };
+
   const saveProgress = () => {
     const video = videoRef.current;
     if (!video || !Number.isFinite(video.currentTime)) return;
@@ -163,7 +176,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
-            : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onTimeUpdate={saveProgress} onEnded={saveProgress} className="h-full w-full object-contain" />}
+            : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={saveProgress} className="h-full w-full object-contain" />}
       </div>
       <div className="p-3 sm:p-4 space-y-3">
         {/^(tamil|ta)(?:\\b|\\s|\\W)/i.test(media.language.trim()) && <div className="rounded-lg border border-amber-500/40 bg-slate-900 p-3">
