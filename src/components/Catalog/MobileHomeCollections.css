@@ -1,0 +1,21 @@
+/* Isolated to phone-size Home: mounted only in Browse. */
+.flixleo-mobile-collections{display:none}
+@media(max-width:640px){
+.flixleo-mobile-collections{display:block;margin:30px -8px 20px;padding:0 3px;color:#fff}
+.flixleo-mobile-collections-intro{display:flex;align-items:center;gap:9px;color:#bdacff;font-weight:800;font-size:13px;letter-spacing:.04em;margin:0 8px 25px}
+.flixleo-mobile-collection{margin:0 0 32px}
+.flixleo-mobile-collection-head{display:flex;align-items:center;justify-content:space-between;padding:0 8px;margin-bottom:12px;color:#b2a0fa}
+.flixleo-mobile-collection-head h2{font-size:19px;line-height:1.25;font-weight:800;color:white;letter-spacing:-.025em}
+.flixleo-mobile-collection-head p{font-size:11px;color:#98a4c0;margin-top:4px}
+.flixleo-mobile-collection-scroll{display:flex;gap:12px;overflow:auto;scrollbar-width:none;scroll-snap-type:x proximity;padding:4px 8px 15px}
+.flixleo-mobile-collection-scroll::-webkit-scrollbar{display:none}
+.flixleo-mobile-collection-card{width:126px;flex:0 0 126px;scroll-snap-align:start;min-width:0}
+.flixleo-mobile-collection-poster{position:relative;width:100%;height:180px;overflow:hidden;border-radius:14px;background:linear-gradient(150deg,#28234b,#0e1429);border:1px solid #b9a5ff38;box-shadow:0 7px 23px #0007}
+.flixleo-mobile-collection-poster img{width:100%;height:100%;object-fit:cover;display:block}
+.flixleo-mobile-collection-poster:focus-visible,.flixleo-mobile-collection-card-foot button:focus-visible{outline:3px solid #bba7ff;outline-offset:3px}
+.flixleo-mobile-collection-progress{position:absolute;left:6px;right:6px;bottom:7px;height:4px;border-radius:5px;background:#ffffff69;overflow:hidden}
+.flixleo-mobile-collection-progress>span{display:block;height:100%;background:linear-gradient(90deg,#7768ff,#ef82ff)}
+.flixleo-mobile-collection-card-foot{display:flex;align-items:center;justify-content:space-between;gap:5px;padding:8px 2px;color:#e4e7f0;font-size:11px;font-weight:650}
+.flixleo-mobile-collection-card-foot>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flixleo-mobile-collection-card-foot button{width:26px;height:26px;border-radius:50%;display:flex;flex:0 0 26px;align-items:center;justify-content:center;color:white;background:#7751d9}
+}
