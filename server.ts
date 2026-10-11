@@ -603,13 +603,23 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
         const declaredMime = String(stream.mimeType || stream.mime_type || '').toLowerCase();
         const hls = /\.m3u8$/i.test(pathname) || /^(application\/(vnd\.apple\.mpegurl|x-mpegurl))/.test(declaredMime);
         const video = /\.(mp4|webm|m4v|mov)$/i.test(pathname) || /^video\/(mp4|webm|quicktime)/.test(declaredMime);
-        if (!hls && !video) return [];
+        // Stremio add-ons often use signed, extensionless HTTPS playback endpoints.
+        // Such links can be tried in the video element, but never as iframes or top-level redirects.
+        // Keep known web pages, playlists other than HLS, and downloadable archives out.
+        const lastSegment = pathname.split('/').pop() || '';
+        const extensionless = !lastSegment.includes('.') && !/\/((embed|watch|view|page|player|login|redirect))(\/|$)/i.test(pathname);
+        if (!hls && !video && !extensionless) return [];
         const label = String(stream.title || '').slice(0, 160);
         const quality = /2160p|4k/i.test(label) ? '4K' : /1080p/i.test(label) ? '1080p' : /720p/i.test(label) ? '720p' : /480p/i.test(label) ? '480p' : 'Auto';
         return [{ provider: provider.hostname, name: String(stream.name || 'Add-on stream').slice(0, 80),
           title: label, url: url.toString(), quality, streamType: hls ? 'hls' : 'direct-video' }];
       });
-      diagnostics.push({ provider: provider.hostname, status: streams.length ? 'compatible' : entries.length ? 'No browser-compatible direct streams' : 'No streams returned', returned: entries.length, compatible: streams.length });
+      const kinds = { httpsUrls: entries.filter((e: any) => typeof e.url === 'string' && e.url.startsWith('https://')).length,
+        torrents: entries.filter((e: any) => Boolean(e.infoHash)).length,
+        externalPages: entries.filter((e: any) => Boolean(e.externalUrl)).length };
+      diagnostics.push({ provider: provider.hostname,
+        status: streams.length ? 'Candidate browser streams' : entries.length ? 'No browser-video URL candidates' : 'No streams returned',
+        returned: entries.length, compatible: streams.length, ...kinds });
       return streams;
     } catch (error) {
       diagnostics.push({ provider: provider.hostname, status: error instanceof Error && error.name === 'AbortError' ? 'Timeout' : 'Connection or response error' });
