@@ -980,6 +980,20 @@ export default function App() {
           </div>
         )}
 
+        {/* Mobile Home: 3D wheel comes before the original Continue Watching row. */}
+        {showMixedMobileWheel && sourceFilter === 'all' && !searchQuery.trim() && !activeMedia && mobileWheelFeatured && (
+          <HeroBanner
+            media={mobileWheelFeatured}
+            items={mobileWheelItems}
+            bookmarkedIds={watchlistIds}
+            mobileHome
+            onPlay={handlePlayMedia}
+            onOpenDetails={setDetailMedia}
+            isBookmarked={watchlistIds.includes(mobileWheelFeatured.id)}
+            onToggleBookmark={toggleBookmark}
+          />
+        )}
+
         {currentTab === 'browse' && !searchQuery.trim() && continueWatching.length > 0 && (
           <section className="mb-8" aria-label="Continue Watching">
             <div className="flex items-center justify-between mb-3">
@@ -1083,7 +1097,7 @@ export default function App() {
         )}
 
         {/* Spotlight Hero Banner */}
-        {(['browse', 'movies', 'series'].includes(currentTab)) && sourceFilter === 'all' && !searchQuery && !activeMedia && featuredMedia && (
+        {!showMixedMobileWheel && (['browse', 'movies', 'series'].includes(currentTab)) && sourceFilter === 'all' && !searchQuery && !activeMedia && featuredMedia && (
           <HeroBanner
             media={showMixedMobileWheel ? mobileWheelFeatured : featuredMedia}
             items={showMixedMobileWheel ? mobileWheelItems : currentTab === 'series' ? tvShows : tmdbMovies}
