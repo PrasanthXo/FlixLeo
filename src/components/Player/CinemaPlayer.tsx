@@ -196,17 +196,24 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         </label>}
         {active?.streamType === 'hls' && !qualityLevels.length && <p className="text-xs text-slate-400">Quality selection depends on stream and browser support. 4K is shown only when the provider offers it.</p>}
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-white text-sm">Available servers</h3>
-          <span className="text-xs text-slate-400">{mirrors.length} listed</span>
+          <h3 className="font-semibold text-white text-sm">Select quality &amp; server</h3>
+          <span className="text-xs text-slate-400">{mirrors.length} available</span>
         </div>
-        <p className="text-xs text-slate-400">Select a different server below the player. Direct video and HLS servers switch automatically on detectable playback errors. Embedded players may not report errors to FlixLeo.</p>
         {error && <p role="status" className="text-amber-300 text-xs">{error}</p>}
-        <div className="flex flex-wrap gap-2">{mirrors.map((mirror, i) => (
-          <button type="button" key={mirror.id + i} onClick={() => switchServer(i)} aria-pressed={index === i}
-            className={`rounded-lg px-3 py-2 text-xs font-medium border ${index === i ? 'border-amber-500 bg-amber-500 text-black' : 'border-slate-700 bg-slate-800 text-slate-200'}`}>
-            {index === i ? '▶ ' : ''}{mirror.label} {mirror.quality}
-          </button>
-        ))}</div>
+        <select
+          aria-label="Select playback quality and server"
+          className="w-full min-w-0 rounded-xl border border-slate-600 bg-slate-800 p-3 text-sm text-white focus:border-amber-400 focus:outline-none"
+          value={active ? index : ''}
+          disabled={!mirrors.length}
+          onChange={event => switchServer(Number(event.target.value))}
+        >
+          {!mirrors.length && <option value="">No streams available</option>}
+          {mirrors.map((mirror, i) => (
+            <option key={mirror.id + i} value={i}>
+              {mirror.quality} · {mirror.label}
+            </option>
+          ))}
+        </select>
         {active?.streamType === 'embed-iframe' && <div className="flex items-center gap-3">
           <button type="button" onClick={autoAdvance} className="text-xs text-amber-300 flex items-center gap-1"><RefreshCw className="h-4 w-4" /> Not working? Try next server</button>
           <a href={active.url} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-300 flex items-center gap-1"><ExternalLink className="h-4 w-4" /> Open player</a>
