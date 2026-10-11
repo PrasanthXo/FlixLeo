@@ -737,6 +737,27 @@ export default function App() {
     return catalog.find(m => m.featured) || catalog[0];
   }, [catalog, currentTab, tmdbMovies, tvShows]);
 
+  // Interleave movies and series in the mobile Home's featured 3D wheel.
+  // Other tabs and larger screens keep their existing featured content.
+  const mobileWheelItems = useMemo(() => {
+    const movies = tmdbMovies.filter(item => item.type !== 'tv' && !item.id.startsWith('tv-'));
+    const series = tvShows.filter(item => item.type === 'tv' || item.id.startsWith('tv-'));
+    const result: MediaItem[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < Math.max(movies.length, series.length) && result.length < 11; i++) {
+      for (const item of [movies[i], series[i]]) {
+        if (item?.posterUrl && !seen.has(item.id) && result.length < 11) {
+          seen.add(item.id);
+          result.push(item);
+        }
+      }
+    }
+    if (!result.length) return uniqueTitles(catalog).slice(0, 11);
+    return result;
+  }, [tmdbMovies, tvShows, catalog]);
+  const mobileWheelFeatured = mobileWheelItems[0] || featuredMedia;
+  const showMixedMobileWheel = !isTvDisplay && currentTab === 'browse';
+
   return (
     <div className={`${isTvDisplay ? "flixleo-tv" : ""} min-h-screen bg-[#080a0f] text-slate-100 flex flex-col selection:bg-amber-500 selection:text-black`}>
       {isTvDisplay && <TvExperience currentTab={currentTab} onSelectTab={handleSelectTab} onOpenProfile={() => { setAccountSection('overview'); setAccountOpen(true); }} />}
@@ -1058,13 +1079,13 @@ export default function App() {
         {/* Spotlight Hero Banner */}
         {(['browse', 'movies', 'series'].includes(currentTab)) && sourceFilter === 'all' && !searchQuery && !activeMedia && featuredMedia && (
           <HeroBanner
-            media={featuredMedia}
-            items={currentTab === 'series' ? tvShows : tmdbMovies}
+            media={showMixedMobileWheel ? mobileWheelFeatured : featuredMedia}
+            items={showMixedMobileWheel ? mobileWheelItems : currentTab === 'series' ? tvShows : tmdbMovies}
             bookmarkedIds={watchlistIds}
             mobileHome={currentTab === "browse"}
             onPlay={(m) => handlePlayMedia(m)}
             onOpenDetails={(m) => setDetailMedia(m)}
-            isBookmarked={watchlistIds.includes(featuredMedia.id)}
+            isBookmarked={watchlistIds.includes((showMixedMobileWheel ? mobileWheelFeatured : featuredMedia).id)}
             onToggleBookmark={toggleBookmark}
           />
         )}
