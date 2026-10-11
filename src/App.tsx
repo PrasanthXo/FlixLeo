@@ -52,7 +52,7 @@ export default function App() {
   const [southIndianMovies, setSouthIndianMovies] = useState<MediaItem[]>([]);
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/tmdb/indian?page=1', { signal: controller.signal })
+    fetch('/api/tmdb/south-indian?page=1', { signal: controller.signal })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('Catalog unavailable')))
       .then(data => {
         if (Array.isArray(data.items)) {
