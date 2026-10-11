@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TmdbArtwork } from './TmdbArtwork';
-import { Play, Info, Bookmark, BookmarkCheck, Film } from 'lucide-react';
+import { Play, Info, Bookmark, BookmarkCheck, MoreVertical } from 'lucide-react';
 import { MediaItem, getSourceDisplayBadge } from '../../types/stream';
 
 interface MovieCardProps {
@@ -18,6 +18,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
   isBookmarked,
   onToggleBookmark
 }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="group relative flex flex-col rounded-xl overflow-hidden bg-slate-900/40 border border-slate-800/80 hover:border-slate-700 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
@@ -37,9 +38,25 @@ export const MovieCard: React.FC<MovieCardProps> = ({
           </span>
         </div>
 
+        {/* Always-visible mobile friendly watchlist menu */}
+        <div className="absolute z-30 top-2 right-2">
+          <button type="button" aria-label={`More options for ${media.title}`} aria-expanded={menuOpen}
+            onClick={e => { e.stopPropagation(); setMenuOpen(open => !open); }}
+            className="h-9 w-9 rounded-full bg-black/85 border border-white/20 text-white flex items-center justify-center shadow-lg backdrop-blur-md">
+            <MoreVertical className="h-5 w-5" />
+          </button>
+          {menuOpen && <div className="absolute right-0 top-10 w-44 rounded-lg border border-slate-700 bg-[#141923] shadow-2xl p-1">
+            <button type="button" onClick={e => { e.stopPropagation(); onToggleBookmark(media); setMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left text-white hover:bg-slate-700 rounded-md">
+              {isBookmarked ? <BookmarkCheck className="h-4 w-4 text-amber-400" /> : <Bookmark className="h-4 w-4" />}
+              {isBookmarked ? 'Remove from Watchlist' : 'Add to Watchlist'}
+            </button>
+            <button type="button" onClick={e => { e.stopPropagation(); setMenuOpen(false); onOpenDetails(media); }} className="w-full px-3 py-2 text-sm text-left text-slate-300 hover:bg-slate-700 rounded-md">View details</button>
+          </div>}
+        </div>
+
         {/* Resolution indicator (Top Right) */}
         {media.resolutionBadge && (
-          <div className="absolute top-2.5 right-2.5">
+          <div className="absolute top-12 right-2.5">
             <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-900/90 text-slate-200 border border-slate-700">
               {media.resolutionBadge.includes('4K') ? '4K UHD' : '1080p'}
             </span>
