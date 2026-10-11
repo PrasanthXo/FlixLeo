@@ -180,7 +180,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     .sort((a, b) => qualityRank(b) - qualityRank(a));
   const playSelected = (mirror: StreamMirror, originals: StreamMirror[]) => {
     if (waitingForServers) return;
-    onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals) }, mirror.id);
+    onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals), ...(isSeries && selectedEpisodeNumber !== undefined ? { playbackSeason: selectedSeasonNumber, playbackEpisode: selectedEpisodeNumber } : {}) }, mirror.id);
     onClose();
   };
   const playInVlc = (mirror: StreamMirror) => {
