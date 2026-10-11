@@ -13,6 +13,60 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// Private FlixLeo admin API. Credentials must only be configured in Render.
+// Never use the public anon key for privileged Supabase Auth operations.
+app.get('/api/admin/users', async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const adminEmail = (process.env.FLIXLEO_ADMIN_EMAIL || '').trim().toLowerCase();
+  if (!supabaseUrl || !secret || !adminEmail) return res.status(503).json({ error: 'Admin access is not configured.' });
+  const authorization = req.headers.authorization || '';
+  if (!authorization.startsWith('Bearer ')) return res.status(401).json({ error: 'Sign in first.' });
+  try {
+    const identityResponse = await fetch(supabaseUrl + '/auth/v1/user', {
+      headers: { apikey: secret, authorization }
+    });
+    if (!identityResponse.ok) return res.status(401).json({ error: 'Session expired or invalid.' });
+    const identity: any = await identityResponse.json();
+    if (!identity?.email_confirmed_at || identity.email?.trim().toLowerCase() !== adminEmail) {
+      return res.status(403).json({ error: 'This account is not authorized.' });
+    }
+    const pageParam = Number(req.query.page || 1);
+    const page = Math.max(1, Math.min(10000, Number.isFinite(pageParam) ? Math.floor(pageParam) : 1));
+    const usersRes = await fetch(supabaseUrl + '/auth/v1/admin/users?page=' + page + '&per_page=100', {
+      headers: { apikey: secret, Authorization: 'Bearer ' + secret }
+    });
+    if (!usersRes.ok) return res.status(502).json({ error: 'Could not retrieve user records.' });
+    const result: any = await usersRes.json();
+    const users = Array.isArray(result.users) ? result.users : [];
+    const ids = users.map((user: any) => user.id).filter(Boolean);
+    let watchlistCounts: Record<string, number> = {};
+    if (ids.length) {
+      const rows = await fetch(supabaseUrl + '/rest/v1/flixleo_user_data?select=user_id,payload&user_id=in.(' + ids.join(',') + ')', {
+        headers: { apikey: secret, Authorization: 'Bearer ' + secret }
+      });
+      if (rows.ok) {
+        const data: any = await rows.json();
+        if (Array.isArray(data)) for (const row of data) watchlistCounts[row.user_id] = Array.isArray(row.payload?.watchlist) ? row.payload.watchlist.length : 0;
+      }
+    }
+    return res.json({
+      page, total: Number(result.aud || result.total || 0) || null,
+      countOnPage: users.length,
+      hasMore: users.length === 100,
+      users: users.map((user: any) => ({
+        id: user.id, email: user.email || '', created_at: user.created_at,
+        last_sign_in_at: user.last_sign_in_at || null,
+        confirmed: Boolean(user.email_confirmed_at),
+        watchlist_count: watchlistCounts[user.id] || 0
+      }))
+    });
+  } catch {
+    return res.status(502).json({ error: 'Admin data is temporarily unavailable.' });
+  }
+});
+
 // API: PixelDrain File Info & Stream Resolver
 app.get('/api/pixeldrain/info/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
