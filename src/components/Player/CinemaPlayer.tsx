@@ -10,13 +10,14 @@ interface CinemaPlayerProps {
   minimizeSignal?: number;
   onClose: () => void;
   onProgressSaved?: () => void;
+  onEpisodeEnded?: () => void;
   onMirrorChange?: (mirror: StreamMirror) => void;
   onPlayNext?: () => void;
   hasPlayNext?: boolean;
 }
 
 export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
-  media, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved, onMirrorChange
+  media, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved, onMirrorChange, onEpisodeEnded
 }) => {
   const playerAnchorRef = useRef<HTMLDivElement>(null);
   const [docked, setDocked] = useState(false);
@@ -171,7 +172,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   // Other providers retain the existing CinemaPlayer implementation.
   if (initialMirrorId?.startsWith('stremio-')) {
     return <StremioNativePlayer media={media} mirrors={mirrors.filter(m => m.id.startsWith('stremio-'))}
-      initialMirrorId={initialMirrorId} minimizeSignal={minimizeSignal} onClose={onClose} onProgressSaved={onProgressSaved} />;
+      initialMirrorId={initialMirrorId} minimizeSignal={minimizeSignal} onClose={onClose} onProgressSaved={onProgressSaved} onEpisodeEnded={onEpisodeEnded} />;
   }
 
   return (
@@ -188,7 +189,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
-            : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={saveProgress} className="h-full w-full object-contain" />}
+            : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); onEpisodeEnded?.(); }} className="h-full w-full object-contain" />}
       </div>
       <div className="p-3 sm:p-4 space-y-3">
         {/^(tamil|ta)(?:\\b|\\s|\\W)/i.test(media.language.trim()) && <div className="rounded-lg border border-amber-500/40 bg-slate-900 p-3">
