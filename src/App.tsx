@@ -496,6 +496,30 @@ export default function App() {
     return counts;
   }, [catalog]);
 
+  // Saved titles can come from dynamically fetched TMDB movies and series, not only the curated catalog.
+  const [savedTitleDetails, setSavedTitleDetails] = useState<MediaItem[]>([]);
+  useEffect(() => {
+    const loaded = new Set([...catalog, ...tmdbMovies, ...movieExtra, ...tvShows, ...tvExtra, ...savedTitleDetails].map(m => m.id));
+    const missing = watchlistIds.filter(id => !loaded.has(id) && /^(?:tmdb-|tv-)?[0-9]+$/.test(id));
+    if (!missing.length) return;
+    let cancelled = false;
+    Promise.all(missing.map(async id => {
+      const isTv = id.startsWith('tv-');
+      try {
+        const response = await fetch('/api/tmdb/' + (isTv ? 'tv/' : 'movie/') + encodeURIComponent(id.replace(/^(tmdb-|tv-)/, '')));
+        const result = await response.json();
+        return result?.item as MediaItem | undefined;
+      } catch { return undefined; }
+    })).then(items => {
+      if (cancelled) return;
+      setSavedTitleDetails(prev => {
+        const existing = new Set(prev.map(m => m.id));
+        return [...prev, ...items.filter((m): m is MediaItem => Boolean(m?.id) && !existing.has(m!.id))];
+      });
+    });
+    return () => { cancelled = true; };
+  }, [watchlistIds, catalog, tmdbMovies, movieExtra, tvShows, tvExtra, savedTitleDetails]);
+
   // Filtered Media
   const filteredCatalog = useMemo(() => {
     let list = catalog;
@@ -518,7 +542,7 @@ export default function App() {
 
     // Filter by Watchlist Tab
     if (currentTab === 'watchlist') {
-      list = catalog.filter(m => watchlistIds.includes(m.id));
+      list = [...catalog, ...tmdbMovies, ...movieExtra, ...tvShows, ...tvExtra, ...savedTitleDetails].filter(m => watchlistIds.includes(m.id));
     }
 
     // Search all locally loaded catalogues and both live TMDB search endpoints.
@@ -535,7 +559,7 @@ export default function App() {
     }
 
     return uniqueTitles(list);
-  }, [catalog, currentTab, tmdbCategory, tmdbMovies, tvShows, movieExtra, tvExtra, sourceFilter, searchQuery, watchlistIds, tmdbSearchResults]);
+  }, [catalog, currentTab, tmdbCategory, tmdbMovies, tvShows, movieExtra, tvExtra, sourceFilter, searchQuery, watchlistIds, tmdbSearchResults, savedTitleDetails]);
 
   // Personalize using explicit favorites and recent viewing without changing playback.
   const forYouTitles = useMemo(() => {
