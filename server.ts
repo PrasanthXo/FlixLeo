@@ -183,17 +183,34 @@ app.post('/api/resolve', async (req: Request, res: Response) => {
     });
   }
 
-  // 5. Ultra Cinema Stream detection
-  if (trimmed.includes('hdhub') || trimmed.includes('4khdhub') || trimmed.includes('hdhub4u')) {
+  // 5. 4KHDHub links: only accept an actual direct media URL.
+  // A listing/page URL is not a stream; never substitute an unrelated film.
+  if (/4khdhub|hdhub4u|hdhub/i.test(trimmed)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+      if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('Unsupported protocol');
+    } catch {
+      return res.status(400).json({ success: false, source: '4khdhub', message: 'Enter a valid HTTP(S) URL.' });
+    }
+
+    if (!/\\.(mp4|m3u8|webm|m4v)(?:$|[?#])/i.test(parsed.pathname + parsed.search + parsed.hash)) {
+      return res.status(422).json({
+        success: false,
+        source: '4khdhub',
+        message: 'This is a web page, not a playable media link. Provide a direct, authorized MP4 or HLS URL.',
+        pageUrl: parsed.toString()
+      });
+    }
+
     return res.json({
       success: true,
       source: '4khdhub',
-      name: 'Ultra 4K Cinema Stream',
-      streamType: 'direct-video',
-      streamUrl: trimmed.endsWith('.mp4') || trimmed.endsWith('.m3u8') ? trimmed : 'https://archive.org/download/night_of_the_living_dead/night_of_the_living_dead_512kb.mp4',
-      embedUrl: trimmed,
-      quality: '4K UHD Full Film',
-      features: ['Full Feature Length (1h 36m)', 'HEVC 10-Bit Master', 'Dual Audio']
+      name: 'External Video Stream',
+      streamType: /\\.m3u8(?:$|[?#])/i.test(parsed.pathname + parsed.search) ? 'hls' : 'direct-video',
+      streamUrl: parsed.toString(),
+      quality: 'Source quality (unverified)',
+      features: ['Direct media URL']
     });
   }
 
