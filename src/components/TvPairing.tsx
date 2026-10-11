@@ -74,6 +74,10 @@ export function TvPairApproval({ id, user, onComplete }: { id: string; user: Clo
     <h3 className="font-bold text-lg text-white">Connect your TV?</h3>
     <p className="text-sm text-slate-200">Approve this request only if you are signing in on a TV in front of you.</p>
     <p className="text-xs text-slate-400">Account: {user.email}</p>
+    <div className="rounded-xl border border-white/10 bg-slate-950/70 p-3">
+      <p className="text-xs font-semibold text-slate-300 mb-1">TV login URL</p>
+      <a href="https://flixleo.cyou/Tv6" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-amber-300 underline break-all">https://flixleo.cyou/Tv6</a>
+    </div>
     {done ? <><p role="status" className="text-green-300">TV approved. Your TV should sign in automatically.</p><button type="button" onClick={onComplete} className="text-white underline">Done</button></> :
       <button type="button" disabled={busy} onClick={async () => {
         setBusy(true); setError('');
