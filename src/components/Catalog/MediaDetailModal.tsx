@@ -84,6 +84,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
             : ['1080p', '720p', '480p', '360p'].includes(stream.quality) ? stream.quality : 'Auto',
           url: stream.url,
           audioFixUrl: stream.audioFixUrl,
+          fileSize: typeof stream.fileSize === 'string' && stream.fileSize.trim() ? stream.fileSize.trim() : undefined,
           streamType: stream.streamType === 'hls' ? 'hls' : 'direct-video',
           isDirect: true
         }));
@@ -361,7 +362,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                             className="min-w-0 flex-1 p-3 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors text-left flex justify-between gap-2"
                           >
                             <span className="break-words">{mirror.label}</span>
-                            <span className="shrink-0 text-amber-400">{mirror.quality}</span>
+                            <span className="shrink-0 text-right text-amber-400">{mirror.quality}{mirror.fileSize && <span className="block text-[11px] text-slate-300">{mirror.fileSize}</span>}</span>
                           </button>
                           <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                             onClick={() => playInVlc(mirror)}
