@@ -153,3 +153,29 @@ export function mergeCloudData(local: CloudRecord, remote: CloudRecord | null): 
     return true;
   }).slice(0, 20), updatedAt: Date.now() };
 }
+
+export type ApprovedTv = { id: string; label: string; approved_at: string; last_seen_at: string | null; revoked_at: string | null };
+export async function cloudListApprovedTvs(): Promise<ApprovedTv[]> {
+  const token = await accessToken();
+  const response = await fetch('/api/tv/devices', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Unable to load TVs');
+  return data.devices;
+}
+export async function cloudRevokeTv(id: string) {
+  const token = await accessToken();
+  const response = await fetch('/api/tv/devices/' + encodeURIComponent(id) + '/revoke', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token }
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Could not revoke TV');
+}
+export async function cloudCheckTv(id: string): Promise<boolean> {
+  const token = await accessToken();
+  const response = await fetch('/api/tv/devices/' + encodeURIComponent(id) + '/check', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+  });
+  if (response.status === 401 || response.status === 403) return false;
+  if (!response.ok) throw new Error('TV status temporarily unavailable');
+  return Boolean((await response.json()).authorized);
+}
