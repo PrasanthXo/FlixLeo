@@ -50,6 +50,20 @@ export default function App() {
   const [tmdbCategory, setTmdbCategory] = useState<'trending' | 'popular' | 'top_rated' | 'indian' | 'all'>('trending');
   const [tmdbMovies, setTmdbMovies] = useState<MediaItem[]>([]);
   const [southIndianMovies, setSouthIndianMovies] = useState<MediaItem[]>([]);
+  const [homeCollections, setHomeCollections] = useState<Record<string, MediaItem[]>>({});
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/tmdb/home-collections', { signal: controller.signal })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('Catalogue request failed')))
+      .then(result => {
+        if (result?.success && result.collections && typeof result.collections === 'object') {
+          setHomeCollections(result.collections);
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/tmdb/south-indian?page=1', { signal: controller.signal })
@@ -1060,6 +1074,7 @@ export default function App() {
           <MobileHomeCollections
             items={uniqueTitles([...tmdbMovies, ...tvShows, ...southIndianMovies, ...catalog])}
             southIndianMovies={southIndianMovies}
+            additionalCollections={homeCollections}
             recent={continueWatching}
             onOpen={setDetailMedia}
             onPlay={handlePlayMedia}
