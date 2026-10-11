@@ -17,7 +17,7 @@
 .flixleo-wheel-stage{position:relative;height:355px;min-width:0;perspective:900px;touch-action:pan-y}
 .flixleo-wheel-halo{position:absolute;left:7%;right:7%;bottom:25px;height:40px;border:2px solid #4b8ffc65;border-radius:50%;box-shadow:0 0 25px #167cf077;transform:perspective(420px) rotateX(70deg);pointer-events:none}
 .flixleo-wheel-track{position:absolute;inset:0;perspective:900px;overflow:hidden}
-.flixleo-wheel-poster{position:absolute;top:13px;left:50%;width:clamp(108px,15vw,185px);height:278px;max-height:80%;padding:0;border-radius:12px;overflow:hidden;border:1px solid #ffffff44;background:#101726;transform:translateX(calc(-50% + var(--wheel-offset) * 72%)) translateZ(calc(var(--wheel-distance) * -75px)) rotateY(calc(var(--wheel-offset) * -13deg)) scale(calc(1 - var(--wheel-distance) * .08));box-shadow:0 14px 27px #000a;transition:transform .38s cubic-bezier(.2,.75,.25,1),opacity .3s,border-color .3s;will-change:transform}
+.flixleo-wheel-poster{position:absolute;top:13px;left:50%;width:clamp(108px,15vw,185px);height:278px;max-height:80%;padding:0;border-radius:12px;overflow:hidden;border:1px solid #ffffff44;background:#101726;transform:translateX(calc(-50% + var(--wheel-shift))) translateZ(var(--wheel-depth)) rotateY(var(--wheel-rotate)) scale(var(--wheel-scale));box-shadow:0 14px 27px #000a;transition:transform .38s cubic-bezier(.2,.75,.25,1),opacity .3s,border-color .3s;will-change:transform}
 .flixleo-wheel-poster img{display:block;width:100%;height:100%;object-fit:cover}
 .flixleo-wheel-poster.is-selected{border:2px solid #82bcff;box-shadow:0 0 0 4px #477ce634,0 0 33px #3b82f69e,0 18px 35px #000b}
 .flixleo-wheel-arrow{position:absolute;top:43%;z-index:18;width:41px;height:41px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;background:#0c1626c9;border:1px solid #a1b4d466}
@@ -30,7 +30,7 @@
 .flixleo-wheel{min-height:0;border-radius:19px}
 .flixleo-wheel-layout{display:flex;flex-direction:column-reverse;min-height:0;padding:20px 14px 23px;gap:8px}
 .flixleo-wheel-stage{width:100%;height:285px}
-.flixleo-wheel-poster{width:143px;height:220px;max-height:80%;transform:translateX(calc(-50% + var(--wheel-offset) * 65%)) translateZ(calc(var(--wheel-distance) * -75px)) rotateY(calc(var(--wheel-offset) * -12deg)) scale(calc(1 - var(--wheel-distance) * .09))}
+.flixleo-wheel-poster{width:143px;height:220px;max-height:80%;transform:translateX(calc(-50% + var(--wheel-mobile-shift))) translateZ(var(--wheel-depth)) rotateY(var(--wheel-mobile-rotate)) scale(var(--wheel-mobile-scale))}
 .flixleo-wheel-arrow{width:35px;height:35px}
 .flixleo-wheel-copy{width:100%;text-align:center}
 .flixleo-wheel-kicker{font-size:10px;margin-bottom:7px}
