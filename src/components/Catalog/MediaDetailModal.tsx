@@ -353,7 +353,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 </div>
                 <div className="space-y-2">
                   {addonLoading && <p className="text-xs text-slate-400">Checking additional sources…</p>}
-                  {addonError && <p className="text-xs text-slate-500">Additional sources unavailable; showing existing options.</p>}
+                  {addonError && <p className="text-xs text-slate-500">{addonError}</p>}
                   {orderedMirrors(activeMedia.mirrors).map((mirror: StreamMirror) => (
                     <div
                       key={mirror.id}
