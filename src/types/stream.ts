@@ -1,6 +1,6 @@
 export type SourceType = 'streamhub' | 'remux' | 'fastedge' | 'vault' | 'custom';
 
-export type QualityOption = '4K UHD' | '1080p' | '720p' | '480p' | 'Auto';
+export type QualityOption = '4K UHD' | '1080p' | '720p' | '480p' | '360p' | 'Auto';
 
 export interface StreamMirror {
   id: string;
