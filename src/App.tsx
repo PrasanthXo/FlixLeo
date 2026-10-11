@@ -12,7 +12,7 @@ import { HeroBanner } from './components/Catalog/HeroBanner';
 import { MovieCard } from './components/Catalog/MovieCard';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
 import { MediaDetailModal } from './components/Catalog/MediaDetailModal';
-import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudResendVerification, cloudSignOut, cloudUpdateProfile, cloudChangePassword, cloudResetPassword, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
+import { cloudConfigured, currentCloudUser, cloudSignIn, cloudSignUp, cloudResendVerification, cloudSignOut, cloudUpdateProfile, cloudChangePassword, cloudResetPassword, cloudRecoveryTokenFromUrl, cloudCompleteRecovery, cloudRead, cloudWrite, mergeCloudData, type CloudUser, type CloudRecord } from './lib/cloudSync';
 
 // Deduplicate repeated TMDB entries by ID and normalized title/year within each media type.
 function uniqueTitles(items: MediaItem[]): MediaItem[] {
@@ -251,6 +251,22 @@ export default function App() {
   // Optional Supabase cross-device account. Local storage remains available without login.
   const [cloudUser, setCloudUser] = useState<CloudUser | null>(() => currentCloudUser());
   const [accountOpen, setAccountOpen] = useState(false);
+  const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [recoveryConfirm, setRecoveryConfirm] = useState('');
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState('');
+  const [recoveryDone, setRecoveryDone] = useState(false);
+  useEffect(() => {
+    if (!window.location.hash.includes('type=recovery') && !new URLSearchParams(window.location.search).get('token_hash')) return;
+    cloudRecoveryTokenFromUrl().then(token => {
+      if (token) { setRecoveryToken(token); setAccountOpen(false); }
+    }).catch(err => {
+      setRecoveryError(err instanceof Error ? err.message : 'Recovery link expired. Request a new one.');
+      window.history.replaceState({}, '', window.location.pathname);
+    });
+  }, []);
+
   const [accountEmail, setAccountEmail] = useState('');
   const [authTab, setAuthTab] = useState<'signin' | 'signup'>('signin');
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -563,6 +579,27 @@ export default function App() {
         bookmarkCount={watchlistIds.length}
       />
 
+      {(recoveryToken || recoveryError || recoveryDone) && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+          <div role="dialog" aria-modal="true" aria-label="Reset FlixLeo password" className="w-full max-w-md rounded-3xl border border-white/15 bg-[#111625] p-6 shadow-2xl space-y-5">
+            <div><p className="text-xs uppercase tracking-widest text-amber-400 font-bold">FlixLeo account recovery</p><h2 className="mt-2 text-2xl font-bold text-white">{recoveryDone ? 'Password changed' : 'Create new password'}</h2></div>
+            {recoveryDone ? <div className="space-y-4"><p className="text-emerald-300 text-sm">Your password has been updated. You can now sign in.</p><button type="button" onClick={() => { setRecoveryDone(false); setRecoveryToken(null); setAccountOpen(true); setAuthTab('signin'); }} className="w-full rounded-xl bg-amber-500 p-3 font-semibold text-black">Go to sign in</button></div>
+            : recoveryToken ? <form className="space-y-4" onSubmit={async e => {
+              e.preventDefault();
+              if (recoveryPassword !== recoveryConfirm) { setRecoveryError('Passwords do not match.'); return; }
+              setRecoveryBusy(true); setRecoveryError('');
+              try { await cloudCompleteRecovery(recoveryToken, recoveryPassword); setRecoveryToken(null); setRecoveryPassword(''); setRecoveryConfirm(''); setRecoveryDone(true); }
+              catch (err) { setRecoveryError(err instanceof Error ? err.message : 'Unable to reset password.'); }
+              finally { setRecoveryBusy(false); }
+            }}>
+              <label className="block text-sm text-slate-300">New password<input required minLength={8} autoComplete="new-password" type="password" value={recoveryPassword} onChange={e => setRecoveryPassword(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 p-3 text-white" placeholder="At least 8 characters" /></label>
+              <label className="block text-sm text-slate-300">Confirm new password<input required minLength={8} autoComplete="new-password" type="password" value={recoveryConfirm} onChange={e => setRecoveryConfirm(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 p-3 text-white" placeholder="Repeat new password" /></label>
+              {recoveryError && <p role="alert" className="text-sm text-rose-300">{recoveryError}</p>}
+              <button disabled={recoveryBusy} type="submit" className="w-full rounded-xl bg-amber-500 p-3 font-bold text-black disabled:opacity-50">{recoveryBusy ? 'Updating…' : 'Save new password'}</button>
+            </form> : <div className="space-y-3"><p role="alert" className="text-sm text-rose-300">{recoveryError}</p><button type="button" onClick={() => { setRecoveryError(''); setAccountOpen(true); setAuthTab('signin'); }} className="w-full rounded-xl bg-amber-500 p-3 font-bold text-black">Request another reset link</button></div>}
+          </div>
+        </div>
+      )}
       {accountOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-lg p-3 sm:p-6" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAccountOpen(false); }}>
           <div role="dialog" aria-modal="true" aria-label="FlixLeo account" className="w-full max-w-xl max-h-[92dvh] overflow-y-auto rounded-[28px] border border-white/10 bg-[#0d111c] p-4 sm:p-7 shadow-[0_24px_100px_rgba(0,0,0,.75)]">
