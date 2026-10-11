@@ -136,8 +136,19 @@ app.post('/api/tv/pair/:id/approve', tvPairRateLimit, async (req: Request, res: 
     });
     if (!linkResponse.ok) return res.status(502).json({ error: 'Could not authorize the TV. Retry.' });
     const link: any = await linkResponse.json();
-    const tokenHash = link?.properties?.hashed_token;
-    if (typeof tokenHash !== 'string' || !tokenHash) return res.status(502).json({ error: 'TV authorization failed.' });
+    // GoTrue versions return the hash in different locations. Some return
+    // only an action_link; its token query parameter is the verification hash.
+    let tokenHash: string | undefined = link?.properties?.hashed_token || link?.hashed_token;
+    if (!tokenHash && typeof link?.properties?.action_link === 'string') {
+      try { tokenHash = new URL(link.properties.action_link).searchParams.get('token') || undefined; } catch {}
+    }
+    if (!tokenHash && typeof link?.action_link === 'string') {
+      try { tokenHash = new URL(link.action_link).searchParams.get('token') || undefined; } catch {}
+    }
+    if (!tokenHash) {
+      console.error('TV authorization: Supabase generate_link returned no verification token (keys:', Object.keys(link || {}).join(','), 'properties:', Object.keys(link?.properties || {}).join(','), ')');
+      return res.status(502).json({ error: 'Supabase did not provide a TV login token. Please retry.' });
+    }
     pair.tokenHash = tokenHash;
     return res.json({ success: true });
   } catch {
