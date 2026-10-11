@@ -319,17 +319,28 @@ export default function App() {
     const timer = window.setTimeout(async () => {
       try {
         const endpoints = ['/api/tmdb/search', '/api/tmdb/tv/search'];
-        const data = await Promise.all(endpoints.map(async endpoint => {
+        const responses = await Promise.allSettled(endpoints.map(async endpoint => {
           const response = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`, { signal: controller.signal });
-          if (!response.ok) throw new Error('TMDB search unavailable');
+          if (!response.ok) throw new Error('Search service unavailable');
           const payload = await response.json();
-          if (!payload?.success || !Array.isArray(payload.items)) throw new Error('TMDB search unavailable');
-          return payload.items as MediaItem[];
+          if (!payload?.success || !Array.isArray(payload.items)) throw new Error('Search service unavailable');
+          return { items: payload.items as MediaItem[], live: payload.isLive === true };
         }));
         if (controller.signal.aborted) return;
-        const unique = new Map<string, MediaItem>();
-        for (const item of data.flat()) unique.set(item.id, item);
-        setTmdbSearchResults(uniqueTitles(Array.from(unique.values())));
+        const good = responses.filter((r): r is PromiseFulfilledResult<{ items: MediaItem[]; live: boolean }> => r.status === 'fulfilled');
+        const localMatches = [...catalog, ...tmdbMovies, ...tvShows, ...movieExtra, ...tvExtra].filter(m =>
+          [m.title, m.originalTitle || '', ...(m.cast || [])].some(v => v.toLocaleLowerCase().includes(q.toLocaleLowerCase()))
+        );
+        const all = uniqueTitles([...good.flatMap(r => r.value.items), ...localMatches]);
+        setTmdbSearchResults(all);
+        if (good.length === 0) {
+          setSearchError('Live search is temporarily unavailable. Showing any matching titles already loaded.');
+        } else if (!good.some(r => r.value.live)) {
+          setSearchError('Live TMDB search is not connected. Showing matching titles from the available catalogue.');
+        } else if (good.length < endpoints.length) {
+          setSearchError('Some search sources are unavailable. Showing available results.');
+        }
+
       } catch (error) {
         if (!controller.signal.aborted) setSearchError('Live search is unavailable. Check the TMDB connection and try again.');
       } finally {
@@ -337,7 +348,7 @@ export default function App() {
       }
     }, 300);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [searchQuery]);
+  }, [searchQuery, catalog, tmdbMovies, tvShows, movieExtra, tvExtra]);
 
   // Toggle Bookmark
   const toggleBookmark = (media: MediaItem) => {
@@ -681,10 +692,10 @@ export default function App() {
             </div>
 
             {/* Empty State */}
-            {filteredCatalog.length === 0 ? (
+            {filteredCatalog.length === 0 && (!searchQuery.trim() || tmdbSearchResults.length === 0) ? (
               <div className="py-20 text-center rounded-2xl bg-slate-900/40 border border-slate-800">
                 <Film className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <h3 className="text-base font-bold text-white">No streams found</h3>
+                <h3 className="text-base font-bold text-white">{searchQuery ? 'Searching catalogue' : 'No streams found'}</h3>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
                   {searchQuery
                     ? `No releases match "${searchQuery}". Try searching by actor, director, or hub name.`
@@ -720,10 +731,10 @@ export default function App() {
               <div className="mt-8 pt-6 border-t border-slate-800">
                 {searchLoading && <p role="status" className="text-sm text-slate-300">Searching movies and series…</p>}
                 {searchError && <p role="alert" className="text-sm text-amber-300">{searchError}</p>}
-                {!searchLoading && !searchError && tmdbSearchResults.length === 0 && <p className="text-sm text-slate-400">No matching movies or series found in TMDB.</p>}
+                {!searchLoading && tmdbSearchResults.length === 0 && <p className="text-sm text-slate-400">No matching titles in the available catalogue.</p>}
               </div>
             )}
-            {searchQuery && tmdbSearchResults.length > 0 && (
+            {searchQuery.trim() && tmdbSearchResults.length > 0 && (
               <div className="mt-8 pt-6 border-t border-slate-800">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#01b4e4]/20 text-[#01b4e4] border border-[#01b4e4]/30 uppercase">
