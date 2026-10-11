@@ -33,10 +33,15 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   const [addonStreams, setAddonStreams] = React.useState<StreamMirror[]>([]);
   const [addonLoading, setAddonLoading] = React.useState(false);
   const [addonError, setAddonError] = React.useState('');
+  const [completedLookupKey, setCompletedLookupKey] = React.useState<string | null>(null);
   const isSeries = Boolean(media && (media.type === 'tv' || media.id.startsWith('tv-')));
   const tmdbId = media?.id.match(/^(?:tmdb-|tv-)(\d+)$/)?.[1];
   const selectedEpisodeNumber = detailedMedia?.seasons?.find(season => season.number === selectedSeasonNumber)
     ?.episodes.find(episode => episode.id === selectedEpisodeId)?.number;
+  const lookupKey = isOpen && tmdbId && (!isSeries || selectedEpisodeNumber !== undefined)
+    ? [tmdbId, isSeries ? 'series' : 'movie', isSeries ? selectedSeasonNumber : '', isSeries ? selectedEpisodeNumber : ''].join(':')
+    : null;
+  const waitingForServers = Boolean(lookupKey && completedLookupKey !== lookupKey);
   React.useEffect(() => {
     setAddonStreams([]);
     setAddonError('');
@@ -48,6 +53,8 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
       params.set('episode', String(selectedEpisodeNumber));
     }
     setAddonLoading(true);
+    let active = true;
+    const deadline = window.setTimeout(() => controller.abort(), 20000);
     fetch('/api/stremio/streams?' + params, { signal: controller.signal })
       .then(async response => {
         const data = await response.json();
@@ -83,9 +90,15 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         setAddonStreams(streams);
         if (!streams.length) setAddonError('No streams available');
       })
-      .catch(error => { if (!controller.signal.aborted) setAddonError('No streams available'); })
-      .finally(() => { if (!controller.signal.aborted) setAddonLoading(false); });
-    return () => controller.abort();
+      .catch(() => { if (active) setAddonError('No streams available'); })
+      .finally(() => {
+        window.clearTimeout(deadline);
+        if (active) {
+          setCompletedLookupKey([tmdbId, isSeries ? 'series' : 'movie', isSeries ? selectedSeasonNumber : '', isSeries ? selectedEpisodeNumber : ''].join(':'));
+          setAddonLoading(false);
+        }
+      });
+    return () => { active = false; window.clearTimeout(deadline); controller.abort(); };
   }, [isOpen, tmdbId, isSeries, selectedSeasonNumber, selectedEpisodeNumber]);
 
 
@@ -165,6 +178,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     .filter((mirror, i, all) => all.findIndex(other => other.url === mirror.url) === i)
     .sort((a, b) => qualityRank(b) - qualityRank(a));
   const playSelected = (mirror: StreamMirror, originals: StreamMirror[]) => {
+    if (waitingForServers) return;
     onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals) }, mirror.id);
     onClose();
   };
@@ -293,7 +307,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 {showAudioOptions && (
                   <div className="p-3 border-t border-slate-800 space-y-2 text-xs">
                     <p className="text-slate-300">Language and Dolby labels are catalogue metadata, not guaranteed selectable soundtracks. Use the player's Settings → Audio / Language to switch real tracks when available in HLS streams. Embedded providers have their own audio controls.</p>
-                    <button type="button" onClick={() => { onPlayMedia(activeMedia); onClose(); }}
+                    <button type="button" onClick={() => { if (waitingForServers) return; onPlayMedia(activeMedia); onClose(); }} disabled={waitingForServers}
                       className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded-lg font-semibold">Open player audio settings</button>
                   </div>
                 )}
@@ -333,22 +347,23 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                     <h4 className="text-lg font-semibold text-white">Select Quality: {selectedEpisode.title}</h4>
                     <p className="text-xs text-slate-400">{isUpcoming(selectedEpisode.airDate) ? 'Upcoming · ' : selectedEpisode.airDate ? 'Aired · ' : ''}{formatAirDate(selectedEpisode.airDate)}</p>
                     <div className="space-y-2">
-                      {addonLoading && (<div role="status" aria-live="polite" className="relative overflow-hidden rounded-xl border border-amber-400/25 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-4 py-3 shadow-lg shadow-amber-500/5">
+                      {waitingForServers && (<div role="status" aria-live="polite" className="relative overflow-hidden rounded-xl border border-amber-400/25 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-4 py-3 shadow-lg shadow-amber-500/5">
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <span className="flex items-center gap-2 text-xs font-semibold text-white"><span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" /> Discovering streaming sources</span>
-                      <span className="text-[11px] text-amber-300">Searching add-ons…</span>
+                      <span className="text-[11px] text-amber-300">Please wait…</span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700/80">
                       <div className="h-full w-1/3 animate-[flixleo-source-scan_1.7s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-amber-600 via-amber-300 to-yellow-100" />
                     </div>
                     <style>{`@keyframes flixleo-source-scan {0%{transform:translateX(-100%)} 100%{transform:translateX(300%)}}`}</style>
-                    <p className="mt-2 text-[11px] text-slate-400">Existing sources remain available while add-ons respond.</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Playback unlocks after all add-ons respond or the lookup times out.</p>
                   </div>)}
                       {addonError && <p className="text-xs text-slate-500">{addonError}</p>}
                       {orderedMirrors(selectedEpisode.mirrors).map(mirror => (
                         <div key={mirror.id} className="flex items-center gap-2">
                           <button
                             onClick={() => playSelected(mirror, selectedEpisode.mirrors)}
+                            disabled={waitingForServers}
                             className="min-w-0 flex-1 p-3 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors text-left flex justify-between gap-2"
                           >
                             <span className="break-words">{mirror.label}</span>
@@ -460,10 +475,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           onClick={() => {
                             playSelected(mirror, activeMedia.mirrors);
                           }}
-                          className="px-3 py-2 rounded-lg bg-slate-800 group-hover:bg-amber-500 text-white group-hover:text-black font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md"
+                          disabled={waitingForServers}
+                          className="px-3 py-2 rounded-lg bg-slate-800 group-hover:bg-amber-500 text-white group-hover:text-black font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
-                          Play
+                          {waitingForServers ? 'Fetching…' : 'Play'}
                         </button>
                       </div>
                     </div>
