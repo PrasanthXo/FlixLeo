@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Film, Link as LinkIcon, Search, Bookmark, Tv, Download, X, Share2, MoreVertical } from 'lucide-react';
+import { Home, Film, Search, Bookmark, Tv, UserRound, Download, X, Share2, MoreVertical } from 'lucide-react';
 import { SourceType } from '../../types/stream';
 
 interface NavbarProps {
@@ -10,12 +10,14 @@ interface NavbarProps {
   selectedSourceFilter: SourceType | 'all';
   onSelectSourceFilter: (source: SourceType | 'all') => void;
   bookmarkCount: number;
+  onOpenProfile: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   onSelectTab,
-  bookmarkCount
+  bookmarkCount,
+  onOpenProfile
 }) => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [installOpen, setInstallOpen] = useState(false);
@@ -60,59 +62,56 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>FlixLeo</span>
         </button>
 
-        {/* Zone 2: Nav Links */}
-        <nav className="hidden md:flex items-center gap-5 text-sm font-medium text-slate-300">
+        {/* Desktop uses the same five destinations as the mobile bottom navigation. */}
+        <nav aria-label="Main navigation" className="hidden md:flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/70 p-1 shadow-inner shadow-black/20">
+          {([
+            { tab: 'browse', title: 'Home', Icon: Home },
+            { tab: 'movies', title: 'Movies', Icon: Film },
+            { tab: 'series', title: 'Series', Icon: Tv },
+            { tab: 'search', title: 'Search', Icon: Search },
+          ] as const).map(({ tab, title, Icon }) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => onSelectTab(tab)}
+              aria-current={currentTab === tab ? 'page' : undefined}
+              className={`flex items-center gap-2 rounded-xl px-3 lg:px-4 py-2.5 text-xs lg:text-sm font-semibold transition-all whitespace-nowrap ${
+                currentTab === tab
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {title}
+            </button>
+          ))}
           <button
-            onClick={() => onSelectTab('browse')}
-            className={`whitespace-nowrap shrink-0 transition-colors ${
-              currentTab === 'browse' ? 'text-amber-400 font-semibold' : 'hover:text-white'
-            }`}
+            type="button"
+            onClick={onOpenProfile}
+            aria-label="Open profile"
+            className="flex items-center gap-2 rounded-xl px-3 lg:px-4 py-2.5 text-xs lg:text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap"
           >
-            Home
-          </button>
-          <button
-            onClick={() => onSelectTab('movies')}
-            className={`whitespace-nowrap shrink-0 transition-colors flex items-center gap-1.5 ${
-              currentTab === 'movies' ? 'text-amber-400 font-semibold' : 'hover:text-white'
-            }`}
-          >
-            <Film className="w-3.5 h-3.5" />
-            <span>Movies</span>
-          </button>
-          <button
-            onClick={() => onSelectTab('series')}
-            className={`whitespace-nowrap shrink-0 transition-colors flex items-center gap-1.5 ${
-              currentTab === 'series' ? 'text-amber-400 font-semibold' : 'hover:text-white'
-            }`}
-          >
-            <Tv className="w-3.5 h-3.5" />
-            <span>Series</span>
-          </button>
-          <button
-            onClick={() => onSelectTab('streamhub')}
-            className={`whitespace-nowrap shrink-0 transition-colors ${
-              currentTab === 'streamhub' ? 'text-sky-400 font-semibold' : 'hover:text-white'
-            }`}
-          >
-            4K Cinema
-          </button>
-          <button
-            onClick={() => onSelectTab('watchlist')}
-            className={`whitespace-nowrap shrink-0 transition-colors flex items-center gap-1.5 ${
-              currentTab === 'watchlist' ? 'text-amber-400 font-semibold' : 'hover:text-white'
-            }`}
-          >
-            <span>Watchlist</span>
-            {bookmarkCount > 0 && (
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-800 text-amber-300">
-                {bookmarkCount}
-              </span>
-            )}
+            <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Profile
           </button>
         </nav>
 
-        {/* Zone 3: Search */}
+        {/* Desktop bookmark shortcut mirrors the Watchlist link in mobile Profile. */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => onSelectTab('watchlist')}
+            aria-label={`Open watchlist (${bookmarkCount} saved)`}
+            title="My Watchlist"
+            className={`hidden md:flex items-center justify-center relative h-10 w-10 rounded-xl border transition-colors ${
+              currentTab === 'watchlist'
+                ? 'border-amber-500/50 bg-amber-500/15 text-amber-400'
+                : 'border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Bookmark className="w-4.5 h-4.5" aria-hidden="true" />
+            {bookmarkCount > 0 && <span className="absolute -top-1 -right-1 min-w-4 h-4 rounded-full bg-amber-500 px-1 text-[10px] leading-4 text-black font-bold">{bookmarkCount}</span>}
+          </button>
           {!installed && (
             <button type="button" onClick={() => void requestInstall()} title="Install FlixLeo web app" aria-label="Install FlixLeo web app"
               className="flex items-center justify-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-2.5 sm:px-3 py-2 text-amber-300 hover:bg-amber-500/25 transition-colors shrink-0 text-xs font-semibold">
