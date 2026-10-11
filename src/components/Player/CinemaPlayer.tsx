@@ -107,7 +107,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       if (typeof (window as any).ManagedMediaSource !== 'undefined' && video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
       } else if (Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true, capLevelToPlayerSize: false, startLevel: -1 });
+        const hls = new Hls({ enableWorker: true, capLevelToPlayerSize: true, startLevel: -1, maxBufferLength: 20, maxMaxBufferLength: 45, backBufferLength: 20, startFragPrefetch: true });
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (disposed) return;
           setQualityLevels(hls.levels.map((level, i) => ({ level: i, height: level.height })).filter(level => level.height > 0).sort((a, b) => b.height - a.height));
