@@ -49,7 +49,6 @@ export default function App() {
   const [sourceFilter, setSourceFilter] = useState<SourceType | 'all'>('all');
   const [tmdbCategory, setTmdbCategory] = useState<'trending' | 'popular' | 'top_rated' | 'indian' | 'all'>('trending');
   const [tmdbMovies, setTmdbMovies] = useState<MediaItem[]>([]);
-  const [southIndianMovies, setSouthIndianMovies] = useState<MediaItem[]>([]);
   const [homeCollections, setHomeCollections] = useState<Record<string, MediaItem[]>>({});
   useEffect(() => {
     const controller = new AbortController();
@@ -64,20 +63,6 @@ export default function App() {
     return () => controller.abort();
   }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch('/api/tmdb/south-indian?page=1', { signal: controller.signal })
-      .then(response => response.ok ? response.json() : Promise.reject(new Error('Catalog unavailable')))
-      .then(data => {
-        if (Array.isArray(data.items)) {
-          setSouthIndianMovies(uniqueTitles(data.items.filter((item: MediaItem) =>
-            item.type !== 'tv' && !item.id.startsWith('tv-') &&
-            ['ta','te','ml','kn','tamil','telugu','malayalam','kannada'].includes((item.language || '').toLowerCase())
-          )));
-        }
-      }).catch(() => {});
-    return () => controller.abort();
-  }, []);
 
   const [isLoadingTmdb, setIsLoadingTmdb] = useState<boolean>(false);
   const [isTmdbLive, setIsTmdbLive] = useState<boolean>(true);
@@ -1113,8 +1098,7 @@ export default function App() {
         {/* Mobile Home-only curated discovery, immediately under the hero rather than after the long grid. */}
         {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
           <MobileHomeCollections
-            items={uniqueTitles([...tmdbMovies, ...tvShows, ...southIndianMovies, ...catalog])}
-            southIndianMovies={southIndianMovies}
+            items={uniqueTitles([...tmdbMovies, ...tvShows, ...catalog])}
             additionalCollections={homeCollections}
             recent={continueWatching}
             onOpen={setDetailMedia}
