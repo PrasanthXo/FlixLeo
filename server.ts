@@ -169,7 +169,7 @@ app.post('/api/tv/pair/:id/approve', tvPairRateLimit, async (req: Request, res: 
 
 
 function tvAdminConfig() {
-  return { url: (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\\/$/, ''),
+  return { url: String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(new RegExp('/$'), ''),
     key: process.env.SUPABASE_SERVICE_ROLE_KEY || '' };
 }
 async function verifiedTvUser(req: Request) {
