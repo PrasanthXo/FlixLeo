@@ -409,6 +409,30 @@ import {
   CURATED_TMDB_SERIES
 } from './server/tmdbService';
 
+// Same-origin poster delivery for legacy smart-TV browsers that cannot load
+// image.tmdb.org directly. Never proxy arbitrary URLs.
+app.get('/api/tv/artwork/:size/:filename', async (req: Request, res: Response) => {
+  const size = String(req.params.size || '');
+  const filename = String(req.params.filename || '');
+  if (!/^(w185|w342|w500|w780|original)$/.test(size) || !/^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+    return res.status(400).end();
+  }
+  try {
+    const imageResponse = await fetch('https://image.tmdb.org/t/p/' + size + '/' + filename, {
+      headers: { Accept: 'image/jpeg,image/png,image/webp,image/*' },
+      signal: AbortSignal.timeout(12000)
+    });
+    if (!imageResponse.ok || !imageResponse.body) return res.status(502).end();
+    const type = imageResponse.headers.get('content-type') || '';
+    if (!type.startsWith('image/')) return res.status(502).end();
+    const bytes = await imageResponse.arrayBuffer();
+    if (bytes.byteLength > 8 * 1024 * 1024) return res.status(413).end();
+    res.setHeader('Content-Type', type);
+    res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+    return res.send(Buffer.from(bytes));
+  } catch { return res.status(502).end(); }
+});
+
 // API: TMDB Configuration Status
 app.get('/api/tmdb/status', (_req: Request, res: Response) => {
   const apiKey = process.env.TMDB_API_KEY;
