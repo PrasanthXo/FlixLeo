@@ -756,7 +756,7 @@ export default function App() {
       )}
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-12">
         {/* Active Cinema Video Player (if active) */}
         {activeMedia && (
           <div className="mb-10 animate-fade-in relative z-30">
