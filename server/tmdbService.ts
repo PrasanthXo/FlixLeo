@@ -108,19 +108,6 @@ export function transformTmdbMovie(raw: any): MediaItem {
       audioTrack: 'Original + Multi-Audio'
     },
     {
-      id: `mir-${id}-embed2`,
-      source: 'fastedge',
-      label: `Full Feature Stream · Server 2 (Embed.su HD) [1080p 60fps Full Movie]`,
-      quality: '1080p',
-      url: `https://embed.su/embed/movie/${tmdbId}`,
-      streamType: 'embed-iframe',
-      fileSize: 'Full Movie Stream',
-      bitrate: '9.8 Mbps',
-      serverNode: 'Global Fast Edge Node',
-      isDirect: false,
-      audioTrack: 'Original 5.1'
-    },
-    {
       id: `mir-${id}-embed3`,
       source: 'vault',
       label: `Full Feature Stream · Server 3 (VidSrc VIP) [Uncut Full Movie]`,
@@ -430,19 +417,6 @@ export function transformTmdbTvShow(raw: any): MediaItem {
       serverNode: 'Ultra Cloud Fast NVMe',
       isDirect: false,
       audioTrack: 'Original + Subtitles'
-    },
-    {
-      id: `mir-${id}-embed2`,
-      source: 'fastedge',
-      label: `TV Series Stream · S01E01 (Embed.su HD) [1080p Series]`,
-      quality: '1080p',
-      url: `https://embed.su/embed/tv/${tmdbId}/1/1`,
-      streamType: 'embed-iframe',
-      fileSize: 'Full Season HD',
-      bitrate: '9.2 Mbps',
-      serverNode: 'Global Fast Edge Node',
-      isDirect: false,
-      audioTrack: 'Original 5.1'
     },
     {
       id: `mir-${id}-embed3`,
