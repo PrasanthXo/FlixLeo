@@ -43,6 +43,19 @@ export async function cloudSignIn(email: string, password: string) {
   persist({ access_token: data.access_token, refresh_token: data.refresh_token, user: verifiedUser, expires_at: Math.floor(Date.now() / 1000) + data.expires_in });
   return verifiedUser as CloudUser;
 }
+export async function cloudSignInTv(hash: string) {
+  const data = await request('/auth/v1/verify', { method: 'POST', body: JSON.stringify({ token_hash: hash, type: 'magiclink' }) });
+  const user = await request('/auth/v1/user', {}, data.access_token);
+  if (!user.email_confirmed_at) throw new Error('Confirm your email first.');
+  persist({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Math.floor(Date.now()/1000) + data.expires_in, user });
+  return user as CloudUser;
+}
+export async function cloudApproveTvPair(id: string) {
+  const token = await accessToken();
+  const response = await fetch('/api/tv/pair/' + encodeURIComponent(id) + '/approve', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+  if (!response.ok) throw new Error((await response.json()).error || 'Pairing failed');
+}
+
 export async function cloudSignUp(email: string, password: string) {
   if (!cloudConfigured) throw new Error('Supabase is not configured yet.');
   const data = await request('/auth/v1/signup' + redirectQuery, { method: 'POST', body: JSON.stringify({ email, password }) });
