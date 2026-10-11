@@ -70,3 +70,22 @@
  .flixleo-tv-nav nav button { padding:10px; font-size:15px; }
  .flixleo-tv main .grid.grid-cols-2 { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
+
+/* Legacy smart-TV rendering fixes, completely scoped away from phones/desktop. */
+.flixleo-tv, .flixleo-tv * { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+.flixleo-tv { font-family:Arial,Helvetica,sans-serif!important; color:#f8fafc!important; background:#080a0f!important; }
+.flixleo-tv .flixleo-tv-nav {display:-webkit-flex;display:flex!important; align-items:center; min-height:88px;}
+.flixleo-tv .flixleo-tv-nav button {font-family:Arial,Helvetica,sans-serif!important; font-size:19px!important; color:#f1f5f9!important; cursor:pointer;}
+.flixleo-tv .flixleo-tv-nav button[aria-current="page"] {color:#0b0f16!important;background:#f59e0b!important;}
+.flixleo-tv .flixleo-tv-brand {font-size:30px!important;color:#fff!important;}
+.flixleo-tv > main {width:100%!important;max-width:none!important;padding:35px 4vw 100px!important;}
+.flixleo-tv main p, .flixleo-tv main span, .flixleo-tv main a {font-size:16px;}
+.flixleo-tv main h2 {font-size:32px!important;color:#fff!important;}
+.flixleo-tv main .grid.grid-cols-2 {display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:22px!important;}
+.flixleo-tv main .grid.grid-cols-2 > * {min-width:0!important;overflow:hidden;}
+.flixleo-tv main .grid.grid-cols-2 img {display:block;object-fit:cover;}
+.flixleo-tv main button {font-size:17px;min-height:48px;}
+.flixleo-tv [role="dialog"] {font-size:19px;}
+.flixleo-tv [role="dialog"] input {font-size:20px;min-height:52px;}
+.flixleo-tv .fixed.bottom-0 {display:none!important;}
+@media(max-width:900px) {.flixleo-tv main .grid.grid-cols-2 {grid-template-columns:repeat(3,minmax(0,1fr))!important;}}
