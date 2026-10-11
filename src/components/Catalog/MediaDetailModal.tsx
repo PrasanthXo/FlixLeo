@@ -60,7 +60,13 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
           id: 'stremio-' + index,
           source: 'custom',
           label: String(stream.provider || 'Stremio').split('.')[0].replace(/[^a-z0-9 -]/gi, ' ').trim() || 'Stremio',
-          quality: stream.quality === '4K' ? '4K UHD' : stream.quality === '1080p' ? '1080p' : stream.quality === '720p' ? '720p' : 'Auto',
+          quality: /(?:4k|2160p)/i.test(String(stream.title || '')) ? '4K UHD'
+            : /1080p/i.test(String(stream.title || '')) ? '1080p'
+            : /720p/i.test(String(stream.title || '')) ? '720p'
+            : /480p/i.test(String(stream.title || '')) ? '480p'
+            : /360p/i.test(String(stream.title || '')) ? '360p'
+            : stream.quality === '4K' ? '4K UHD'
+            : ['1080p', '720p', '480p', '360p'].includes(stream.quality) ? stream.quality : 'Auto',
           url: stream.url,
           streamType: stream.streamType === 'hls' ? 'hls' : 'direct-video',
           isDirect: true
@@ -126,6 +132,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     if (/1080p/.test(label)) return 1080;
     if (/720p/.test(label)) return 720;
     if (/480p/.test(label)) return 480;
+    if (/360p/.test(label)) return 360;
     return 0;
   };
   const orderedMirrors = (mirrors: StreamMirror[]) => [...mirrors, ...addonStreams]
@@ -300,7 +307,17 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                     <h4 className="text-lg font-semibold text-white">Select Quality: {selectedEpisode.title}</h4>
                     <p className="text-xs text-slate-400">{isUpcoming(selectedEpisode.airDate) ? 'Upcoming · ' : selectedEpisode.airDate ? 'Aired · ' : ''}{formatAirDate(selectedEpisode.airDate)}</p>
                     <div className="space-y-2">
-                      {addonLoading && <p className="text-xs text-slate-400">Checking additional sources…</p>}
+                      {addonLoading && (<div role="status" aria-live="polite" className="relative overflow-hidden rounded-xl border border-amber-400/25 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-4 py-3 shadow-lg shadow-amber-500/5">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2 text-xs font-semibold text-white"><span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" /> Discovering streaming sources</span>
+                      <span className="text-[11px] text-amber-300">Searching add-ons…</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700/80">
+                      <div className="h-full w-1/3 animate-[flixleo-source-scan_1.7s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-amber-600 via-amber-300 to-yellow-100" />
+                    </div>
+                    <style>{`@keyframes flixleo-source-scan {0%{transform:translateX(-100%)} 100%{transform:translateX(300%)}}`}</style>
+                    <p className="mt-2 text-[11px] text-slate-400">Existing sources remain available while add-ons respond.</p>
+                  </div>)}
                       {addonError && <p className="text-xs text-slate-500">{addonError}</p>}
                       {orderedMirrors(selectedEpisode.mirrors).map(mirror => (
                         <div key={mirror.id} className="flex items-center gap-2">
@@ -352,7 +369,17 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                   </h4>
                 </div>
                 <div className="space-y-2">
-                  {addonLoading && <p className="text-xs text-slate-400">Checking additional sources…</p>}
+                  {addonLoading && (<div role="status" aria-live="polite" className="relative overflow-hidden rounded-xl border border-amber-400/25 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-4 py-3 shadow-lg shadow-amber-500/5">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2 text-xs font-semibold text-white"><span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" /> Discovering streaming sources</span>
+                      <span className="text-[11px] text-amber-300">Searching add-ons…</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700/80">
+                      <div className="h-full w-1/3 animate-[flixleo-source-scan_1.7s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-amber-600 via-amber-300 to-yellow-100" />
+                    </div>
+                    <style>{`@keyframes flixleo-source-scan {0%{transform:translateX(-100%)} 100%{transform:translateX(300%)}}`}</style>
+                    <p className="mt-2 text-[11px] text-slate-400">Existing sources remain available while add-ons respond.</p>
+                  </div>)}
                   {addonError && <p className="text-xs text-slate-500">{addonError}</p>}
                   {orderedMirrors(activeMedia.mirrors).map((mirror: StreamMirror) => (
                     <div
