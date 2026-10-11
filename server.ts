@@ -546,13 +546,18 @@ app.get('/api/tmdb/movie/:id', async (req: Request, res: Response) => {
  * browsers can only use direct, CORS-enabled HLS or video sources.
  */
 app.get('/api/stremio/streams', async (req: Request, res: Response) => {
-  const type = req.query.type;
-  const tmdb = String(req.query.tmdb || '');
-  const season = Number(req.query.season);
-  const episode = Number(req.query.episode);
+  // Some mobile link handlers encode the ampersand into the type value.
+  // Parse it safely without weakening title/episode validation.
+  const rawQuery = req.originalUrl.split('?').slice(1).join('?');
+  const normalizedQuery = rawQuery.replace(/%26/gi, '&').replace(/%3D/gi, '=');
+  const parsedQuery = new URLSearchParams(normalizedQuery);
+  const type = parsedQuery.get('type') ?? req.query.type;
+  const tmdb = String(parsedQuery.get('tmdb') ?? req.query.tmdb ?? '').trim();
+  const season = Number(parsedQuery.get('season') ?? req.query.season);
+  const episode = Number(parsedQuery.get('episode') ?? req.query.episode);
   if ((type !== 'movie' && type !== 'series') || !/^\d{1,12}$/.test(tmdb) ||
       (type === 'series' && (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 1))) {
-    return res.status(400).json({ error: 'Invalid title or episode' });
+    return res.status(400).json({ error: 'Invalid title or episode', received: { type: String(type || ''), tmdb, season: Number.isFinite(season) ? season : null, episode: Number.isFinite(episode) ? episode : null } });
   }
   const configured = (process.env.STREMIO_ADDON_URLS || '').split(',').map(x => x.trim()).filter(Boolean).slice(0, 5);
   if (!configured.length) return res.json({ streams: [], configured: false, message: 'No add-ons configured on Render' });
