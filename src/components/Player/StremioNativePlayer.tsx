@@ -415,6 +415,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           {audioFix ? 'Use original audio' : 'Audio Fix · Convert audio to AAC (video unchanged)'}
         </button>}
         {audioFix && <p className="text-xs text-amber-300">Audio conversion may take time to start. Video codecs must still be browser-compatible.</p>}
+        {!active?.audioFixUrl && /4k|2160/i.test(active?.quality || '') && <p className="text-xs text-amber-300">AAC Audio Fix is unavailable for this 4K source. The actual video host must support server-side access and be approved in Render.</p>}
         <label className="block text-xs text-slate-300"><span className="inline-flex items-center gap-1"><Volume2 size={14} /> Audio track</span>
           <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={audio} disabled={!audioAvailable} onChange={e => changeAudio(Number(e.target.value))}>
             {!audioAvailable && <option value={-1}>{audioStatus === 'loading' ? 'Detecting audio tracks…' : audioStatus === 'browser-limited' ? 'Audio tracks not exposed by this browser' : 'Original audio · no alternate track detected'}</option>}
