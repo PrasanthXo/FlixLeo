@@ -26,6 +26,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     return () => window.removeEventListener('scroll', onScroll);
   }, [docked]);
   const hlsRef = useRef<Hls | null>(null);
+  const shakaRef = useRef<any>(null);
   const uploadedRef = useRef<string | null>(null);
   const subtitleController = useRef<AbortController | null>(null);
   const [audioAvailable, setAudioAvailable] = useState(false);
@@ -97,7 +98,64 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     setSelectedSubtitle('');
     const fail = () => { if (!disposed) { setBuffering(false); setError('Unable to play this stream in your browser.'); } };
     const url = audioFix && active.audioFixUrl ? active.audioFixUrl : active.url;
-    if (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url)) {
+    const isAdaptive = !audioFix && (active.streamType === 'hls' || /\\.m3u8(?:\\?|$)|\\.mpd(?:\\?|$)/i.test(url));
+    let shakaPlayer: any = null;
+    const setupShaka = async () => {
+      try {
+        const module = await import('shaka-player');
+        const shaka = (module as any).default || module;
+        shaka.polyfill.installAll();
+        if (disposed) return;
+        if (!shaka.Player.isBrowserSupported()) throw new Error('Unsupported browser');
+        shakaPlayer = new shaka.Player();
+        await shakaPlayer.attach(video);
+        if (disposed) { await shakaPlayer.destroy(); return; }
+        shakaRef.current = shakaPlayer;
+        shakaPlayer.configure({ streaming: { bufferingGoal: 20, rebufferingGoal: 3, bufferBehind: 20 }, abr: { enabled: true } });
+        const refreshTracks = () => {
+          if (disposed) return;
+          const languages = shakaPlayer.getVariantTracks().filter((track: any) => track.audioId != null);
+          const unique = languages.filter((track: any, i: number) => languages.findIndex((other: any) => other.audioId === track.audioId && other.language === track.language) === i);
+          setAudioTracks(unique.map((track: any) => ({ id: track.id, name: [track.language, track.label].filter(Boolean).join(' · ') || 'Audio ' + track.id })));
+          setAudioAvailable(unique.length > 1);
+          setAudioStatus(unique.length > 1 ? 'available' : 'unavailable');
+          const selected = shakaPlayer.getVariantTracks().find((track: any) => track.active);
+          if (selected) setAudio(selected.id);
+          const embedded = shakaPlayer.getTextTracks();
+          setSubtitles(previous => [
+            ...previous.filter(t => !t.url.startsWith('shaka-sub:')),
+            ...embedded.map((track: any) => ({ url: 'shaka-sub:' + track.id, label: track.label || track.language || 'Embedded subtitles', language: track.language || 'und' }))
+          ]);
+          if (embedded.length && subtitlePreference.current === 'auto' && !subtitleSelection.current) {
+            const preferred = embedded.find((track: any) => /^en(?:-|$)/i.test(track.language || '')) || embedded[0];
+            shakaPlayer.selectTextTrack(preferred);
+            shakaPlayer.setTextTrackVisibility(true);
+            subtitleSelection.current = 'shaka-sub:' + preferred.id;
+            setSelectedSubtitle(subtitleSelection.current);
+          }
+        };
+        shakaPlayer.addEventListener('trackschanged', refreshTracks);
+        shakaPlayer.addEventListener('adaptation', refreshTracks);
+        shakaPlayer.addEventListener('error', () => { if (!disposed) fail(); });
+        await shakaPlayer.load(url);
+        if (!disposed) { refreshTracks(); void video.play().catch(() => setPlaying(false)); }
+      } catch {
+        if (disposed) return;
+        if (shakaPlayer) { void shakaPlayer.destroy(); shakaPlayer = null; shakaRef.current = null; }
+        // Keep the existing HLS/native playback if Shaka fails to initialize.
+        if (active.streamType === 'hls' || /\\.m3u8(?:\\?|$)/i.test(url)) {
+          if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
+          else if (Hls.isSupported()) {
+            const fallback = new Hls({ enableWorker: true, startLevel: -1, maxBufferLength: 20 });
+            hlsRef.current = fallback;
+            fallback.loadSource(url); fallback.attachMedia(video);
+          } else fail();
+        } else video.src = url;
+        void video.play().catch(() => setPlaying(false));
+      }
+    };
+    if (isAdaptive) { void setupShaka(); }
+    else if (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url)) {
       if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
       else if (Hls.isSupported()) {
         const hls = new Hls({ enableWorker: true, startLevel: -1, maxBufferLength: 20, maxMaxBufferLength: 45, backBufferLength: 20, capLevelToPlayerSize: true, startFragPrefetch: true });
@@ -191,7 +249,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     video.addEventListener('loadedmetadata', detectNativeAudio);
     video.addEventListener('canplay', detectNativeAudio);
     video.addEventListener('error', fail);
-    video.play().catch(() => setPlaying(false));
+    if (!isAdaptive) video.play().catch(() => setPlaying(false));
     return () => {
       disposed = true;
       video.removeEventListener('loadedmetadata', detectEmbeddedSubtitles);
@@ -202,10 +260,17 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       video.removeEventListener('canplay', detectNativeAudio);
       video.removeEventListener('loadedmetadata', loaded); video.removeEventListener('loadedmetadata', detectNativeAudio); video.removeEventListener('error', fail);
       hlsRef.current?.destroy(); hlsRef.current = null;
+      if (shakaPlayer) { void shakaPlayer.destroy(); shakaPlayer = null; }
+      shakaRef.current = null;
       video.pause(); video.removeAttribute('src'); video.load();
     };
   }, [active?.id, active?.url, active?.audioFixUrl, audioFix, media.id]);
   const changeAudio = (id: number) => {
+    if (shakaRef.current) {
+      const track = shakaRef.current.getVariantTracks().find((t: any) => t.id === id);
+      if (track) { shakaRef.current.configure({ abr: { enabled: false } }); shakaRef.current.selectVariantTrack(track, true); setAudio(id); }
+      return;
+    }
     if (hlsRef.current) { hlsRef.current.audioTrack = id; setAudio(id); return; }
     const native = (videoRef.current as (HTMLVideoElement & { audioTracks?: { length: number; [index: number]: { enabled: boolean } } }) | null)?.audioTracks;
     if (native && id >= 0 && id < native.length) {
@@ -219,6 +284,12 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     subtitlePreference.current = url ? 'manual' : 'off';
     setSubtitleMode(url ? 'on' : 'off');
     subtitleSelection.current = url;
+    if (shakaRef.current) {
+      const enabled = url.startsWith('shaka-sub:');
+      const track = enabled ? shakaRef.current.getTextTracks().find((t: any) => String(t.id) === url.slice(10)) : null;
+      if (track) shakaRef.current.selectTextTrack(track);
+      shakaRef.current.setTextTrackVisibility(Boolean(track));
+    }
     if (hlsRef.current) {
       hlsRef.current.subtitleDisplay = url.startsWith('hls-sub:');
       hlsRef.current.subtitleTrack = url.startsWith('hls-sub:') ? Number(url.slice(8)) : -1;
@@ -226,7 +297,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     if (videoRef.current) for (let i = 0; i < videoRef.current.textTracks.length; i++) {
       videoRef.current.textTracks[i].mode = url === 'native-sub:' + i ? 'showing' : 'disabled';
     }
-    if (!url || url.startsWith('hls-sub:') || url.startsWith('native-sub:') || url.startsWith('blob:')) {
+    if (!url || url.startsWith('hls-sub:') || url.startsWith('native-sub:') || url.startsWith('shaka-sub:') || url.startsWith('blob:')) {
       setSelectedSubtitle(url);
       return;
     }
@@ -258,7 +329,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     }
     subtitlePreference.current = mode === 'auto' ? 'auto' : 'manual';
     subtitleSelection.current = '';
-    const available = subtitles.filter(track => track.url.startsWith('native-sub:') || track.url.startsWith('hls-sub:'));
+    const available = subtitles.filter(track => track.url.startsWith('native-sub:') || track.url.startsWith('hls-sub:') || track.url.startsWith('shaka-sub:'));
     const preferred = available.find(track => /^en(?:-|$)/i.test(track.language)) || available[0];
     if (preferred) {
       if (mode === 'auto') {
@@ -271,6 +342,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     } else {
       setSelectedSubtitle('');
       if (hlsRef.current) { hlsRef.current.subtitleTrack = -1; hlsRef.current.subtitleDisplay = false; }
+      if (shakaRef.current) shakaRef.current.setTextTrackVisibility(false);
       if (videoRef.current) Array.from(videoRef.current.textTracks).forEach(track => { track.mode = 'disabled'; });
     }
   };
@@ -305,7 +377,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         onCanPlay={() => setBuffering(false)}
         onTimeUpdate={event => { setPosition(event.currentTarget.currentTime); setDuration(event.currentTarget.duration || 0); save(); }}
         onEnded={() => { setPlaying(false); save(); }}>
-        {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
+        {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>
       {buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
       {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 p-3 text-xs text-amber-300">{error}</div>}
