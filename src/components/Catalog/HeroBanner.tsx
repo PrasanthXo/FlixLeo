@@ -11,11 +11,12 @@ interface HeroBannerProps {
   isBookmarked: boolean;
   onToggleBookmark: (media: MediaItem) => void;
   bookmarkedIds?: string[];
+  mobileHome?: boolean;
 }
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({
   media, items = [], onPlay, onOpenDetails, isBookmarked,
-  onToggleBookmark, bookmarkedIds
+  onToggleBookmark, bookmarkedIds, mobileHome = false
 }) => {
   const slides = useMemo(() => {
     const candidates = [media, ...items];
@@ -34,7 +35,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   const move = (delta: number) => setIndex(i => (i + delta + len) % len);
   const selectedSaved = bookmarkedIds ? bookmarkedIds.includes(current.id) : current.id === media.id && isBookmarked;
   return (
-    <section className="flixleo-wheel" aria-label="Featured movies and TV series">
+    <section className={`flixleo-wheel${mobileHome ? " flixleo-mobile-home-wheel" : ""}`} aria-label="Featured movies and TV series">
       <div className="flixleo-wheel-backdrop" style={{ backgroundImage: current.backdropUrl ? `url("${current.backdropUrl.replace(/"/g, '%22')}")` : undefined }} aria-hidden="true" />
       <div className="flixleo-wheel-vignette" aria-hidden="true" />
       <div className="flixleo-wheel-layout">
