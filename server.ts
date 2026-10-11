@@ -605,6 +605,17 @@ app.get('/api/tmdb/home-collections', async (_req: Request, res: Response) => {
     ...Object.entries(languages).map(([key,code]) => ({key:'language:'+key,endpoint:'/discover/movie',params:{with_original_language:code}})),
     {key:'anime:movies',endpoint:'/discover/movie',params:{with_genres:'16',with_original_language:'ja'}},
     {key:'anime:series',endpoint:'/discover/tv',params:{with_genres:'16',with_original_language:'ja'},tv:true},
+    // Tamil originals discoverable by provider in the indicated region.
+    ...([
+      {name:'Netflix',id:'8',region:'IN'},
+      {name:'STARZ',id:'43',region:'US'},
+      {name:'ZEE5',id:'232',region:'IN'}
+    ]).flatMap(provider => [
+      {key:'tamilProviderMovie:'+provider.name,endpoint:'/discover/movie',
+       params:{with_original_language:'ta',with_watch_providers:provider.id,watch_region:provider.region}},
+      {key:'tamilProviderSeries:'+provider.name,endpoint:'/discover/tv',
+       params:{with_original_language:'ta',with_watch_providers:provider.id,watch_region:provider.region},tv:true}
+    ]),
     ...Object.entries(providers).flatMap(([key,id]) => [
       {key:'providerMovie:'+key,endpoint:'/discover/movie',params:{with_watch_providers:id,watch_region:'US'}},
       {key:'providerSeries:'+key,endpoint:'/discover/tv',params:{with_watch_providers:id,watch_region:'US'},tv:true}
