@@ -26,6 +26,8 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const [error, setError] = useState('');
   const [audioTracks, setAudioTracks] = useState<{ id: number; name: string }[]>([]);
   const [audio, setAudio] = useState(-1);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
   const [subtitles, setSubtitles] = useState<Track[]>([]);
   const [selectedSubtitle, setSelectedSubtitle] = useState('');
   const [subtitleMode, setSubtitleMode] = useState<'auto' | 'on' | 'off'>('auto');
@@ -72,6 +74,9 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     const video = videoRef.current;
     if (!video || !active) return;
     let disposed = false;
+    video.muted = false;
+    video.volume = 1;
+    setMuted(false); setVolume(1);
     setError(''); setBuffering(true); setAudioTracks([]); setAudio(-1); setAudioAvailable(false); setAudioStatus('loading');
     setSubtitles(previous => previous.filter(t => !t.url.startsWith('hls-sub:') && !t.url.startsWith('native-sub:')));
     subtitlePreference.current = 'auto';
@@ -88,6 +93,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (disposed) return;
           setAudioTracks(hls.audioTracks.map((t, i) => ({ id: i, name: t.name || t.lang || 'Track ' + (i + 1) })));
+          if (hls.audioTracks.length && hls.audioTrack < 0) hls.audioTrack = 0;
           setAudio(hls.audioTrack);
           setAudioAvailable(hls.audioTracks.length > 1);
           setAudioStatus(hls.audioTracks.length > 1 ? 'available' : 'unavailable');
@@ -134,7 +140,9 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       const list = (video as HTMLVideoElement & { audioTracks?: NativeAudioTrackList }).audioTracks;
       if (list && list.length) {
         setAudioTracks(Array.from({ length: list.length }, (_, i) => ({ id: i, name: [list[i].label, list[i].language].filter(Boolean).join(' · ') || 'Track ' + (i + 1) })));
-        setAudio(Array.from({ length: list.length }, (_, i) => i).find(i => list[i].enabled) ?? 0);
+        const selectedAudio = Array.from({ length: list.length }, (_, i) => i).find(i => list[i].enabled);
+        if (selectedAudio === undefined) list[0].enabled = true;
+        setAudio(selectedAudio ?? 0);
         setAudioAvailable(list.length > 1);
         setAudioStatus(list.length > 1 ? 'available' : 'unavailable');
       } else if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
@@ -290,6 +298,14 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" onClick={() => { if (videoRef.current) videoRef.current.currentTime -= 10; }} aria-label="Rewind ten seconds"><RotateCcw /></button>
         <button type="button" onClick={() => { if (videoRef.current) videoRef.current.currentTime += 10; }} aria-label="Forward ten seconds"><RotateCw /></button>
         <span className="text-xs tabular-nums text-slate-300">{timeLabel(position)} / {timeLabel(duration)}</span>
+        <button type="button" aria-label={muted || volume === 0 ? 'Unmute' : 'Mute'} title={muted || volume === 0 ? 'Unmute' : 'Mute'} onClick={() => {
+          const v = videoRef.current; if (!v) return;
+          if (v.muted || v.volume === 0) { v.muted = false; v.volume = Math.max(v.volume, 0.7); }
+          else v.muted = true;
+          setMuted(v.muted); setVolume(v.volume);
+        }}><Volume2 className={muted || volume === 0 ? 'text-amber-400' : ''}/></button>
+        <input aria-label="Volume" title="Volume" type="range" min="0" max="1" step="0.05" value={volume}
+          className="w-16 sm:w-24 accent-amber-500" onChange={e => { const v = videoRef.current; if (!v) return; v.volume = Number(e.target.value); v.muted = false; setVolume(v.volume); setMuted(false); }} />
         <button type="button" className="ml-auto" aria-label="Fullscreen" onClick={() => videoRef.current?.requestFullscreen?.()}><Maximize /></button>
       </div>
       <div className="flex items-center gap-2">
@@ -309,6 +325,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
             {audioTracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </label>
+        <p className="text-xs text-slate-400">If picture plays without sound, try another Audio track above or choose another stream. AC-3, E-AC-3, DTS and some MKV audio are not supported in all browsers; FlixLeo cannot decode unsupported audio tracks in the browser.</p>
         {audioStatus === 'browser-limited' && <p className="text-xs text-slate-400">This browser cannot inspect or switch embedded audio tracks for this video. Multi-audio MP4/MKV files may require a compatible HLS stream or server-side remuxing.</p>}
         <div className="space-y-2">
           <span className="block text-xs text-slate-300">Subtitle display</span>
