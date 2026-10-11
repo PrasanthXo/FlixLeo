@@ -19,3 +19,7 @@
 .flixleo-mobile-collection-card-foot>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .flixleo-mobile-collection-card-foot button{width:26px;height:26px;border-radius:50%;display:flex;flex:0 0 26px;align-items:center;justify-content:center;color:white;background:#7751d9}
 }
+
+@media(max-width:640px){
+.flixleo-mobile-collection-empty{margin:5px 8px 13px;padding:19px 15px;border:1px solid #9a86fc30;border-radius:14px;background:linear-gradient(130deg,#17162d99,#0d142599);font-size:12px;color:#aab8d1}
+}
