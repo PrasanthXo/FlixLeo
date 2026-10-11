@@ -1,18 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
-import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
-type Props = { media: MediaItem; mirrors: StreamMirror[]; initialMirrorId?: string; onClose: () => void; onProgressSaved?: () => void };
+type Props = { media: MediaItem; mirrors: StreamMirror[]; initialMirrorId?: string; minimizeSignal?: number; onClose: () => void; onProgressSaved?: () => void };
 type Track = { label: string; language: string; url: string };
 const timeLabel = (n: number) => Number.isFinite(n) ? `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}` : '0:00';
 const qualitySort = (m: StreamMirror) => /4k|2160/i.test(m.quality) ? 2160 : parseInt(m.quality, 10) || 0;
 const parseSrt = (text: string) => 'WEBVTT\n\n' + text.replace(/\r/g, '').replace(/(\d\d:\d\d:\d\d),(\d\d\d)/g, '$1.$2');
 
-export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMirrorId, onClose, onProgressSaved }) => {
+export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved }) => {
   const sorted = [...mirrors].sort((a, b) => qualitySort(b) - qualitySort(a));
   const [selected, setSelected] = useState(initialMirrorId || sorted[0]?.id || '');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playerAnchor = useRef<HTMLDivElement>(null);
+  const [docked, setDocked] = useState(false);
+  useEffect(() => { if (minimizeSignal > 0) setDocked(true); }, [minimizeSignal]);
+  useEffect(() => {
+    const onScroll = () => {
+      const anchor = playerAnchor.current;
+      if (anchor && !docked && anchor.getBoundingClientRect().bottom < 0) setDocked(true);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [docked]);
   const hlsRef = useRef<Hls | null>(null);
   const uploadedRef = useRef<string | null>(null);
   const subtitleController = useRef<AbortController | null>(null);
@@ -272,13 +283,20 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     void selectSubtitle(url);
   };
   useEffect(() => () => { subtitleController.current?.abort(); if (uploadedRef.current) URL.revokeObjectURL(uploadedRef.current); }, []);
-  return <section className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700 bg-[#090b11] text-white">
+  return <section ref={playerAnchor} className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700 bg-[#090b11] text-white">
     <div className="relative min-h-32 bg-cover bg-center p-4" style={{ backgroundImage: `linear-gradient(to top, #090b11, transparent), url("${media.backdropUrl}")` }}>
-      <button type="button" onClick={() => { save(); onClose(); }} className="mb-5 rounded-full bg-slate-900/90 p-2" aria-label="Back"><ArrowLeft /></button>
+      <div className="mb-5 flex items-center justify-between gap-2">
+        <button type="button" onClick={() => { save(); onClose(); }} className="rounded-full bg-slate-900/90 p-2" aria-label="Back"><ArrowLeft /></button>
+        <button type="button" onClick={() => setDocked(true)} className="flex items-center gap-2 rounded-lg bg-slate-900/90 px-3 py-2 text-xs text-white" aria-label="Minimize player"><Minimize2 size={16} /> Mini player</button>
+      </div>
       <h2 className="text-lg font-bold">{media.title}</h2>
       <p className="text-xs text-slate-300">{media.year} · {media.duration}</p>
     </div>
-    <div className="relative aspect-video bg-black">
+    <div className={docked ? "fixed z-[80] right-3 bottom-24 md:bottom-8 w-[min(72vw,300px)] aspect-video overflow-hidden rounded-xl border border-amber-500/60 bg-black shadow-2xl" : "relative aspect-video bg-black"}>
+      {docked && <div className="absolute right-1 top-1 z-20 flex gap-1">
+        <button type="button" aria-label="Expand mini player" onClick={() => { setDocked(false); playerAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
+        <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
+      </div>}
       <video ref={videoRef} playsInline preload="metadata" className="h-full w-full object-contain"
         onPlay={() => { setPlaying(true); setBuffering(false); }}
         onPause={() => setPlaying(false)}
