@@ -1,0 +1,46 @@
+/* FlixLeo cinematic glass spotlight: scoped to catalogue only. */
+.flixleo-wheel{position:relative;isolation:isolate;overflow:hidden;min-height:490px;margin-bottom:30px;border:1px solid rgba(145,166,203,.17);border-radius:24px;background:#070b13;box-shadow:0 28px 65px #0006}
+.flixleo-wheel-backdrop{position:absolute;inset:-18px;background-size:cover;background-position:center 35%;filter:blur(13px) saturate(1.1);opacity:.7;transform:scale(1.08);transition:background-image .25s}
+.flixleo-wheel-vignette{position:absolute;inset:0;background:linear-gradient(90deg,#060b14f5 1%,#060b14dc 30%,#080d1b80 68%,#060910bb),linear-gradient(0deg,#070a11 0%,transparent 45%)}
+.flixleo-wheel-layout{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);min-height:490px;align-items:center;gap:5px;padding:35px 36px}
+.flixleo-wheel-copy{max-width:430px;min-width:0;z-index:3}
+.flixleo-wheel-kicker{font-size:12px;font-weight:800;letter-spacing:.15em;color:#9fb6d9;margin-bottom:14px}
+.flixleo-wheel-copy h1{font-size:clamp(30px,3.6vw,53px);line-height:1.06;letter-spacing:-.045em;color:white;font-weight:850;text-wrap:balance}
+.flixleo-wheel-meta{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0;color:#c2cbda;font-size:12px}
+.flixleo-wheel-summary{font-size:14px;line-height:1.65;color:#c8d0df;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;margin:12px 0 22px}
+.flixleo-wheel-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.flixleo-wheel-actions button{display:inline-flex;align-items:center;justify-content:center;gap:9px;height:45px;padding:0 18px;border-radius:999px;font-weight:750;font-size:13px;transition:transform .15s,background .15s}
+.flixleo-wheel-actions button:hover{transform:translateY(-2px)}
+.flixleo-wheel-play{background:#f9fafb;color:#080b12;box-shadow:0 0 24px #fff5}
+.flixleo-wheel-info,.flixleo-wheel-save{background:#ffffff18;color:white;border:1px solid #ffffff48;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.flixleo-wheel-save{width:45px;padding:0!important}
+.flixleo-wheel-stage{position:relative;height:355px;min-width:0;perspective:900px;touch-action:pan-y}
+.flixleo-wheel-halo{position:absolute;left:7%;right:7%;bottom:25px;height:40px;border:2px solid #4b8ffc65;border-radius:50%;box-shadow:0 0 25px #167cf077;transform:perspective(420px) rotateX(70deg);pointer-events:none}
+.flixleo-wheel-track{position:absolute;inset:0;perspective:900px;overflow:hidden}
+.flixleo-wheel-poster{position:absolute;top:13px;left:50%;width:clamp(108px,15vw,185px);height:278px;max-height:80%;padding:0;border-radius:12px;overflow:hidden;border:1px solid #ffffff44;background:#101726;transform:translateX(calc(-50% + var(--wheel-offset) * 72%)) translateZ(calc(var(--wheel-distance) * -75px)) rotateY(calc(var(--wheel-offset) * -13deg)) scale(calc(1 - var(--wheel-distance) * .08));box-shadow:0 14px 27px #000a;transition:transform .38s cubic-bezier(.2,.75,.25,1),opacity .3s,border-color .3s;will-change:transform}
+.flixleo-wheel-poster img{display:block;width:100%;height:100%;object-fit:cover}
+.flixleo-wheel-poster.is-selected{border:2px solid #82bcff;box-shadow:0 0 0 4px #477ce634,0 0 33px #3b82f69e,0 18px 35px #000b}
+.flixleo-wheel-arrow{position:absolute;top:43%;z-index:18;width:41px;height:41px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;background:#0c1626c9;border:1px solid #a1b4d466}
+.flixleo-wheel-prev{left:0}.flixleo-wheel-next{right:0}
+.flixleo-wheel-dots{position:absolute;bottom:4px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:8px}
+.flixleo-wheel-dots button{height:7px;width:7px;border-radius:999px;background:#b7c5d67a}
+.flixleo-wheel-dots button.active{width:21px;background:#72b6ff;box-shadow:0 0 10px #64a6ff}
+.flixleo-wheel :is(button):focus-visible{outline:3px solid #8dc3ff;outline-offset:4px}
+@media(max-width:750px){
+.flixleo-wheel{min-height:0;border-radius:19px}
+.flixleo-wheel-layout{display:flex;flex-direction:column-reverse;min-height:0;padding:20px 14px 23px;gap:8px}
+.flixleo-wheel-stage{width:100%;height:285px}
+.flixleo-wheel-poster{width:143px;height:220px;max-height:80%;transform:translateX(calc(-50% + var(--wheel-offset) * 65%)) translateZ(calc(var(--wheel-distance) * -75px)) rotateY(calc(var(--wheel-offset) * -12deg)) scale(calc(1 - var(--wheel-distance) * .09))}
+.flixleo-wheel-arrow{width:35px;height:35px}
+.flixleo-wheel-copy{width:100%;text-align:center}
+.flixleo-wheel-kicker{font-size:10px;margin-bottom:7px}
+.flixleo-wheel-copy h1{font-size:25px}
+.flixleo-wheel-meta{justify-content:center;margin:9px 0;font-size:11px}
+.flixleo-wheel-summary{font-size:12px;margin:8px auto 15px;-webkit-line-clamp:2}
+.flixleo-wheel-actions{justify-content:center}
+.flixleo-wheel-actions button{height:42px;font-size:12px}
+}
+.flixleo-tv .flixleo-wheel{min-height:510px}
+.flixleo-tv .flixleo-wheel-layout{min-height:510px}
+.flixleo-tv .flixleo-wheel-poster:focus,.flixleo-tv .flixleo-wheel-arrow:focus{outline:4px solid #fbbf24!important;outline-offset:4px}
+@media(prefers-reduced-motion:reduce){.flixleo-wheel-poster,.flixleo-wheel-actions button{transition:none!important}}
