@@ -607,7 +607,6 @@ app.get('/api/tmdb/home-collections', async (_req: Request, res: Response) => {
     {key:'anime:series',endpoint:'/discover/tv',params:{with_genres:'16',with_original_language:'ja'},tv:true},
     // All-language titles discoverable by provider in the indicated region.
     ...([
-      {name:'Netflix',id:'8',region:'IN'},
       {name:'STARZ',id:'43',region:'US'},
       {name:'ZEE5',id:'232',region:'IN'}
     ]).flatMap(provider => [
