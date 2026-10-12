@@ -209,8 +209,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         const result = await desktopVlc.playInVlc(source.href);
         if (!result?.ok) window.alert(result?.error || 'Unable to open VLC.');
       } else {
-        window.location.href = 'intent://' + source.href.slice('https://'.length) +
-          '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
+        window.location.href = 'flixleo-player://play?url=' + encodeURIComponent(source.href);
       }
     } catch {
       window.alert('This stream has no supported VLC playback link.');
@@ -325,7 +324,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               </div>
             )}
             <p className="md:col-span-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm font-bold text-amber-300">
-              No audio or sound not working? Use VLC Play to watch with sound. Some 4K audio formats are not supported by your browser.
+              No audio or sound not working? Use {isAndroidDevice && !desktopVlc ? "Native Play" : "VLC Play"} to watch with sound. Some 4K audio formats are not supported by your browser.
             </p>
           </div>
 
@@ -386,7 +385,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                             onClick={() => playInVlc(mirror)}
                             className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-3 text-xs font-semibold text-orange-200 disabled:opacity-40">
-                            VLC Play
+                            {isAndroidDevice && !desktopVlc ? "Native Play" : "VLC Play"}
                           </button>}
                         </div>
                       ))}
@@ -490,7 +489,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                         {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                           onClick={() => playInVlc(mirror)}
                           className="px-3 py-2 rounded-lg border border-orange-500/40 bg-orange-500/15 text-orange-200 font-semibold text-xs disabled:opacity-40">
-                          VLC Play
+                          {isAndroidDevice && !desktopVlc ? "Native Play" : "VLC Play"}
                         </button>}
                       </div>
                     </div>
