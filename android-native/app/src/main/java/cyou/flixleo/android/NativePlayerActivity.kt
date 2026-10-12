@@ -18,7 +18,7 @@ class NativePlayerActivity : Activity() {
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         val stream = intent.getStringExtra("stream_url")
         val uri = stream?.let { runCatching { Uri.parse(it) }.getOrNull() }
-        if (uri == null || uri.scheme != "https" || uri.host.isNullOrBlank() || uri.userInfo != null) {
+        if (uri == null || uri.scheme != "https" || uri.host.isNullOrBlank()) {
             Toast.makeText(this, "Invalid video stream", Toast.LENGTH_SHORT).show()
             finish()
             return
