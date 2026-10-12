@@ -395,7 +395,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         onTimeUpdate={event => { setPosition(event.currentTarget.currentTime); setDuration(event.currentTarget.duration || 0); save(); }}
         onEnded={() => { setPlaying(false); save(); onEpisodeEnded?.(); }}>
         {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
-      </video>
+      </video>}
       {buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
       {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 p-3 text-xs text-amber-300">{error}</div>}
     </div>
