@@ -1,3 +1,4 @@
+import { DesktopNativeSurface, desktopBridge } from './DesktopNativeSurface';
 import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2 } from 'lucide-react';
@@ -59,6 +60,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [subtitleLoading, setSubtitleLoading] = useState(false);
   const active = sorted.find(m => m.id === selected) || sorted[0];
+  const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
   const [vlcNotice, setVlcNotice] = useState('');
   const openInVlc = () => {
     if (!active?.url || !/^https:\/\//i.test(active.url)) {
@@ -100,7 +102,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   }, [media.id, media.type]);
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !active) return;
+    if (!video || !active || desktopNative) return;
     let disposed = false;
     video.muted = false;
     video.volume = 1;
@@ -385,7 +387,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Expand mini player" onClick={() => { setDocked(false); playerAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
-      <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
+      {desktopNative && active ? <DesktopNativeSurface key={active.id} url={active.url} /> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
         onPlay={() => { setPlaying(true); setBuffering(false); }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBuffering(true)}
