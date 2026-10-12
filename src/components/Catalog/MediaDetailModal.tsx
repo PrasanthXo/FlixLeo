@@ -192,7 +192,6 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals), ...(isSeries && selectedEpisodeNumber !== undefined ? { playbackSeason: selectedSeasonNumber, playbackEpisode: selectedEpisodeNumber } : {}) }, mirror.id);
     onClose();
   };
-  const isAndroidDevice = /Android/i.test(navigator.userAgent);
   const desktopVlc = (window as Window & { flixleoDesktop?: { playInVlc: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
   const isFlixLeoNative = /FlixLeoNative\/1\.0/i.test(navigator.userAgent);
   const canUseVlc = isFlixLeoNative || Boolean(desktopVlc);
@@ -386,7 +385,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                             onClick={() => playInVlc(mirror)}
                             className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-3 text-xs font-semibold text-orange-200 disabled:opacity-40">
-                            {isAndroidDevice && !desktopVlc ? "Native Play" : "VLC Play"}
+                            {isFlixLeoNative ? "Native Play" : "VLC Play"}
                           </button>}
                         </div>
                       ))}
@@ -490,7 +489,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                         {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                           onClick={() => playInVlc(mirror)}
                           className="px-3 py-2 rounded-lg border border-orange-500/40 bg-orange-500/15 text-orange-200 font-semibold text-xs disabled:opacity-40">
-                          {isAndroidDevice && !desktopVlc ? "Native Play" : "VLC Play"}
+                          {isFlixLeoNative ? "Native Play" : "VLC Play"}
                         </button>}
                       </div>
                     </div>
