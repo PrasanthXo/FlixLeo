@@ -22,7 +22,7 @@ internal static class FlixLeoEmbed {
     const int GWL_STYLE = -16;
     const long WS_CHILD = 0x40000000L, WS_POPUP = unchecked((long)0x80000000), WS_CAPTION = 0x00c00000L, WS_THICKFRAME = 0x00040000L;
     const uint SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010, SWP_FRAMECHANGED = 0x0020;
-    static IntPtr WindowStyle(IntPtr hwnd) => IntPtr.Size == 8 ? GetWindowLongPtr64(hwnd, GWL_STYLE) : new IntPtr(GetWindowLong32(hwnd, GWL_STYLE));
+    static IntPtr WindowStyle(IntPtr hwnd) { return IntPtr.Size == 8 ? GetWindowLongPtr64(hwnd, GWL_STYLE) : new IntPtr(GetWindowLong32(hwnd, GWL_STYLE)); }
     static void ChangeStyle(IntPtr hwnd, IntPtr style) {
         if (IntPtr.Size == 8) SetWindowLongPtr64(hwnd, GWL_STYLE, style);
         else SetWindowLong32(hwnd, GWL_STYLE, style.ToInt32());
@@ -72,5 +72,5 @@ internal static class FlixLeoEmbed {
     // P/Invoke SetParent returns null for previously unparented top-level windows even on success.
     // SetLastError(0) allows the caller to distinguish that from an actual failure.
     [DllImport("kernel32.dll", EntryPoint = "SetLastError")] static extern void SetLastErrorSafe(uint code);
-    static void SetLastErrorSafe() => SetLastErrorSafe(0);
+    static void SetLastErrorSafe() { SetLastErrorSafe(0); }
 }
