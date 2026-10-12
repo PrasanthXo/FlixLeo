@@ -22,6 +22,12 @@ jobs:
         run: npm run desktop:dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Check generated Windows executables
+        shell: pwsh
+        run: |
+          Get-ChildItem desktop-release -Recurse -File | Select-Object FullName, Length
+          $exes = @(Get-ChildItem desktop-release -Filter '*.exe' -File)
+          if ($exes.Count -lt 2) { throw "Expected installer and portable EXE but found $($exes.Count)" }
       - uses: actions/upload-artifact@v4
         with:
           name: FlixLeo-Windows
