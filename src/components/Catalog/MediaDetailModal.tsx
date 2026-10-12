@@ -189,7 +189,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     .sort((a, b) => qualityRank(b) - qualityRank(a));
   const playSelected = async (mirror: StreamMirror, originals: StreamMirror[]) => {
     if (waitingForServers) return;
-    // Windows Electron uses the installed native VLC decoder by default.
+    // Windows Electron uses its bundled mpv decoder by default.
     // Browser playback remains available for website, TV and Android.
     const desktop = (window as Window & { flixleoDesktop?: { playNative: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
     if (desktop && mirror.streamType !== 'embed-iframe') {
@@ -338,7 +338,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               </div>
             )}
             <p className="md:col-span-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm font-bold text-amber-300">
-              No audio or sound not working? Use {isFlixLeoNative ? "Native Play" : "Native Play"} to watch with sound. Some 4K audio formats are not supported by your browser.
+              No audio or sound not working? Use Native Play on Android. Some 4K audio formats are not supported by browsers.
             </p>
           </div>
 
@@ -396,7 +396,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                             <span className="break-words">{mirror.label}</span>
                             <span className="shrink-0 text-right text-amber-400">{mirror.quality}{mirror.fileSize && <span className="block text-[11px] text-slate-300">{mirror.fileSize}</span>}</span>
                           </button>
-                          {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                          {isFlixLeoNative && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                             onClick={() => playInVlc(mirror)}
                             className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-3 text-xs font-semibold text-orange-200 disabled:opacity-40">
                             {isFlixLeoNative ? "Native Play" : "Native Play"}
@@ -500,7 +500,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           <Play className="w-3.5 h-3.5 fill-current" />
                           {waitingForServers ? 'Fetching…' : 'Play'}
                         </button>
-                        {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                        {isFlixLeoNative && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                           onClick={() => playInVlc(mirror)}
                           className="px-3 py-2 rounded-lg border border-orange-500/40 bg-orange-500/15 text-orange-200 font-semibold text-xs disabled:opacity-40">
                           {isFlixLeoNative ? "Native Play" : "Native Play"}
