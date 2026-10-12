@@ -1,67 +1,109 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const WEBSITE = 'https://flixleo.cyou';
-function findVlc() {
-  const candidates = [
-    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'VideoLAN', 'VLC', 'vlc.exe'),
-    path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'VideoLAN', 'VLC', 'vlc.exe'),
-    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'VideoLAN', 'VLC', 'vlc.exe')
-  ];
-  return candidates.find(candidate => fs.existsSync(candidate));
-}
+let nativeWindow = null;
+let nativeProcess = null;
 function trusted(event) {
   try {
     const url = new URL(event.senderFrame?.url || '');
     return url.origin === WEBSITE && event.senderFrame === event.sender.mainFrame;
   } catch { return false; }
 }
-ipcMain.handle('flixleo:play-vlc', async (event, streamUrl) => {
-  if (!trusted(event)) return { ok:false, error:'Untrusted page' };
-  if (typeof streamUrl !== 'string' || streamUrl.length > 8192) return { ok:false, error:'Invalid stream' };
-  let target;
-  try { target = new URL(streamUrl); } catch { return { ok:false, error:'Invalid stream' }; }
-  if (target.protocol !== 'https:' || target.username || target.password ||
-      ['localhost', '127.0.0.1', '0.0.0.0', '[::1]'].includes(target.hostname) ||
-      /(?:^|\.)(?:local|internal|localhost)$/.test(target.hostname)) {
-    return { ok:false, error:'Unsupported stream URL' };
+function nativeExecutable() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'mpv', 'mpv.exe')
+    : path.join(__dirname, 'vendor', 'mpv', 'mpv.exe');
+}
+function stopPlayer() {
+  if (nativeProcess) {
+    try { nativeProcess.kill(); } catch {}
+    nativeProcess = null;
   }
-  const vlc = findVlc();
-  if (!vlc) return { ok:false, error:'Install VLC Media Player for Windows first.' };
+}
+function validUrl(input) {
+  if (typeof input !== 'string' || input.length > 8192) return null;
   try {
-    const child = spawn(vlc, ['--one-instance', '--playlist-enqueue', target.href], {
-      detached: true, stdio: 'ignore', windowsHide: true
+    const target = new URL(input);
+    if (target.protocol !== 'https:' || target.username || target.password ||
+      !target.hostname.includes('.') ||
+      /(?:^|\.)(?:localhost|local|internal|test)$/.test(target.hostname)) return null;
+    return target.href;
+  } catch { return null; }
+}
+ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
+  if (!trusted(event)) return { ok:false, error:'Untrusted page' };
+  const url = validUrl(streamUrl);
+  if (!url) return { ok:false, error:'Unsupported stream URL' };
+  const executable = nativeExecutable();
+  if (!fs.existsSync(executable)) return { ok:false, error:'Built-in native player is missing. Install the updated FlixLeo Windows version.' };
+  if (nativeWindow && !nativeWindow.isDestroyed()) nativeWindow.close();
+  stopPlayer();
+  const win = new BrowserWindow({
+    width: 1200, height: 740, minWidth: 640, minHeight: 380,
+    title: 'FlixLeo · Native Player', backgroundColor: '#000000',
+    autoHideMenuBar: true,
+    webPreferences: { nodeIntegration:false, contextIsolation:true, sandbox:true }
+  });
+  nativeWindow = win;
+  win.setMenuBarVisibility(false);
+  const handle = win.getNativeWindowHandle();
+  const id = process.platform === 'win32'
+    ? (process.arch === 'x64' ? handle.readBigUInt64LE(0) : BigInt(handle.readUInt32LE(0))).toString()
+    : '';
+  if (!id) { win.close(); return { ok:false, error:'Embedded video is available on Windows only.' }; }
+  win.on('closed', () => { if (nativeWindow === win) nativeWindow = null; stopPlayer(); });
+  win.loadURL('data:text/html,<html><body style="margin:0;background:black"></body></html>');
+  const args = [
+    '--no-config', '--no-terminal', '--force-window=yes', '--idle=no',
+    '--keep-open=no', '--osc=yes', '--input-default-bindings=yes',
+    '--hwdec=auto-safe', '--audio-display=no', '--border=no',
+    '--wid=' + id, '--title=FlixLeo Native Player',
+    '--user-agent=FlixLeoDesktop/1.0', '--', url
+  ];
+  try {
+    const proc = spawn(executable, args, {
+      windowsHide: true, stdio: 'ignore', cwd: path.dirname(executable)
     });
-    child.on('error', () => {});
-    child.unref();
+    nativeProcess = proc;
+    proc.on('error', () => {
+      if (!win.isDestroyed()) dialog.showMessageBox(win, {
+        type:'error', title:'FlixLeo Native Player',
+        message:'Could not start the bundled native player.' });
+    });
+    proc.on('exit', () => { if (!win.isDestroyed()) win.close(); });
+    win.show();
+    win.focus();
     return { ok:true };
-  } catch { return { ok:false, error:'Could not start VLC.' }; }
+  } catch {
+    if (!win.isDestroyed()) win.close();
+    return { ok:false, error:'Unable to start native playback.' };
+  }
 });
 function createWindow() {
   const win = new BrowserWindow({
     width: 1380, height: 850, minWidth: 850, minHeight: 560,
-    title: 'FlixLeo',
-    backgroundColor: '#080a0f',
+    title:'FlixLeo', backgroundColor:'#080a0f',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
-      contextIsolation: true, sandbox: true, nodeIntegration: false,
-      webSecurity: true
+      preload:path.join(__dirname,'preload.cjs'),
+      contextIsolation:true, sandbox:true, nodeIntegration:false, webSecurity:true
     }
   });
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  win.webContents.setWindowOpenHandler(({url})=>{
     if (/^https:\/\//i.test(url)) shell.openExternal(url);
-    return { action: 'deny' };
+    return {action:'deny'};
   });
-  win.webContents.on('will-navigate', (event, url) => {
-    try { if (new URL(url).origin !== WEBSITE) { event.preventDefault(); shell.openExternal(url); } }
-    catch { event.preventDefault(); }
+  win.webContents.on('will-navigate',(event,url)=>{
+    try {
+      if (new URL(url).origin!==WEBSITE) { event.preventDefault(); shell.openExternal(url); }
+    } catch { event.preventDefault(); }
   });
   win.loadURL(WEBSITE);
 }
-app.whenReady().then(() => {
+app.whenReady().then(()=>{
   createWindow();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)createWindow()});
 });
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed',()=>{stopPlayer();if(process.platform!=='darwin')app.quit()});
