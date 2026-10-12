@@ -194,7 +194,8 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   };
   const isAndroidDevice = /Android/i.test(navigator.userAgent);
   const desktopVlc = (window as Window & { flixleoDesktop?: { playInVlc: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
-  const canUseVlc = isAndroidDevice || Boolean(desktopVlc);
+  const isFlixLeoNative = /FlixLeoNative\/1\.0/i.test(navigator.userAgent);
+  const canUseVlc = isFlixLeoNative || Boolean(desktopVlc);
   const playInVlc = async (mirror: StreamMirror) => {
     // External VLC invocation is supported only on Android. Desktop browsers
     // cannot securely hand off a private media URL to VLC without exposing it.
@@ -324,7 +325,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               </div>
             )}
             <p className="md:col-span-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm font-bold text-amber-300">
-              No audio or sound not working? Use {isAndroidDevice && !desktopVlc ? "Native Play" : "VLC Play"} to watch with sound. Some 4K audio formats are not supported by your browser.
+              No audio or sound not working? Use {isFlixLeoNative ? "Native Play" : "VLC Play"} to watch with sound. Some 4K audio formats are not supported by your browser.
             </p>
           </div>
 
