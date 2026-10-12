@@ -1,9 +1,13 @@
 package cyou.flixleo.android
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import android.os.Bundle
 import android.view.View
 import android.webkit.CookieManager
@@ -22,6 +26,9 @@ class MainActivity : Activity() {
     private var fileCallback: android.webkit.ValueCallback<Array<Uri>>? = null
     private val fileRequestCode = 450
     private val home = "https://flixleo.cyou/"
+    private var lastPolicyCheck = 0L
+    private var blockingDialog: AlertDialog? = null
+    private var lastOptionalVersion = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +88,80 @@ class MainActivity : Activity() {
         }
         if (savedInstanceState != null) browser.restoreState(savedInstanceState)
         else browser.loadUrl(home)
+        checkUpdatePolicy()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::browser.isInitialized && System.currentTimeMillis() - lastPolicyCheck > 60L * 60 * 1000) {
+            checkUpdatePolicy()
+        }
+    }
+
+    private fun checkUpdatePolicy() {
+        if (System.currentTimeMillis() - lastPolicyCheck < 30_000) return
+        lastPolicyCheck = System.currentTimeMillis()
+        Thread {
+            var conn: HttpURLConnection? = null
+            try {
+                conn = (URL(home + "api/gateway/v1/check/flixleo-android?versionCode=1").openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 5000
+                    readTimeout = 5000
+                    requestMethod = "GET"
+                }
+                if (conn.responseCode != 200) return@Thread
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val response = JSONObject(body)
+                val policy = response.optJSONObject("policy") ?: return@Thread
+                val latest = policy.optInt("latestVersionCode", 1)
+                val minimum = policy.optInt("minVersionCode", 0)
+                val forced = policy.optBoolean("forceUpdate", false) && 1 < minimum
+                val optional = policy.optBoolean("updateAvailable", false) && latest > 1
+                val maintenance = policy.optBoolean("maintenance", false)
+                val url = policy.optString("updateUrl", "")
+                val notes = policy.optString("notes", "")
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    if (forced) {
+                        blockingDialog?.dismiss()
+                        blockingDialog = AlertDialog.Builder(this)
+                            .setTitle("FlixLeo update required")
+                            .setMessage(if (notes.isBlank()) "Please update FlixLeo to continue." else notes)
+                            .setCancelable(false)
+                            .setPositiveButton("Update") { _, _ -> openUpdatePage(url); blockingDialog = null; checkUpdatePolicy() }
+                            .create()
+                        blockingDialog?.show()
+                    } else if (maintenance) {
+                        blockingDialog?.dismiss()
+                        blockingDialog = AlertDialog.Builder(this)
+                            .setTitle("FlixLeo maintenance")
+                            .setMessage(policy.optString("maintenanceMessage", "Service is temporarily unavailable."))
+                            .setCancelable(false)
+                            .setPositiveButton("Retry") { _, _ -> blockingDialog = null; lastPolicyCheck = 0; checkUpdatePolicy() }
+                            .create()
+                        blockingDialog?.show()
+                    } else if (optional && latest != lastOptionalVersion) {
+                        lastOptionalVersion = latest
+                        AlertDialog.Builder(this)
+                            .setTitle("FlixLeo update available")
+                            .setMessage(notes.ifBlank { "Version " + policy.optString("latestVersionName") + " is available." })
+                            .setPositiveButton("Update") { _, _ -> openUpdatePage(url) }
+                            .setNegativeButton("Later", null)
+                            .show()
+                    }
+                }
+            } catch (_: Exception) {
+                // Network failure never blocks installed versions.
+            } finally { conn?.disconnect() }
+        }.start()
+    }
+
+    private fun openUpdatePage(link: String) {
+        try {
+            val uri = Uri.parse(link)
+            if (uri.scheme != "https" || uri.host.isNullOrBlank()) return
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (_: Exception) { }
     }
 
     private fun handleUrl(url: String): Boolean {
