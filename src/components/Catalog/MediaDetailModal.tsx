@@ -192,16 +192,28 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals), ...(isSeries && selectedEpisodeNumber !== undefined ? { playbackSeason: selectedSeasonNumber, playbackEpisode: selectedEpisodeNumber } : {}) }, mirror.id);
     onClose();
   };
-  const playInVlc = (mirror: StreamMirror) => {
+  const isAndroidDevice = /Android/i.test(navigator.userAgent);
+  const playInVlc = async (mirror: StreamMirror) => {
     try {
       const source = new URL(mirror.url);
-      if (source.protocol !== 'https:' || source.username || source.password || mirror.streamType === 'embed-iframe') {
+      if (!['https:', 'http:'].includes(source.protocol) || source.username || source.password || mirror.streamType === 'embed-iframe') {
         window.alert('This source cannot be opened directly in VLC.');
         return;
       }
-      const intent = 'intent://' + source.href.slice('https://'.length) +
-        '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
-      window.location.href = intent;
+      if (isAndroidDevice) {
+        const intent = 'intent://' + source.href.replace(/^https?:\\/\\//, '') +
+          '#Intent;scheme=' + source.protocol.slice(0, -1) + ';package=org.videolan.vlc;type=video/*;end';
+        window.location.href = intent;
+        return;
+      }
+      // Desktop browsers cannot launch VLC via Android intent: URLs. Provide an
+      // explicit network-stream handoff without exposing the URL in the page.
+      try {
+        await navigator.clipboard.writeText(source.href);
+        window.alert('Stream link copied. Open VLC on your computer, press Ctrl+N (Media > Open Network Stream), paste with Ctrl+V, and click Play.');
+      } catch {
+        window.alert('Your browser blocked copying the stream link. Allow clipboard permission, then try VLC Play again.');
+      }
     } catch {
       window.alert('This stream has no supported VLC playback link.');
     }
@@ -376,7 +388,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                             onClick={() => playInVlc(mirror)}
                             className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-3 text-xs font-semibold text-orange-200 disabled:opacity-40">
-                            VLC Play
+                            {isAndroidDevice ? 'VLC Play' : 'Copy for VLC'}
                           </button>
                         </div>
                       ))}
@@ -480,7 +492,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                         <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                           onClick={() => playInVlc(mirror)}
                           className="px-3 py-2 rounded-lg border border-orange-500/40 bg-orange-500/15 text-orange-200 font-semibold text-xs disabled:opacity-40">
-                          VLC Play
+                          {isAndroidDevice ? 'VLC Play' : 'Copy for VLC'}
                         </button>
                       </div>
                     </div>
