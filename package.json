@@ -65,12 +65,15 @@
             "x64"
           ]
         }
-      ],
-      "artifactName": "FlixLeo-${version}-${arch}.${ext}"
+      ]
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "FlixLeo-Setup-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "FlixLeo-Portable-${version}-${arch}.${ext}"
     }
   },
   "main": "desktop/main.cjs",
