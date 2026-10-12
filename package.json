@@ -1,14 +1,16 @@
 {
-  "name": "react-example",
+  "name": "flixleo",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
     "start": "tsx server.ts",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "desktop": "electron desktop/main.cjs",
+    "desktop:dist": "electron-builder --win nsis portable --x64"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -34,6 +36,41 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
-    "@types/express": "^4.17.21"
+    "@types/express": "^4.17.21",
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "description": "FlixLeo Windows desktop app and web platform",
+  "build": {
+    "appId": "cyou.flixleo.desktop",
+    "productName": "FlixLeo",
+    "directories": {
+      "output": "desktop-release"
+    },
+    "files": [
+      "desktop/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "FlixLeo-${version}-${arch}-${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
