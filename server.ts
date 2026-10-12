@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import updateGateway from './server/updateGateway';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -15,6 +16,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(updateGateway);
 
 // Private FlixLeo admin API. Credentials must only be configured in Render.
 // Never use the public anon key for privileged Supabase Auth operations.
