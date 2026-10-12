@@ -7,6 +7,7 @@ const WEBSITE = 'https://flixleo.cyou';
 let mainWindow = null;
 let playing = false;
 let previousUrl = WEBSITE;
+let lastBounds = null;
 let nativeProcess = null;
 let embedProcess = null;
 function trusted(event) {
@@ -43,7 +44,6 @@ function backToFlixLeo() {
   stopPlayer();
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.setTitle('FlixLeo');
-  mainWindow.loadURL(previousUrl.startsWith(WEBSITE) ? previousUrl : WEBSITE);
 }
 ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
   if (!trusted(event)) return { ok:false, error:'Untrusted page' };
@@ -57,11 +57,8 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
   // mpv --wid paints in the EXISTING native window. Chromium must release its
   // compositor surface first or users can hear audio while seeing black video.
   stopPlayer();
-  previousUrl = win.webContents.getURL() || WEBSITE;
   playing = true;
-  win.setTitle('FlixLeo · Native Player — Alt+Left to return');
-  await win.loadURL('data:text/html,<html><body style="background:#000;margin:0"></body></html>');
-  if (win.isDestroyed() || !playing) return { ok:false, error:'Playback cancelled' };
+  win.setTitle('FlixLeo');
   const handle = win.getNativeWindowHandle();
   const id = process.arch === 'x64'
     ? handle.readBigUInt64LE(0).toString()
@@ -81,9 +78,10 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
     const proc = spawn(executable, args, { windowsHide:true, stdio:'ignore', cwd:path.dirname(executable) });
     nativeProcess = proc;
     const helperProc = spawn(helper, [id, String(proc.pid)], {
-      windowsHide:true, stdio:['ignore', 'pipe', 'pipe']
+      windowsHide:true, stdio:['pipe', 'pipe', 'pipe']
     });
     embedProcess = helperProc;
+    if (lastBounds) helperProc.stdin.write(lastBounds.join(',') + '\n');
     let embedded = false;
     helperProc.stdout.on('data', chunk => {
       if (String(chunk).includes('EMBEDDED')) embedded = true;
@@ -105,8 +103,15 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
   }
 });
 ipcMain.handle('flixleo:stop-native', (event) => {
-  if (event.sender !== mainWindow?.webContents) return false;
+  if (!trusted(event)) return false;
   backToFlixLeo();
+  return true;
+});
+ipcMain.handle('flixleo:position-native', (event, bounds) => {
+  if (!trusted(event) || !Array.isArray(bounds) || bounds.length !== 4 ||
+      !bounds.every(x => Number.isFinite(x) && x >= 0 && x < 20000)) return false;
+  lastBounds = bounds.map(Math.round);
+  if (embedProcess?.stdin?.writable) embedProcess.stdin.write(lastBounds.join(',') + '\n');
   return true;
 });
 function createWindow() {
