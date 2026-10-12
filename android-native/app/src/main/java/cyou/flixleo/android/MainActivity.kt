@@ -102,10 +102,9 @@ class MainActivity : Activity() {
             val target = parsed.data ?: return true
             if (target.scheme != "https" || target.host.isNullOrBlank()) return true
             val vlcIntent = Intent(Intent.ACTION_VIEW).apply {
-                data = target
+                setDataAndType(target, "video/*")
                 setPackage("org.videolan.vlc")
                 addCategory(Intent.CATEGORY_BROWSABLE)
-                type = "video/*"
             }
             startActivity(vlcIntent)
         } catch (_: ActivityNotFoundException) {
