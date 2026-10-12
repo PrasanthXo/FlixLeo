@@ -28,6 +28,7 @@ class MainActivity : Activity() {
     private val home = "https://flixleo.cyou/"
     private var lastPolicyCheck = 0L
     private var blockingDialog: AlertDialog? = null
+    private var updateBlocked = false
     private var lastOptionalVersion = 0
     private val shownNotices = mutableSetOf<String>()
 
@@ -130,7 +131,7 @@ class MainActivity : Activity() {
                             .setTitle("FlixLeo update required")
                             .setMessage(if (notes.isBlank()) "Please update FlixLeo to continue." else notes)
                             .setCancelable(false)
-                            .setPositiveButton("Update") { _, _ -> openUpdatePage(url); blockingDialog = null; checkUpdatePolicy() }
+                            .setPositiveButton("Update") { _, _ -> openUpdatePage(url); lastPolicyCheck = 0; checkUpdatePolicy() }
                             .create()
                         blockingDialog?.show()
                     } else if (maintenance) {
@@ -139,7 +140,7 @@ class MainActivity : Activity() {
                             .setTitle("FlixLeo maintenance")
                             .setMessage(policy.optString("maintenanceMessage", "Service is temporarily unavailable."))
                             .setCancelable(false)
-                            .setPositiveButton("Retry") { _, _ -> blockingDialog = null; lastPolicyCheck = 0; checkUpdatePolicy() }
+                            .setPositiveButton("Retry") { _, _ -> lastPolicyCheck = 0; checkUpdatePolicy() }
                             .create()
                         blockingDialog?.show()
                     } else if (optional && latest != lastOptionalVersion) {
