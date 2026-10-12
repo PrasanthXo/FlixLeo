@@ -56,13 +56,28 @@ internal static class FlixLeoEmbed {
                 ShowWindow(child, 5);
                 Console.WriteLine("EMBEDDED");
                 Console.Out.Flush();
+                int px = 0, py = 0, pw = 1280, ph = 720;
+                var updates = new System.Collections.Concurrent.ConcurrentQueue<string>();
+                var reader = new Thread(() => {
+                    try { string line; while ((line = Console.ReadLine()) != null) updates.Enqueue(line); }
+                    catch {}
+                });
+                reader.IsBackground = true;
+                reader.Start();
                 while (IsWindow(parent) && IsWindow(child) && !process.HasExited) {
-                    Rect rect;
-                    if (GetClientRect(parent, out rect)) {
-                        SetWindowPos(child, IntPtr.Zero, 0, 0, Math.Max(1, rect.right - rect.left),
-                            Math.Max(1, rect.bottom - rect.top), SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                    string line;
+                    while (updates.TryDequeue(out line)) {
+                        var parts = line.Split(',');
+                        int x, y, w, h;
+                        if (parts.Length == 4 && int.TryParse(parts[0], out x) &&
+                            int.TryParse(parts[1], out y) && int.TryParse(parts[2], out w) &&
+                            int.TryParse(parts[3], out h)) {
+                            px = Math.Max(0, x); py = Math.Max(0, y);
+                            pw = Math.Max(1, w); ph = Math.Max(1, h);
+                        }
                     }
-                    Thread.Sleep(250);
+                    SetWindowPos(child, IntPtr.Zero, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                    Thread.Sleep(100);
                 }
                 return 0;
             }
