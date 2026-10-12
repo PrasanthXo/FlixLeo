@@ -72,10 +72,12 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
       {row.list.length === 0 ? <p className="flixleo-mobile-collection-empty">No titles available in this collection right now.</p> : <div className="flixleo-mobile-collection-scroll">
         {row.list.map(item => {
           return <div className="flixleo-mobile-collection-card relative" key={item.id}>
+            <div className="flixleo-mobile-collection-poster-wrap">
             <button type="button" onClick={() => onOpen(item)} aria-label={`More about ${item.title}`} className="flixleo-mobile-collection-poster">
               <TmdbArtwork media={item} kind="poster" alt={item.title} loading="lazy" referrerPolicy="no-referrer" className="flixleo-mobile-collection-artwork"/>
             </button>
-            <PosterOptions media={item} onOpen={onOpen} isBookmarked={bookmarkedIds.includes(item.id)} onToggleBookmark={onToggleBookmark} />
+            <PosterOptions media={item} onOpen={onOpen} isBookmarked={bookmarkedIds.includes(item.id)} onToggleBookmark={onToggleBookmark} className="flixleo-mobile-poster-options" />
+            </div>
             <div className="flixleo-mobile-collection-card-foot"><span title={item.title}>{item.title}</span><button type="button" onClick={() => onPlay(item)} aria-label={`Play ${item.title}`}><Play size={12} fill="currentColor"/></button></div>
           </div>;
         })}
