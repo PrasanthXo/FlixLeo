@@ -32,6 +32,7 @@ class MainActivity : Activity() {
         frame.addView(browser, FrameLayout.LayoutParams(-1, -1))
         setContentView(frame)
         browser.settings.apply {
+            userAgentString = userAgentString + " FlixLeoNative/1.0"
             javaScriptEnabled = true
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
