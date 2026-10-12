@@ -193,18 +193,25 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     onClose();
   };
   const isAndroidDevice = /Android/i.test(navigator.userAgent);
-  const playInVlc = (mirror: StreamMirror) => {
+  const desktopVlc = (window as Window & { flixleoDesktop?: { playInVlc: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
+  const canUseVlc = isAndroidDevice || Boolean(desktopVlc);
+  const playInVlc = async (mirror: StreamMirror) => {
     // External VLC invocation is supported only on Android. Desktop browsers
     // cannot securely hand off a private media URL to VLC without exposing it.
-    if (!isAndroidDevice) return;
+    if (!canUseVlc) return;
     try {
       const source = new URL(mirror.url);
       if (source.protocol !== 'https:' || source.username || source.password || mirror.streamType === 'embed-iframe') {
         window.alert('This source cannot be opened directly in VLC.');
         return;
       }
-      window.location.href = 'intent://' + source.href.slice('https://'.length) +
-        '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
+      if (desktopVlc) {
+        const result = await desktopVlc.playInVlc(source.href);
+        if (!result?.ok) window.alert(result?.error || 'Unable to open VLC.');
+      } else {
+        window.location.href = 'intent://' + source.href.slice('https://'.length) +
+          '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
+      }
     } catch {
       window.alert('This stream has no supported VLC playback link.');
     }
@@ -376,7 +383,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                             <span className="break-words">{mirror.label}</span>
                             <span className="shrink-0 text-right text-amber-400">{mirror.quality}{mirror.fileSize && <span className="block text-[11px] text-slate-300">{mirror.fileSize}</span>}</span>
                           </button>
-                          {isAndroidDevice && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                          {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                             onClick={() => playInVlc(mirror)}
                             className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-3 text-xs font-semibold text-orange-200 disabled:opacity-40">
                             VLC Play
@@ -480,7 +487,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           <Play className="w-3.5 h-3.5 fill-current" />
                           {waitingForServers ? 'Fetching…' : 'Play'}
                         </button>
-                        {isAndroidDevice && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                        {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                           onClick={() => playInVlc(mirror)}
                           className="px-3 py-2 rounded-lg border border-orange-500/40 bg-orange-500/15 text-orange-200 font-semibold text-xs disabled:opacity-40">
                           VLC Play
