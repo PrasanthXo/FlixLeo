@@ -1,3 +1,4 @@
+import { DesktopNativeSurface, desktopBridge } from './DesktopNativeSurface';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { StremioNativePlayer } from './StremioNativePlayer';
@@ -34,6 +35,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const hlsRef = useRef<Hls | null>(null);
   const lastSaveRef = useRef(0);
   const active = mirrors[index];
+  const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
   useEffect(() => {
     const anchor = playerAnchorRef.current;
     if (!anchor || typeof IntersectionObserver === 'undefined') return;
@@ -89,6 +91,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     setSelectedQuality(-1);
     if (!active) return;
     onMirrorChange?.(active);
+    if (desktopNative) { setReady(true); return; }
     if (active.streamType === 'embed-iframe') {
       setReady(true);
       return;
@@ -188,6 +191,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       <div className={docked ? "fixed z-[65] right-3 bottom-28 md:bottom-8 w-[min(60vw,240px)] md:w-80 aspect-video rounded-xl overflow-hidden border border-amber-500/60 shadow-2xl bg-black" : "tv6-cinema-frame aspect-video w-full bg-black relative"}>
         {docked && <div className="absolute z-20 right-1 top-1 flex gap-1"><button type="button" onClick={() => { setDocked(false); playerAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
+          : desktopNative ? <DesktopNativeSurface key={active.id} url={active.url} />
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
             : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); onEpisodeEnded?.(); }} className="h-full w-full object-contain" />}
