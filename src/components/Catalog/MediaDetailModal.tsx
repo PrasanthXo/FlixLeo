@@ -191,14 +191,14 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     if (waitingForServers) return;
     // Windows Electron uses the installed native VLC decoder by default.
     // Browser playback remains available for website, TV and Android.
-    const desktop = (window as Window & { flixleoDesktop?: { playInVlc: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
+    const desktop = (window as Window & { flixleoDesktop?: { playNative: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
     if (desktop && mirror.streamType !== 'embed-iframe') {
       try {
         const url = new URL(mirror.url);
         if (url.protocol === 'https:' && !url.username && !url.password) {
-          const result = await desktop.playInVlc(url.href);
+          const result = await desktop.playNative(url.href);
           if (result?.ok) { onClose(); return; }
-          window.alert(result?.error || 'Native playback failed. Use the browser player if VLC is unavailable.');
+          window.alert(result?.error || 'Native playback failed. Try another stream if the native decoder cannot play this source.');
           return;
         }
       } catch { /* Continue with web player if no valid direct media URL exists. */ }
@@ -206,7 +206,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals), ...(isSeries && selectedEpisodeNumber !== undefined ? { playbackSeason: selectedSeasonNumber, playbackEpisode: selectedEpisodeNumber } : {}) }, mirror.id);
     onClose();
   };
-  const desktopVlc = (window as Window & { flixleoDesktop?: { playInVlc: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
+  const desktopVlc = (window as Window & { flixleoDesktop?: { playNative: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
   const isFlixLeoNative = /FlixLeoNative\/1\.0/i.test(navigator.userAgent);
   const canUseVlc = isFlixLeoNative || Boolean(desktopVlc);
   const playInVlc = async (mirror: StreamMirror) => {
@@ -220,7 +220,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         return;
       }
       if (desktopVlc) {
-        const result = await desktopVlc.playInVlc(source.href);
+        const result = await desktopVlc.playNative(source.href);
         if (!result?.ok) window.alert(result?.error || 'Unable to open VLC.');
       } else {
         window.location.href = 'flixleo-player://play?url=' + encodeURIComponent(source.href);
@@ -338,7 +338,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               </div>
             )}
             <p className="md:col-span-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm font-bold text-amber-300">
-              No audio or sound not working? Use {isFlixLeoNative ? "Native Play" : "VLC Play"} to watch with sound. Some 4K audio formats are not supported by your browser.
+              No audio or sound not working? Use {isFlixLeoNative ? "Native Play" : "Native Play"} to watch with sound. Some 4K audio formats are not supported by your browser.
             </p>
           </div>
 
@@ -399,7 +399,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                             onClick={() => playInVlc(mirror)}
                             className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-3 text-xs font-semibold text-orange-200 disabled:opacity-40">
-                            {isFlixLeoNative ? "Native Play" : "VLC Play"}
+                            {isFlixLeoNative ? "Native Play" : "Native Play"}
                           </button>}
                         </div>
                       ))}
@@ -503,7 +503,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                         {canUseVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                           onClick={() => playInVlc(mirror)}
                           className="px-3 py-2 rounded-lg border border-orange-500/40 bg-orange-500/15 text-orange-200 font-semibold text-xs disabled:opacity-40">
-                          {isFlixLeoNative ? "Native Play" : "VLC Play"}
+                          {isFlixLeoNative ? "Native Play" : "Native Play"}
                         </button>}
                       </div>
                     </div>
