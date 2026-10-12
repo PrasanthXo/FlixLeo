@@ -35,6 +35,15 @@ jobs:
           if (-not $exe) { throw 'mpv executable missing from downloaded build' }
           if ($exe.DirectoryName -ne (Resolve-Path desktop/vendor/mpv).Path) { Copy-Item $exe.FullName desktop/vendor/mpv/mpv.exe -Force }
           Write-Host 'Bundled mpv SHA256 validated.'
+      - name: Compile Windows in-app video embedding helper
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $compiler = "$env:WINDIR\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe"
+          if (-not (Test-Path $compiler)) { throw 'Windows .NET Framework C# compiler not found' }
+          & $compiler /nologo /target:exe /platform:x64 /out:desktop/vendor/mpv/FlixLeoEmbed.exe desktop/win32/FlixLeoEmbed.cs
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to compile FlixLeo native embedding helper' }
+          if (-not (Test-Path desktop/vendor/mpv/FlixLeoEmbed.exe)) { throw 'Embedding helper missing' }
       - name: Package installer and portable Windows app
         run: npm run desktop:dist
         env:
