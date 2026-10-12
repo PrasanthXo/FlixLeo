@@ -8,6 +8,7 @@ let mainWindow = null;
 let playing = false;
 let previousUrl = WEBSITE;
 let nativeProcess = null;
+let embedProcess = null;
 function trusted(event) {
   try {
     const url = new URL(event.senderFrame?.url || '');
@@ -20,6 +21,7 @@ function nativeExecutable() {
     : path.join(__dirname, 'vendor', 'mpv', 'mpv.exe');
 }
 function stopPlayer() {
+  if (embedProcess) { try { embedProcess.kill(); } catch {} embedProcess = null; }
   if (nativeProcess) {
     try { nativeProcess.kill(); } catch {}
     nativeProcess = null;
@@ -64,16 +66,35 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
   const id = process.arch === 'x64'
     ? handle.readBigUInt64LE(0).toString()
     : String(handle.readUInt32LE(0));
+  const helper = app.isPackaged
+    ? path.join(process.resourcesPath, 'mpv', 'FlixLeoEmbed.exe')
+    : path.join(__dirname, 'vendor', 'mpv', 'FlixLeoEmbed.exe');
+  if (!fs.existsSync(helper)) { backToFlixLeo(); return { ok:false, error:'FlixLeo video embedding component is missing.' }; }
   const args = [
     '--no-config', '--no-terminal', '--force-window=yes', '--idle=no',
     '--keep-open=no', '--osc=yes', '--input-default-bindings=yes',
-    '--hwdec=auto-safe', '--border=no', '--wid=' + id,
+    '--hwdec=auto-safe', '--border=no', '--geometry=1280x720',
     '--title=FlixLeo Native Player', '--user-agent=FlixLeoDesktop/1.0',
     '--', url
   ];
   try {
     const proc = spawn(executable, args, { windowsHide:true, stdio:'ignore', cwd:path.dirname(executable) });
     nativeProcess = proc;
+    const helperProc = spawn(helper, [id, String(proc.pid)], {
+      windowsHide:true, stdio:['ignore', 'pipe', 'pipe']
+    });
+    embedProcess = helperProc;
+    let embedded = false;
+    helperProc.stdout.on('data', chunk => {
+      if (String(chunk).includes('EMBEDDED')) embedded = true;
+    });
+    helperProc.on('exit', code => {
+      if (!embedded && nativeProcess === proc && playing) {
+        backToFlixLeo();
+        dialog.showMessageBox(win, { type:'error', title:'FlixLeo video',
+          message:'The native video window could not be embedded (code ' + code + ').' });
+      }
+    });
     proc.on('error', () => { backToFlixLeo(); });
     proc.on('exit', () => { if (nativeProcess === proc) backToFlixLeo(); });
     win.focus();
@@ -104,6 +125,7 @@ function createWindow() {
       backToFlixLeo();
     }
   });
+  win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(({url})=>{
     if (/^https:\/\//i.test(url)) shell.openExternal(url);
     return {action:'deny'};
