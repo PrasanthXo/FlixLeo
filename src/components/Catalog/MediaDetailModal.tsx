@@ -193,27 +193,18 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     onClose();
   };
   const isAndroidDevice = /Android/i.test(navigator.userAgent);
-  const playInVlc = async (mirror: StreamMirror) => {
+  const playInVlc = (mirror: StreamMirror) => {
+    // External VLC invocation is supported only on Android. Desktop browsers
+    // cannot securely hand off a private media URL to VLC without exposing it.
+    if (!isAndroidDevice) return;
     try {
       const source = new URL(mirror.url);
-      if (!['https:', 'http:'].includes(source.protocol) || source.username || source.password || mirror.streamType === 'embed-iframe') {
+      if (source.protocol !== 'https:' || source.username || source.password || mirror.streamType === 'embed-iframe') {
         window.alert('This source cannot be opened directly in VLC.');
         return;
       }
-      if (isAndroidDevice) {
-        const intent = 'intent://' + source.href.replace(/^https?:\\/\\//, '') +
-          '#Intent;scheme=' + source.protocol.slice(0, -1) + ';package=org.videolan.vlc;type=video/*;end';
-        window.location.href = intent;
-        return;
-      }
-      // Desktop browsers cannot launch VLC via Android intent: URLs. Provide an
-      // explicit network-stream handoff without exposing the URL in the page.
-      try {
-        await navigator.clipboard.writeText(source.href);
-        window.alert('Stream link copied. Open VLC on your computer, press Ctrl+N (Media > Open Network Stream), paste with Ctrl+V, and click Play.');
-      } catch {
-        window.alert('Your browser blocked copying the stream link. Allow clipboard permission, then try VLC Play again.');
-      }
+      window.location.href = 'intent://' + source.href.slice('https://'.length) +
+        '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
     } catch {
       window.alert('This stream has no supported VLC playback link.');
     }
@@ -385,11 +376,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                             <span className="break-words">{mirror.label}</span>
                             <span className="shrink-0 text-right text-amber-400">{mirror.quality}{mirror.fileSize && <span className="block text-[11px] text-slate-300">{mirror.fileSize}</span>}</span>
                           </button>
-                          <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                          {isAndroidDevice && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                             onClick={() => playInVlc(mirror)}
                             className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-3 text-xs font-semibold text-orange-200 disabled:opacity-40">
-                            {isAndroidDevice ? 'VLC Play' : 'Copy for VLC'}
-                          </button>
+                            VLC Play
+                          </button>}
                         </div>
                       ))}
                     </div>
@@ -489,11 +480,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           <Play className="w-3.5 h-3.5 fill-current" />
                           {waitingForServers ? 'Fetching…' : 'Play'}
                         </button>
-                        <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                        {isAndroidDevice && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                           onClick={() => playInVlc(mirror)}
                           className="px-3 py-2 rounded-lg border border-orange-500/40 bg-orange-500/15 text-orange-200 font-semibold text-xs disabled:opacity-40">
-                          {isAndroidDevice ? 'VLC Play' : 'Copy for VLC'}
-                        </button>
+                          VLC Play
+                        </button>}
                       </div>
                     </div>
                   ))}
