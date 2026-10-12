@@ -187,8 +187,22 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   const orderedMirrors = (mirrors: StreamMirror[]) => [...mirrors, ...addonStreams]
     .filter((mirror, i, all) => all.findIndex(other => other.url === mirror.url) === i)
     .sort((a, b) => qualityRank(b) - qualityRank(a));
-  const playSelected = (mirror: StreamMirror, originals: StreamMirror[]) => {
+  const playSelected = async (mirror: StreamMirror, originals: StreamMirror[]) => {
     if (waitingForServers) return;
+    // Windows Electron uses the installed native VLC decoder by default.
+    // Browser playback remains available for website, TV and Android.
+    const desktop = (window as Window & { flixleoDesktop?: { playInVlc: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
+    if (desktop && mirror.streamType !== 'embed-iframe') {
+      try {
+        const url = new URL(mirror.url);
+        if (url.protocol === 'https:' && !url.username && !url.password) {
+          const result = await desktop.playInVlc(url.href);
+          if (result?.ok) { onClose(); return; }
+          window.alert(result?.error || 'Native playback failed. Use the browser player if VLC is unavailable.');
+          return;
+        }
+      } catch { /* Continue with web player if no valid direct media URL exists. */ }
+    }
     onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals), ...(isSeries && selectedEpisodeNumber !== undefined ? { playbackSeason: selectedSeasonNumber, playbackEpisode: selectedEpisodeNumber } : {}) }, mirror.id);
     onClose();
   };
