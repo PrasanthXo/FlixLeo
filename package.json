@@ -74,7 +74,16 @@
     },
     "portable": {
       "artifactName": "FlixLeo-Portable-${version}-${arch}.${ext}"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "desktop/vendor/mpv",
+        "to": "mpv",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   },
   "main": "desktop/main.cjs",
   "author": "FlixLeo"
