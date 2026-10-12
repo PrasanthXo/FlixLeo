@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /Tv6
+
+Sitemap: https://flixleo.cyou/sitemap.xml
