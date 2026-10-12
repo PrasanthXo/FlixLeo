@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     private var lastPolicyCheck = 0L
     private var blockingDialog: AlertDialog? = null
     private var lastOptionalVersion = 0
+    private val shownNotices = mutableSetOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,6 +114,7 @@ class MainActivity : Activity() {
                 val body = conn.inputStream.bufferedReader().use { it.readText() }
                 val response = JSONObject(body)
                 val policy = response.optJSONObject("policy") ?: return@Thread
+                val notices = response.optJSONArray("notices")
                 val latest = policy.optInt("latestVersionCode", 1)
                 val minimum = policy.optInt("minVersionCode", 0)
                 val forced = policy.optBoolean("forceUpdate", false) && 1 < minimum
@@ -148,6 +150,16 @@ class MainActivity : Activity() {
                             .setPositiveButton("Update") { _, _ -> openUpdatePage(url) }
                             .setNegativeButton("Later", null)
                             .show()
+                    } else if (!forced && !maintenance && notices != null && notices.length() > 0) {
+                        val notice = notices.optJSONObject(0)
+                        val noticeId = notice?.optString("id", "").orEmpty()
+                        if (notice != null && noticeId.isNotBlank() && shownNotices.add(noticeId)) {
+                            AlertDialog.Builder(this)
+                                .setTitle(notice.optString("title", "FlixLeo announcement"))
+                                .setMessage(notice.optString("body", ""))
+                                .setPositiveButton("OK", null)
+                                .show()
+                        }
                     }
                 }
             } catch (_: Exception) {
