@@ -23,34 +23,17 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $release = Invoke-RestMethod 'https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/tags/20261012'
-          $asset = @($release.assets | Where-Object { $_.name -match '^mpv-x86_64-20261012-.*\.7z
-        run: npm run desktop:dist
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Check generated Windows executables
-        shell: pwsh
-        run: |
-          Get-ChildItem desktop-release -Recurse -File | Select-Object FullName, Length
-          $exes = @(Get-ChildItem desktop-release -Filter '*.exe' -File)
-          if ($exes.Count -lt 2) { throw "Expected installer and portable EXE but found $($exes.Count)" }
-      - uses: actions/upload-artifact@v4
-        with:
-          name: FlixLeo-Windows
-          path: desktop-release/*.exe
-          if-no-files-found: error
- }) | Select-Object -First 1
+          $asset = @($release.assets | Where-Object { $_.name -match '^mpv-x86_64-20261012-.*[.]7z$' }) | Select-Object -First 1
           if (-not $asset) { throw 'Pinned Windows x64 mpv build not found' }
           New-Item -ItemType Directory -Force desktop/vendor/mpv | Out-Null
           Invoke-WebRequest -Uri $asset.browser_download_url -OutFile mpv.7z
           $actual = (Get-FileHash mpv.7z -Algorithm SHA256).Hash.ToLower()
           $expected = ($asset.digest -replace '^sha256:', '').ToLower()
           if (-not $expected -or $actual -ne $expected) { throw 'mpv archive SHA256 mismatch' }
-          & 'C:\Program Files\7-Zip\7z.exe' x mpv.7z "-odesktop/vendor/mpv" -y | Out-Null
+          & 'C:\Program Files\7-Zip\7z.exe' x mpv.7z '-odesktop/vendor/mpv' -y | Out-Null
           $exe = Get-ChildItem desktop/vendor/mpv -Filter mpv.exe -Recurse -File | Select-Object -First 1
           if (-not $exe) { throw 'mpv executable missing from downloaded build' }
-          if ($exe.DirectoryName -ne (Resolve-Path desktop/vendor/mpv).Path) {
-            Copy-Item $exe.FullName desktop/vendor/mpv/mpv.exe -Force
-          }
+          if ($exe.DirectoryName -ne (Resolve-Path desktop/vendor/mpv).Path) { Copy-Item $exe.FullName desktop/vendor/mpv/mpv.exe -Force }
           Write-Host 'Bundled mpv SHA256 validated.'
       - name: Package installer and portable Windows app
         run: npm run desktop:dist
