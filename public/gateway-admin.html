@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FlixLeo · App Gateway</title><meta name="robots" content="noindex,nofollow">
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,Segoe UI,sans-serif;background:#090c16;color:#eff3ff}
+*{box-sizing:border-box}body{margin:0;padding:32px 16px;max-width:1050px;margin:auto}
+h1{margin-bottom:4px;letter-spacing:-.04em}p{color:#a9b3cb}article{background:#11172a;border:1px solid #283249;border-radius:18px;padding:22px;margin:20px 0}
+label{display:block;color:#b9c7e2;font-size:13px;margin:12px 0 5px}input,textarea,select{background:#0a1020;border:1px solid #35415f;border-radius:10px;color:#fff;font:inherit;padding:12px;width:100%}
+input[type=checkbox]{width:auto;accent-color:#6e84f7}button{background:#647bff;color:white;border:0;padding:11px 18px;border-radius:10px;cursor:pointer;font-weight:700;margin:8px 8px 0 0}
+button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#26314c}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+small{color:#8492b0}.status{min-height:24px;color:#f4c55f;margin-top:12px}h2{margin:0 0 16px}a{color:#aab7ff}
+</style></head><body><h1>App Gateway</h1><p>Manage app updates, emergency minimum versions, maintenance mode, and in-app notices. Policies are persisted server-side.</p>
+<article><h2>Administrator access</h2><label for="token">Gateway admin token (not saved)</label>
+<input id="token" type="password" autocomplete="off" placeholder="Paste GATEWAY_ADMIN_TOKEN">
+<button id="connect">Connect</button><button class="secondary" id="forget">Clear token</button><div class="status" id="status" role="status"></div></article>
+<article><h2>App update policy</h2><label for="app">Application</label>
+<select id="app"><option value="flixleo-android">FlixLeo · Android</option><option value="flixleo-windows">FlixLeo · Windows</option><option value="sabdham-android">SABDHAM · Android</option><option value="sri-tunnel-android">SRI TUNNEL · Android</option></select>
+<div class="grid"><div><label for="latest">Latest version code</label><input id="latest" type="number" min="0" value="1"></div>
+<div><label for="minimum">Minimum supported version code</label><input id="minimum" type="number" min="0" value="0"></div>
+<div><label for="version">Version name</label><input id="version" value="1.0.0"></div>
+<div><label for="link">HTTPS update URL</label><input id="link" type="url" placeholder="https://..." value="https://flixleo.cyou/"></div></div>
+<div class="grid"><div><label><input type="checkbox" id="forced"> Require update below minimum version</label></div><div><label><input type="checkbox" id="maintenance"> Maintenance mode</label></div></div>
+<label for="notes">Release notes</label><textarea id="notes" rows="3"></textarea>
+<label for="msg">Maintenance message</label><textarea id="msg" rows="2"></textarea>
+<button id="save">Save policy</button><p><small>Publish a valid update before raising the minimum version. Mandatory updates can lock users out.</small></p></article>
+<article><h2>Post announcement</h2><div class="grid"><div><label for="severity">Severity</label>
+<select id="severity"><option>info</option><option>warning</option><option>critical</option></select></div>
+<div><label for="title">Notice title</label><input id="title" maxlength="120"></div></div>
+<label for="body">Notice text</label><textarea id="body" rows="3" maxlength="1000"></textarea><button id="post">Publish notice</button>
+<p><small>Announcements are delivered when compatible apps check the gateway; this is not Firebase background push.</small></p></article>
+<script>
+let token='';
+const $=id=>document.getElementById(id);
+function status(s){$('status').textContent=s}
+async function api(route,method='GET',body){
+ if(!token)throw Error('Connect with an admin token first');
+ const r=await fetch('/api/gateway/v1/'+route,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,cache:'no-store'});
+ const data=await r.json().catch(()=>({}));
+ if(!r.ok)throw Error(data.error||'Request failed ('+r.status+')');
+ return data;
+}
+async function load(){
+ const {apps}=await api('admin/apps');const a=apps.find(x=>x.app_id===$('app').value);
+ if(!a){status('No policy for this app');return}
+ $('latest').value=a.latest_version_code;$('minimum').value=a.min_version_code;$('version').value=a.latest_version_name;
+ $('link').value=a.update_url;$('forced').checked=a.force_update;$('maintenance').checked=a.maintenance;
+ $('notes').value=a.release_notes;$('msg').value=a.maintenance_message;status('Connected. Policy loaded for '+a.app_id);
+}
+$('connect').onclick=async()=>{token=$('token').value.trim();$('token').value='';try{await load()}catch(e){token='';status(e.message)}};
+$('forget').onclick=()=>{token='';status('Token cleared')};
+$('app').onchange=async()=>{try{await load()}catch(e){status(e.message)}};
+$('save').onclick=async()=>{
+ try{
+ await api('admin/apps/'+$('app').value,'PUT',{
+ latestVersionCode:Number($('latest').value),minVersionCode:Number($('minimum').value),
+ latestVersionName:$('version').value,forceUpdate:$('forced').checked,maintenance:$('maintenance').checked,
+ updateUrl:$('link').value,releaseNotes:$('notes').value,maintenanceMessage:$('msg').value});
+ status('Policy saved successfully');
+ }catch(e){status(e.message)}
+};
+$('post').onclick=async()=>{try{await api('admin/notices','POST',{appId:$('app').value,severity:$('severity').value,title:$('title').value,body:$('body').value});status('Notice published');$('title').value='';$('body').value=''}catch(e){status(e.message)}};
+</script></body></html>
