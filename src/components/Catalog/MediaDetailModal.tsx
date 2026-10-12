@@ -189,20 +189,6 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     .sort((a, b) => qualityRank(b) - qualityRank(a));
   const playSelected = async (mirror: StreamMirror, originals: StreamMirror[]) => {
     if (waitingForServers) return;
-    // Windows Electron uses its bundled mpv decoder by default.
-    // Browser playback remains available for website, TV and Android.
-    const desktop = (window as Window & { flixleoDesktop?: { playNative: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
-    if (desktop && mirror.streamType !== 'embed-iframe') {
-      try {
-        const url = new URL(mirror.url);
-        if (url.protocol === 'https:' && !url.username && !url.password) {
-          const result = await desktop.playNative(url.href);
-          if (result?.ok) { onClose(); return; }
-          window.alert(result?.error || 'Native playback failed. Try another stream if the native decoder cannot play this source.');
-          return;
-        }
-      } catch { /* Continue with web player if no valid direct media URL exists. */ }
-    }
     onPlayMedia({ ...activeMedia, mirrors: orderedMirrors(originals), ...(isSeries && selectedEpisodeNumber !== undefined ? { playbackSeason: selectedSeasonNumber, playbackEpisode: selectedEpisodeNumber } : {}) }, mirror.id);
     onClose();
   };
