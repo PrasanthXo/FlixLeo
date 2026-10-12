@@ -4,7 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const WEBSITE = 'https://flixleo.cyou';
-let nativeWindow = null;
+let mainWindow = null;
+let playing = false;
+let previousUrl = WEBSITE;
 let nativeProcess = null;
 function trusted(event) {
   try {
@@ -33,54 +35,58 @@ function validUrl(input) {
     return target.href;
   } catch { return null; }
 }
+function backToFlixLeo() {
+  if (!playing) return;
+  playing = false;
+  stopPlayer();
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.setTitle('FlixLeo');
+  mainWindow.loadURL(previousUrl.startsWith(WEBSITE) ? previousUrl : WEBSITE);
+}
 ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
   if (!trusted(event)) return { ok:false, error:'Untrusted page' };
   const url = validUrl(streamUrl);
   if (!url) return { ok:false, error:'Unsupported stream URL' };
   const executable = nativeExecutable();
   if (!fs.existsSync(executable)) return { ok:false, error:'Built-in native player is missing. Install the updated FlixLeo Windows version.' };
-  if (nativeWindow && !nativeWindow.isDestroyed()) nativeWindow.close();
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return { ok:false, error:'FlixLeo window is unavailable' };
+  if (process.platform !== 'win32') return { ok:false, error:'Native playback is supported only on Windows.' };
+  // mpv --wid paints in the EXISTING native window. Chromium must release its
+  // compositor surface first or users can hear audio while seeing black video.
   stopPlayer();
-  const win = new BrowserWindow({
-    width: 1200, height: 740, minWidth: 640, minHeight: 380,
-    title: 'FlixLeo · Native Player', backgroundColor: '#000000',
-    autoHideMenuBar: true,
-    webPreferences: { nodeIntegration:false, contextIsolation:true, sandbox:true }
-  });
-  nativeWindow = win;
-  win.setMenuBarVisibility(false);
+  previousUrl = win.webContents.getURL() || WEBSITE;
+  playing = true;
+  win.setTitle('FlixLeo · Native Player — Alt+Left to return');
+  await win.loadURL('data:text/html,<html><body style="background:#000;margin:0"></body></html>');
+  if (win.isDestroyed() || !playing) return { ok:false, error:'Playback cancelled' };
   const handle = win.getNativeWindowHandle();
-  const id = process.platform === 'win32'
-    ? (process.arch === 'x64' ? handle.readBigUInt64LE(0) : BigInt(handle.readUInt32LE(0))).toString()
-    : '';
-  if (!id) { win.close(); return { ok:false, error:'Embedded video is available on Windows only.' }; }
-  win.on('closed', () => { if (nativeWindow === win) nativeWindow = null; stopPlayer(); });
-  win.loadURL('data:text/html,<html><body style="margin:0;background:black"></body></html>');
+  const id = process.arch === 'x64'
+    ? handle.readBigUInt64LE(0).toString()
+    : String(handle.readUInt32LE(0));
   const args = [
     '--no-config', '--no-terminal', '--force-window=yes', '--idle=no',
     '--keep-open=no', '--osc=yes', '--input-default-bindings=yes',
-    '--hwdec=auto-safe', '--audio-display=no', '--border=no',
-    '--wid=' + id, '--title=FlixLeo Native Player',
-    '--user-agent=FlixLeoDesktop/1.0', '--', url
+    '--hwdec=auto-safe', '--border=no', '--wid=' + id,
+    '--title=FlixLeo Native Player', '--user-agent=FlixLeoDesktop/1.0',
+    '--', url
   ];
   try {
-    const proc = spawn(executable, args, {
-      windowsHide: true, stdio: 'ignore', cwd: path.dirname(executable)
-    });
+    const proc = spawn(executable, args, { windowsHide:true, stdio:'ignore', cwd:path.dirname(executable) });
     nativeProcess = proc;
-    proc.on('error', () => {
-      if (!win.isDestroyed()) dialog.showMessageBox(win, {
-        type:'error', title:'FlixLeo Native Player',
-        message:'Could not start the bundled native player.' });
-    });
-    proc.on('exit', () => { if (!win.isDestroyed()) win.close(); });
-    win.show();
+    proc.on('error', () => { backToFlixLeo(); });
+    proc.on('exit', () => { if (nativeProcess === proc) backToFlixLeo(); });
     win.focus();
     return { ok:true };
   } catch {
-    if (!win.isDestroyed()) win.close();
+    backToFlixLeo();
     return { ok:false, error:'Unable to start native playback.' };
   }
+});
+ipcMain.handle('flixleo:stop-native', (event) => {
+  if (event.sender !== mainWindow?.webContents) return false;
+  backToFlixLeo();
+  return true;
 });
 function createWindow() {
   const win = new BrowserWindow({
@@ -89,6 +95,13 @@ function createWindow() {
     webPreferences: {
       preload:path.join(__dirname,'preload.cjs'),
       contextIsolation:true, sandbox:true, nodeIntegration:false, webSecurity:true
+    }
+  });
+  mainWindow = win;
+  win.webContents.on('before-input-event', (event, input) => {
+    if (playing && (input.key === 'Escape' || (input.alt && input.key === 'Left'))) {
+      event.preventDefault();
+      backToFlixLeo();
     }
   });
   win.webContents.setWindowOpenHandler(({url})=>{
