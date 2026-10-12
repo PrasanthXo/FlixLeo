@@ -29,7 +29,8 @@ internal static class FlixLeoEmbed {
     }
 
     static int Main(string[] args) {
-        if (args.Length != 2 || !long.TryParse(args[0], out long targetParent) || !int.TryParse(args[1], out int mpvPid)) return 2;
+        long targetParent; int mpvPid;
+        if (args.Length != 2 || !long.TryParse(args[0], out targetParent) || !int.TryParse(args[1], out mpvPid)) return 2;
         var parent = new IntPtr(targetParent);
         try {
             using (var process = Process.GetProcessById(mpvPid)) {
