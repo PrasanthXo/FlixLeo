@@ -23,13 +23,13 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $release = Invoke-RestMethod 'https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/tags/20261012'
-          $asset = @($release.assets | Where-Object { $_.name -match '^mpv-x86_64-20261012-.*[.]7z$' }) | Select-Object -First 1
+          $asset = @($release.assets | Where-Object { $_.name -eq 'mpv-x86_64-20261012-git-88eb9f2e73.7z' }) | Select-Object -First 1
           if (-not $asset) { throw 'Pinned Windows x64 mpv build not found' }
           New-Item -ItemType Directory -Force desktop/vendor/mpv | Out-Null
           Invoke-WebRequest -Uri $asset.browser_download_url -OutFile mpv.7z
           $actual = (Get-FileHash mpv.7z -Algorithm SHA256).Hash.ToLower()
           $expected = ($asset.digest -replace '^sha256:', '').ToLower()
-          if (-not $expected -or $actual -ne $expected) { throw 'mpv archive SHA256 mismatch' }
+          if ($expected -ne 'cc57a4ee7c72de9b3ad877a0e85afec9e81fc906c0248ee548f003efe360cf2b' -or $actual -ne $expected) { throw 'mpv archive SHA256 mismatch' }
           & 'C:\Program Files\7-Zip\7z.exe' x mpv.7z '-odesktop/vendor/mpv' -y | Out-Null
           $exe = Get-ChildItem desktop/vendor/mpv -Filter mpv.exe -Recurse -File | Select-Object -First 1
           if (-not $exe) { throw 'mpv executable missing from downloaded build' }
