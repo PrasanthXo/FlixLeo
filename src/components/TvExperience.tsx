@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { Home, Film, Tv, Search, Bookmark, UserRound } from 'lucide-react';
+import { Home, Film, Tv, Radio, Search, Bookmark, UserRound } from 'lucide-react';
 
 const items = [
   { id: 'browse', label: 'Home', Icon: Home },
   { id: 'movies', label: 'Movies', Icon: Film },
   { id: 'series', label: 'Series', Icon: Tv },
+  { id: 'live', label: 'Live TV', Icon: Radio },
   { id: 'search', label: 'Search', Icon: Search },
   { id: 'watchlist', label: 'Watchlist', Icon: Bookmark },
 ] as const;
