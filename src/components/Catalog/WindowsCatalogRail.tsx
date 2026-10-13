@@ -87,7 +87,7 @@ export function WindowsCatalogRail({
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     el.scrollBy({
       left: direction * Math.max(210, Math.floor(el.clientWidth * 0.78)),
-      behavior: reduceMotion ? 'instant' : 'smooth'
+      behavior: reduceMotion ? 'auto' : 'smooth'
     });
   };
 
