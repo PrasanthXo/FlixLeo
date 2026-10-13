@@ -32,6 +32,13 @@ function stopPlayer() {
     nativeProcess = null;
   }
 }
+function toggleVideoFullscreen(win) {
+  if (!win || win.isDestroyed()) return false;
+  const next = !win.isFullScreen();
+  win.setFullScreen(next);
+  if (embedProcess?.stdin?.writable) embedProcess.stdin.write(next ? 'FULLSCREEN\\n' : 'RESTORE\\n');
+  return next;
+}
 function validUrl(input) {
   if (typeof input !== 'string' || input.length > 8192) return null;
   try {
@@ -77,7 +84,7 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
     '--keep-open=no', '--osc=yes', '--input-default-bindings=yes',
     '--input-cursor=yes',
     // Modern minimal overlay; disappears shortly after mouse movement.
-    '--script-opts=osc-visibility=auto,osc-layout=box,osc-hidetimeout=2000,osc-fadeduration=200,osc-deadzonesize=0,osc-scalewindowed=1.35,osc-scalefullscreen=1.5',
+    '--script-opts=osc-visibility=auto,osc-layout=bottombar,osc-hidetimeout=2000,osc-fadeduration=180,osc-deadzonesize=0,osc-scalewindowed=1.7,osc-scalefullscreen=1.8',
     `--input-ipc-server=${mpvPipe}`,
     '--hwdec=auto-safe', '--border=no', '--geometry=1280x720',
     '--title=FlixLeo', '--user-agent=FlixLeoDesktop/1.0',
@@ -127,7 +134,7 @@ ipcMain.handle('flixleo:command-native', async (event, action, value) => {
   let command = commands[action];
   if (action === 'setAudioTrack' && Number.isInteger(value) && value >= 0) command = ['set_property','aid',value];
   if (action === 'setSubtitleTrack' && Number.isInteger(value) && value >= 0) command = ['set_property','sid',value];
-  if (action === 'toggleFullscreen') { mainWindow?.setFullScreen(!mainWindow.isFullScreen()); return true; }
+  if (action === 'toggleFullscreen') { toggleVideoFullscreen(mainWindow); return true; }
   if (action === 'setVolume' && Number.isFinite(value)) command = ['set_property', 'volume', Math.max(0, Math.min(100, Number(value)))];
   if (!command) return false;
   return await new Promise(resolve => {
@@ -220,12 +227,12 @@ function createWindow() {
   mainWindow = win;
   // Fullscreen is controlled by Electron's window, not by the mpv child window.
   // F11 works even if native-video controls are unavailable.
-  win.on('leave-full-screen', () => { if (playing) win.webContents.send('flixleo:fullscreen', false); });
-  win.on('enter-full-screen', () => { if (playing) win.webContents.send('flixleo:fullscreen', true); });
+  win.on('leave-full-screen', () => { if (playing && embedProcess?.stdin?.writable) embedProcess.stdin.write('RESTORE\\n'); });
+  win.on('enter-full-screen', () => { if (playing && embedProcess?.stdin?.writable) embedProcess.stdin.write('FULLSCREEN\\n'); });
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && input.key === 'F11') {
       event.preventDefault();
-      win.setFullScreen(!win.isFullScreen());
+      toggleVideoFullscreen(win);
       return;
     }
     if (playing && input.alt && input.key === 'Left') {
