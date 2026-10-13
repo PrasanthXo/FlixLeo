@@ -57,6 +57,7 @@ internal static class FlixLeoEmbed {
                 Console.WriteLine("EMBEDDED");
                 Console.Out.Flush();
                 int px = 0, py = 0, pw = 1280, ph = 720;
+                bool fullscreen = false;
                 var updates = new System.Collections.Concurrent.ConcurrentQueue<string>();
                 var reader = new Thread(() => {
                     try { string line; while ((line = Console.ReadLine()) != null) updates.Enqueue(line); }
@@ -67,6 +68,8 @@ internal static class FlixLeoEmbed {
                 while (IsWindow(parent) && IsWindow(child) && !process.HasExited) {
                     string line;
                     while (updates.TryDequeue(out line)) {
+                        if (line == "FULLSCREEN") { fullscreen = true; continue; }
+                        if (line == "RESTORE") { fullscreen = false; continue; }
                         var parts = line.Split(',');
                         int x, y, w, h;
                         if (parts.Length == 4 && int.TryParse(parts[0], out x) &&
@@ -76,7 +79,11 @@ internal static class FlixLeoEmbed {
                             pw = Math.Max(1, w); ph = Math.Max(1, h);
                         }
                     }
-                    SetWindowPos(child, IntPtr.Zero, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                    Rect client;
+                    if (fullscreen && GetClientRect(parent, out client))
+                        SetWindowPos(child, IntPtr.Zero, 0, 0, Math.Max(1, client.right - client.left), Math.Max(1, client.bottom - client.top), SWP_NOZORDER | SWP_NOACTIVATE);
+                    else
+                        SetWindowPos(child, IntPtr.Zero, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE);
                     Thread.Sleep(100);
                 }
                 return 0;
