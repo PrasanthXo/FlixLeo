@@ -129,8 +129,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ($version -notmatch '^\\d+\\.\\d+\\.\\d+
-) { throw 'Invalid Windows release version' }
+          if ($version -notmatch '^[0-9]+[.][0-9]+[.][0-9]+$') { throw 'Invalid Windows release version' }
           $tag = "windows-v$version"
           $installer = @(Get-ChildItem desktop-release -File -Filter "FlixLeo-Setup-$version-x64.exe")
           if ($installer.Count -ne 1) { throw 'Expected exact signed Windows installer not found' }
