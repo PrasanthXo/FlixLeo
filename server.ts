@@ -1010,7 +1010,7 @@ app.get('/api/stremio/plavio/live/streams', async (req: Request, res: Response) 
       const pathname = url.pathname.toLowerCase();
       const mime = String(entry.mimeType || '').toLowerCase();
       const hls = pathname.endsWith('.m3u8') || mime.includes('mpegurl') ||
-        /\\.m3u8(?:[?&]|$)/i.test(url.search);
+        /\.m3u8(?:[?&]|$)/i.test(url.search);
       const dash = pathname.endsWith('.mpd') || mime.includes('dash+xml');
       const direct = ['.mp4', '.webm', '.m4v', '.mov'].some(ext => pathname.endsWith(ext)) || mime.startsWith('video/');
       const segment = pathname.split('/').pop() || '';
