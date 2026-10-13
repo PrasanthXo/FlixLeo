@@ -10,6 +10,7 @@ import { MobileBottomNav } from './components/MobileBottomNav';
 import { CinemaPlayer } from './components/Player/CinemaPlayer';
 import { HeroBanner } from './components/Catalog/HeroBanner';
 import { MobileHomeCollections } from './components/Catalog/MobileHomeCollections';
+import { PlavioLiveSection } from './components/Catalog/PlavioLiveSection';
 import { MovieCard } from './components/Catalog/MovieCard';
 import { PosterOptions } from './components/Catalog/PosterOptions';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
@@ -1110,6 +1111,11 @@ export default function App() {
             bookmarkedIds={watchlistIds}
             onToggleBookmark={toggleBookmark}
           />
+        )}
+
+        {/* Dedicated PlavioHD live catalog; movie/series providers above remain unchanged. */}
+        {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
+          <PlavioLiveSection onPlay={handlePlayMedia} />
         )}
 
         <div className={(!isTvDisplay && currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all') ? 'flixleo-mobile-home-hide-legacy' : ''}>
