@@ -43,9 +43,9 @@ export function DesktopFullscreenControls({ title, onClose }: { title: string; o
   }, []);
   const command = (action: Parameters<NonNullable<ReturnType<typeof desktopBridge>>['commandNative']>[0], value?: number) =>
     void desktopBridge()?.commandNative(action, value);
-  const close = () => {
-    command('toggleFullscreen');
-    onClose();
+  const close = async () => {
+    try { await desktopBridge()?.commandNative('toggleFullscreen'); }
+    finally { onClose(); }
   };
   return <div className="absolute bottom-0 left-0 right-0 z-[200] flex h-[96px] flex-col border-t border-white/15 bg-[#101521] text-white shadow-[0_-8px_25px_rgba(0,0,0,0.6)]" role="toolbar" aria-label="Windows fullscreen video controls">
     <div className="flex h-[32px] shrink-0 items-center gap-3 px-4">
@@ -79,7 +79,7 @@ export function DesktopFullscreenControls({ title, onClose }: { title: string; o
       <input aria-label="Volume" title="Volume" type="range" min="0" max="100" value={volume} onChange={e => { const next = Number(e.target.value); setVolume(next); command('setVolume', next); }} className="w-20 accent-amber-400"/>
       <span className="mx-1 h-5 w-px bg-white/15" />
       <button type="button" title="Exit fullscreen (F11)" aria-label="Exit fullscreen" onClick={() => command('toggleFullscreen')} className="rounded-lg p-2 hover:bg-white/10"><Minimize2 size={20}/></button>
-      <button type="button" title="Close player" aria-label="Close player" onClick={close} className="rounded-lg p-2 hover:bg-red-500/20"><X size={21}/></button>
+      <button type="button" title="Close player" aria-label="Close player" onClick={() => void close()} className="rounded-lg p-2 hover:bg-red-500/20"><X size={21}/></button>
     </div>
   </div>;
 }
