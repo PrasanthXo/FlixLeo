@@ -163,6 +163,18 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       }
     };
     const url = audioFix && active.audioFixUrl ? active.audioFixUrl : active.url;
+    let autoplayBlocked = false;
+    const startPlayback = () => {
+      void video.play().catch((reason: unknown) => {
+        if (disposed) return;
+        setPlaying(false);
+        if ((reason as { name?: string })?.name === 'NotAllowedError') {
+          autoplayBlocked = true;
+          setBuffering(false);
+          setError('Press Play to start this channel.');
+        }
+      });
+    };
     // Prefer native HLS / hls.js for live channels; retain Shaka for existing VOD.
     const dash = /\.mpd(?:\?|$)/i.test(url);
     const isAdaptive = !audioFix && (dash || (!liveChannel && (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url))));
@@ -229,6 +241,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         hlsRef.current = hls;
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (disposed) return;
+          if (liveChannel) startPlayback();
           setAudioTracks(hls.audioTracks.map((t, i) => ({ id: i, name: t.name || t.lang || 'Track ' + (i + 1) })));
           if (hls.audioTracks.length && hls.audioTrack < 0) hls.audioTrack = 0;
           setAudio(hls.audioTrack);
@@ -317,7 +330,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     };
     video.addEventListener('playing', onLivePlaying);
     const startupTimer = liveChannel ? window.setTimeout(() => {
-      if (!disposed && !startupConfirmed && video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) fail();
+      if (!disposed && !autoplayBlocked && !startupConfirmed && video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) fail();
     }, 24000) : null;
     video.addEventListener('loadedmetadata', detectEmbeddedSubtitles);
     video.textTracks.addEventListener('addtrack', detectEmbeddedSubtitles);
@@ -325,7 +338,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     video.addEventListener('loadedmetadata', detectNativeAudio);
     video.addEventListener('canplay', detectNativeAudio);
     video.addEventListener('error', fail);
-    if (!isAdaptive) video.play().catch(() => setPlaying(false));
+    if (!isAdaptive) startPlayback();
     return () => {
       disposed = true;
       if (startupTimer !== null) window.clearTimeout(startupTimer);
@@ -451,7 +464,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
       {desktopNative && active ? <DesktopNativeSurface key={active.id} url={active.url} /> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
-        onPlay={() => { setPlaying(true); setBuffering(false); }}
+        onPlay={() => { setPlaying(true); setBuffering(false); setError(''); }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBuffering(true)}
         onCanPlay={() => setBuffering(false)}
