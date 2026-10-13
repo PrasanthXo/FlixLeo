@@ -167,3 +167,72 @@
 .flixleo-mobile-collection-artwork{display:flex;width:100%;height:100%;object-fit:cover;align-items:center;justify-content:center;text-align:center;}
 
 .flixleo-wheel-artwork{display:flex;width:100%;height:100%;object-fit:cover;align-items:center;justify-content:center;text-align:center;}
+
+/* Apply the same mobile Home glass/nebula pattern to DESKTOP WEB + EXE.
+   The mobile rules above are unchanged; smart-TV and Android-native keep
+   their previous desktop-size presentation. This class is only on Home. */
+@media (min-width: 641px) {
+  .flixleo-wheel.flixleo-mobile-home-wheel {
+    background:#090b1e url('/flixleo-assets/cinematic-nebula.svg') center/cover no-repeat;
+    border:1px solid rgba(132,99,252,.29);
+    border-radius:26px;
+    box-shadow:0 24px 70px #0009,inset 0 1px #ffffff14;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-backdrop {
+    opacity:.31;
+    filter:blur(21px) saturate(1.25);
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-vignette {
+    background:linear-gradient(90deg,#0b0b25ed 0%,#111333b8 40%,#1113334d 73%,#060a1acc),
+               linear-gradient(0deg,#08091cdb,transparent 70%);
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-stage {
+    perspective:1050px;
+    isolation:isolate;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-stage::before {
+    content:"";position:absolute;inset:-10% -7%;
+    background:url('/flixleo-assets/ambient-flare.svg') center/contain no-repeat;
+    pointer-events:none;z-index:0;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-stage::after {
+    content:"";position:absolute;left:2%;right:2%;bottom:0;height:150px;
+    background:url('/flixleo-assets/holographic-platform.svg') center bottom/contain no-repeat;
+    pointer-events:none;opacity:.8;z-index:0;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-halo {
+    left:5%;right:5%;bottom:20px;height:62px;
+    border:3px solid #8b5cf6;
+    background:radial-gradient(ellipse,#5a34c343,transparent 70%);
+    box-shadow:0 0 19px #a66bff,inset 0 0 29px #6b4ff4a8,0 0 40px #5038ed96;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-track {z-index:1;}
+  .flixleo-mobile-home-wheel .flixleo-wheel-poster {
+    border-radius:15px;
+    box-shadow:0 15px 32px #000b;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-poster.is-selected {
+    border:2px solid #b5a0ff;
+    box-shadow:0 0 0 3px #7861ff55,0 0 31px #8f56ff9c,0 23px 43px #000c;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-poster.is-selected::after {
+    content:"";position:absolute;inset:0;
+    background:url('/flixleo-assets/glass-sheen.svg') center/100% 100% no-repeat;
+    pointer-events:none;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-dots button.active {
+    background:#a881ff;
+    box-shadow:0 0 13px #9b5aff;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-kicker {color:#b8a1ff;}
+  .flixleo-mobile-home-wheel .flixleo-wheel-play {
+    background:linear-gradient(105deg,#635bff,#b62bf0);
+    color:white;
+    box-shadow:0 5px 22px #7737fc6e;
+  }
+  .flixleo-mobile-home-wheel .flixleo-wheel-info,
+  .flixleo-mobile-home-wheel .flixleo-wheel-save {
+    background:#1a2338c9;
+    border:1px solid #72829f75;
+  }
+}
