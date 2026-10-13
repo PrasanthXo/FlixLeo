@@ -38,7 +38,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const [docked, setDocked] = useState(false);
   // Older saved catalogue entries can still contain the defunct embed.su mirror.
   const mirrors = (media.mirrors || []).filter(m => !/^https?:\/\/embed\.su(?:\/|$)/i.test(m.url));
-  const [index, setIndex] = useState(() => Math.max(0, mirrors.findIndex(m => m.id === initialMirrorId)));
+  const [index, setIndex] = useState(() => Math.max(0, mirrors.findIndex(m => m.id === (initialMirrorId || (() => { try { const rows = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]'); const saved = Array.isArray(rows) ? rows.find((row: any) => row?.media && resumeKey(row.media) === resumeKey(media)) : undefined; return saved?.mirrorId && mirrors.some(m => m.id === saved.mirrorId) ? saved.mirrorId : undefined; } catch { return undefined; } })()))));
   const [tried, setTried] = useState<number[]>([]);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
@@ -179,7 +179,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       const key = 'flixleo_continue_watching';
       const existing = JSON.parse(localStorage.getItem(key) || '[]');
       const list = Array.isArray(existing) ? existing : [];
-      const entry = { media, progress: video.currentTime, duration: Number.isFinite(video.duration) ? video.duration : 0, updatedAt: Date.now() };
+      const entry = { media, mirrorId: active?.id, progress: video.currentTime, duration: Number.isFinite(video.duration) ? video.duration : 0, updatedAt: Date.now() };
       localStorage.setItem(key, JSON.stringify([entry, ...list.filter((r: any) => !r?.media || resumeKey(r.media) !== resumeKey(media))].slice(0, 20)));
       onProgressSaved?.();
     } catch { /* playback continues even without storage */ }
@@ -206,7 +206,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         {<button type="button" onClick={() => void toggleFrameFullscreen()} className="absolute z-[60] right-3 top-3 rounded-lg bg-black/85 px-3 py-2 text-xs font-semibold text-white hover:bg-black border border-white/20" aria-label={frameFullscreen ? "Exit fullscreen player" : "Fullscreen player"}>{frameFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
         {docked && <div className="absolute z-20 right-1 top-1 flex gap-1"><button type="button" onClick={() => { setDocked(false); playerAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
-          : desktopNative ? <DesktopNativeSurface key={active.id} url={active.url} />
+          : desktopNative ? <DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} />
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
             : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); onEpisodeEnded?.(); }} className="h-full w-full object-contain" />}
