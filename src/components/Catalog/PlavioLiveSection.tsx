@@ -2,18 +2,9 @@ import React from 'react';
 import { Play, Radio, RefreshCw, Tv2 } from 'lucide-react';
 import type { MediaItem, QualityOption, StreamMirror } from '../../types/stream';
 
-type LiveCategory = 'live' | 'cricket' | 'football' | 'networks';
 type LiveChannel = { id: string; name: string; poster: string; description: string };
 type LiveStream = { name: string; url: string; quality: string; streamType: 'hls' | 'direct-video' };
-const categories: { id: LiveCategory; label: string }[] = [
-  { id: 'live', label: '🔴 Live Now' },
-  { id: 'cricket', label: '🏏 Cricket' },
-  { id: 'football', label: '⚽ Football' },
-  { id: 'networks', label: '📺 Sports Networks' }
-];
-
 export function PlavioLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirrorId?: string) => void }) {
-  const [category, setCategory] = React.useState<LiveCategory>('live');
   const [refreshCount, setRefreshCount] = React.useState(0);
   const [channels, setChannels] = React.useState<LiveChannel[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -26,7 +17,7 @@ export function PlavioLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirro
     setChannels([]);
     setLoading(true);
     setError('');
-    fetch('/api/stremio/plavio/live/catalog?category=' + encodeURIComponent(category), { signal: controller.signal })
+    fetch('/api/stremio/plavio/live/catalog', { signal: controller.signal })
       .then(async response => {
         if (!response.ok) throw new Error('Live catalog unavailable');
         return response.json();
@@ -37,7 +28,7 @@ export function PlavioLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirro
       .catch(() => { if (!controller.signal.aborted) setError('Live catalog temporarily unavailable. Try refreshing.'); })
       .finally(() => { window.clearTimeout(timeout); setLoading(false); });
     return () => { window.clearTimeout(timeout); controller.abort(); };
-  }, [category, refreshCount]);
+  }, [refreshCount]);
 
   const playChannel = async (channel: LiveChannel) => {
     if (playingId) return;
@@ -84,22 +75,14 @@ export function PlavioLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirro
         <div className="flex items-center gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-red-400/30 bg-red-500/10 text-red-300"><Radio size={22} /></span>
           <div>
-            <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">Live Sports &amp; TV</h2>
-            <p className="text-xs text-slate-400">Powered by PlavioHD · availability varies by channel</p>
+            <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">Live TV</h2>
+            <p className="text-xs text-slate-400">PlavioHD channels · select a channel to play</p>
           </div>
         </div>
         <button type="button" onClick={() => setRefreshCount(value => value + 1)}
           aria-label="Refresh live channels" className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-400">
           <RefreshCw size={18} />
         </button>
-      </div>
-      <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-        {categories.map(option =>
-          <button key={option.id} type="button" aria-pressed={category === option.id} onClick={() => setCategory(option.id)}
-            className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-amber-400 ${category === option.id ? 'border-amber-400 bg-amber-400 text-slate-950' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-            {option.label}
-          </button>
-        )}
       </div>
       {loading ? <div className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-6 text-sm text-slate-300" role="status"><RefreshCw className="animate-spin text-amber-400" size={18} /> Loading live channels…</div>
         : channels.length === 0 ? <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-5 text-sm text-slate-300">{error || 'No live channels are listed right now.'}</div>
