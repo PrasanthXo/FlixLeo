@@ -164,7 +164,8 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     };
     const url = audioFix && active.audioFixUrl ? active.audioFixUrl : active.url;
     // Prefer native HLS / hls.js for live channels; retain Shaka for existing VOD.
-    const isAdaptive = !liveChannel && !audioFix && (active.streamType === 'hls' || /\.m3u8(?:\?|$)|\.mpd(?:\?|$)/i.test(url));
+    const dash = /\.mpd(?:\?|$)/i.test(url);
+    const isAdaptive = !audioFix && (dash || (!liveChannel && (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url))));
     let shakaPlayer: any = null;
     const setupShaka = async () => {
       try {
