@@ -12,11 +12,12 @@ type Props = {
   recent: { media: MediaItem; progress: number; duration: number }[];
   onOpen: (item: MediaItem) => void;
   onPlay: (item: MediaItem) => void;
+  desktopView?: boolean;
   bookmarkedIds?: string[];
   onToggleBookmark?: (item: MediaItem) => void;
 };
 
-export function MobileHomeCollections({ items, southIndianMovies = [], additionalCollections = {}, recent, onOpen, onPlay, bookmarkedIds = [], onToggleBookmark }: Props) {
+export function MobileHomeCollections({ items, southIndianMovies = [], additionalCollections = {}, recent, onOpen, onPlay, bookmarkedIds = [], onToggleBookmark, desktopView = false }: Props) {
   const unique = useMemo(() => {
     const seen = new Set<string>();
     return items.filter(item => {
@@ -65,7 +66,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
       {label:provider+' Series',subtitle:'All languages · provider discovery',list:combined('allProviderSeries:'+provider)}
     ])
   ].filter(row => row.list.length > 0);
-  return <div className="flixleo-mobile-collections" aria-label="Explore FlixLeo collections">
+  return <div className={desktopView ? 'flixleo-mobile-collections flixleo-native-desktop-collections' : 'flixleo-mobile-collections'} aria-label="Explore FlixLeo collections">
     <div className="flixleo-mobile-collections-intro"><Sparkles size={17}/> Explore your universe</div>
     {rows.map(row => <section key={row.label} className="flixleo-mobile-collection" aria-label={row.label}>
       <div className="flixleo-mobile-collection-head"><div><h2>{row.label}</h2><p>{row.subtitle}</p></div><ArrowRight size={19} aria-hidden="true"/></div>
