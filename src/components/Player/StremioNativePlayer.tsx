@@ -1,4 +1,4 @@
-import { DesktopNativeSurface, desktopBridge } from './DesktopNativeSurface';
+import { DesktopNativeSurface, desktopBridge, fullLanguage, type NativeTrack } from './DesktopNativeSurface';
 import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2 } from 'lucide-react';
@@ -78,6 +78,18 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const [subtitleLoading, setSubtitleLoading] = useState(false);
   const active = sorted.find(m => m.id === selected) || sorted[0];
   const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
+  const [nativeTracks, setNativeTracks] = useState<{audio:NativeTrack[]; subtitles:NativeTrack[]}>({audio:[], subtitles:[]});
+  useEffect(() => {
+    if (!desktopNative) return;
+    let mounted = true;
+    const refresh = () => {
+      void desktopBridge()?.tracksNative?.().then(tracks => { if (mounted) setNativeTracks(tracks); }).catch(() => {});
+    };
+    const timer = window.setInterval(refresh, 1800);
+    refresh();
+    return () => { mounted = false; window.clearInterval(timer); };
+  }, [desktopNative, active?.id]);
+
   const [vlcNotice, setVlcNotice] = useState('');
   const openInVlc = () => {
     if (!active?.url || !/^https:\/\//i.test(active.url)) {
@@ -480,7 +492,23 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       </div>}
     </div>
     {desktopNative ? <div className="space-y-3 p-4">
-      <p className="text-xs text-slate-400">Playback controls appear over the video when you move the pointer. They hide automatically when idle.</p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" className="inline-flex items-center justify-center rounded-xl bg-slate-800 p-3 hover:bg-slate-700" aria-label={desktopFullscreen ? 'Exit fullscreen' : 'Fullscreen'} title="Fullscreen (F11)" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')}><Maximize2 size={21}/></button>
+        <label className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2" title="Audio language">
+          <Volume2 size={21}/>
+          <select aria-label="Audio language" className="max-w-56 bg-transparent text-sm text-white outline-none" value={nativeTracks.audio.find(t => t.selected)?.id ?? ''} onChange={e => void desktopBridge()?.commandNative('setAudioTrack', Number(e.target.value))}>
+            {!nativeTracks.audio.length && <option value="">Audio language</option>}
+            {nativeTracks.audio.map(t => <option key={t.id} value={t.id} className="bg-slate-900">{fullLanguage(t.language, t.title)}</option>)}
+          </select>
+        </label>
+        <label className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2" title="Subtitle language">
+          <Subtitles size={21}/>
+          <select aria-label="Subtitle language" className="max-w-56 bg-transparent text-sm text-white outline-none" value={nativeTracks.subtitles.find(t => t.selected)?.id ?? ''} onChange={e => void desktopBridge()?.commandNative('setSubtitleTrack', Number(e.target.value))}>
+            {!nativeTracks.subtitles.some(t=>t.selected) && <option value="">Subtitles off</option>}
+            {nativeTracks.subtitles.map(t => <option key={t.id} value={t.id} className="bg-slate-900">{fullLanguage(t.language, t.title)}</option>)}
+          </select>
+        </label>
+      </div>
       <label className="block text-xs text-slate-300">Video quality / stream
         <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => setSelected(e.target.value)}>
           {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}{m.fileSize ? ' · ' + m.fileSize : ''}</option>)}
