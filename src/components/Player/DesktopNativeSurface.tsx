@@ -10,8 +10,10 @@ type DesktopBridge = {
   durationNative?: () => Promise<number>;
   isFullscreen?: () => Promise<boolean>;
   onFullscreenChanged?: (listener: (fullscreen: boolean) => void) => () => void;
+  onNativeControlsVisible?: (listener: (visible: boolean) => void) => () => void;
+  setControlsHeight?: (physicalPixels: number) => Promise<boolean>;
   tracksNative?: () => Promise<{ audio:NativeTrack[]; subtitles:NativeTrack[] }>;
-  commandNative: (action: 'togglePause' | 'seekBackward' | 'seekForward' | 'toggleMute' | 'toggleSubtitles' | 'setVolume' | 'toggleFullscreen' | 'nextAudio' | 'nextSubtitle' | 'setAudioTrack' | 'setSubtitleTrack' | 'disableSubtitles' | 'seekTo', value?: number) => Promise<boolean>;
+  commandNative: (action: 'togglePause' | 'seekBackward' | 'seekForward' | 'toggleMute' | 'toggleSubtitles' | 'setVolume' | 'toggleFullscreen' | 'nextAudio' | 'nextSubtitle' | 'setAudioTrack' | 'setSubtitleTrack' | 'disableSubtitles' | 'seekTo' | 'setAspectRatio', value?: number | string) => Promise<boolean>;
 };
 export const fullLanguage = (code: string, title?: string): string => {
   const lang = (code || '').trim().replace(/_/g, '-').toLowerCase();
@@ -35,6 +37,16 @@ export function useDesktopWindowFullscreen(): boolean {
     return () => { mounted = false; unsubscribe?.(); };
   }, []);
   return fullscreen;
+}
+
+export function useDesktopControlsVisible(fullscreen: boolean): boolean {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    if (!fullscreen) { setVisible(true); return; }
+    const off = desktopBridge()?.onNativeControlsVisible?.(setVisible);
+    return () => off?.();
+  }, [fullscreen]);
+  return visible;
 }
 
 /** Video remains inside the existing React big/mini player; the same mpv
