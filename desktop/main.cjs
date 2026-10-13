@@ -36,7 +36,7 @@ function toggleVideoFullscreen(win) {
   if (!win || win.isDestroyed()) return false;
   const next = !win.isFullScreen();
   win.setFullScreen(next);
-  if (embedProcess?.stdin?.writable) embedProcess.stdin.write(next ? 'FULLSCREEN\\n' : 'RESTORE\\n');
+  if (embedProcess?.stdin?.writable) embedProcess.stdin.write(next ? 'FULLSCREEN\n' : 'RESTORE\n');
   return next;
 }
 function validUrl(input) {
@@ -227,8 +227,8 @@ function createWindow() {
   mainWindow = win;
   // Fullscreen is controlled by Electron's window, not by the mpv child window.
   // F11 works even if native-video controls are unavailable.
-  win.on('leave-full-screen', () => { if (playing && embedProcess?.stdin?.writable) embedProcess.stdin.write('RESTORE\\n'); });
-  win.on('enter-full-screen', () => { if (playing && embedProcess?.stdin?.writable) embedProcess.stdin.write('FULLSCREEN\\n'); });
+  win.on('leave-full-screen', () => { if (playing && embedProcess?.stdin?.writable) embedProcess.stdin.write('RESTORE\n'); });
+  win.on('enter-full-screen', () => { if (playing && embedProcess?.stdin?.writable) embedProcess.stdin.write('FULLSCREEN\n'); });
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && input.key === 'F11') {
       event.preventDefault();
