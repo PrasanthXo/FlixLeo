@@ -537,7 +537,7 @@ export default function App() {
       const entries = Array.isArray(saved) ? saved : [];
       const previous = entries.find(entry => entry?.media && progressKey(entry.media) === progressKey(media));
       const updated = [
-        { media, progress: previous?.progress || 0, duration: previous?.duration || 0, updatedAt: Date.now() },
+        { media, mirrorId: previous?.mirrorId, progress: previous?.progress || 0, duration: previous?.duration || 0, updatedAt: Date.now() },
         ...entries.filter(entry => entry?.media && progressKey(entry.media) !== progressKey(media))
       ].slice(0, 20);
       localStorage.setItem('flixleo_continue_watching', JSON.stringify(updated));
@@ -588,7 +588,15 @@ export default function App() {
     setPlaySession(n => n + 1);
     rememberPlayed(media);
     setActiveMedia(media);
-    setActiveMirrorId(mirrorId || media.mirrors[0]?.id);
+    let savedMirrorId: string | undefined;
+    if (!mirrorId) {
+      try {
+        const rows = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
+        const entry = Array.isArray(rows) ? rows.find((row: any) => row?.media && progressKey(row.media) === progressKey(media)) : undefined;
+        if (entry?.mirrorId && media.mirrors.some(m => m.id === entry.mirrorId)) savedMirrorId = entry.mirrorId;
+      } catch { /* use first available server */ }
+    }
+    setActiveMirrorId(mirrorId || savedMirrorId || media.mirrors[0]?.id);
   };
 
 
