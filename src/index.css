@@ -230,3 +230,9 @@
 
 /* Stage 2 mobile Home: remove the old Movie Catalogs selector and its entire legacy grid below. */
 @media(max-width:640px){.flixleo-mobile-home-hide-legacy{display:none!important}}
+
+/* Native Windows fullscreen: hide the Chromium pointer with the embedded mpv cursor. */
+html.flixleo-native-cursor-hidden,
+html.flixleo-native-cursor-hidden * {
+  cursor: none !important;
+}
