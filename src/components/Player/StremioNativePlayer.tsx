@@ -549,7 +549,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     </div>
     {desktopNative ? <div className="space-y-3 p-4">
       <div className="flex items-center gap-2 flex-wrap">
-        <button type="button" className="inline-flex items-center justify-center rounded-xl bg-slate-800 p-3 hover:bg-slate-700" aria-label={desktopFullscreen ? 'Exit fullscreen' : 'Fullscreen'} title="Fullscreen (F11)" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')}><Maximize2 size={21}/></button>
+        <button type="button" className="inline-flex items-center justify-center rounded-xl bg-slate-800 p-3 hover:bg-slate-700" aria-label={desktopFullscreen ? 'Exit fullscreen' : 'Fullscreen'} title="Fullscreen · Esc to exit" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')}><Maximize2 size={21}/></button>
         <DesktopAspectRatioPicker value={aspectRatio} onChange={changeAspectRatio} />
         <label className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2" title="Audio language">
           <Volume2 size={21}/>
