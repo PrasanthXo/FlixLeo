@@ -522,7 +522,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           if (!video) return;
           setError(''); setBuffering(true);
           void video.play().catch(() => { setBuffering(false); setError('Cannot play this stream in the browser. Try another server.'); });
-        }}><Play size={30} fill="currentColor" /></button>
+        }}><Play size={30} fill="currentColor" /></button>}
       {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/85 p-3 text-xs text-amber-300">
         <p>{error}</p>
         {liveChannel && <button type="button" onClick={() => { failedLiveSources.current.clear(); setError(''); setSelected(sorted[0]?.id || ''); setRetryToken(n => n + 1); }}
