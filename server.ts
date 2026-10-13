@@ -905,6 +905,99 @@ app.get('/api/stremio/audio-fix/:ticket', (req: Request, res: Response) => {
 // Avoid repeatedly hitting providers that temporarily refuse Render requests.
 // This cache is server-local and automatically expires.
 const stremioProviderCooldown = new Map<string, number>();
+
+const PLAVIOHD_BASE = 'https://plaviohd.vercel.app';
+// PlavioHD is an additive built-in provider; existing Render add-ons remain intact.
+const plavioLiveCatalogs: Record<string, string> = {
+  live: 'plaviohd-live',
+  cricket: 'plaviohd-cricket',
+  football: 'plaviohd-football',
+  networks: 'plaviohd-networks'
+};
+async function fetchPlavioJson(route: string, timeoutMs = 14000): Promise<any> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(PLAVIOHD_BASE + route, {
+      headers: { Accept: 'application/json' }, redirect: 'error', signal: controller.signal
+    });
+    if (!response.ok) throw new Error('PlavioHD returned HTTP ' + response.status);
+    if (Number(response.headers.get('content-length') || 0) > 1024 * 1024) throw new Error('Response too large');
+    const raw = await response.text();
+    if (raw.length > 1024 * 1024) throw new Error('Response too large');
+    return JSON.parse(raw);
+  } finally { clearTimeout(timeout); }
+}
+function plavioSafePoster(candidate: unknown): string {
+  if (typeof candidate !== 'string') return '';
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== 'https:' || url.username || url.password || !url.hostname.includes('.') ||
+        url.hostname === 'localhost' || url.hostname.endsWith('.local') || url.hostname.endsWith('.internal')) return '';
+    return url.href;
+  } catch { return ''; }
+}
+// Only known catalog IDs are exposed; this is not an arbitrary upstream URL proxy.
+app.get('/api/stremio/plavio/live/catalog', async (req: Request, res: Response) => {
+  const category = String(req.query.category || 'live');
+  const catalogId = Object.prototype.hasOwnProperty.call(plavioLiveCatalogs, category) ? plavioLiveCatalogs[category] : undefined;
+  if (!catalogId) return res.status(400).json({ error: 'Unknown live category' });
+  try {
+    const data = await fetchPlavioJson('/catalog/tv/' + catalogId + '.json');
+    const metas = Array.isArray(data?.metas) ? data.metas.slice(0, 100) : [];
+    const items = metas.flatMap((entry: any) => {
+      const id = typeof entry?.id === 'string' ? entry.id : '';
+      if (!/^(?:plaviohdtv-[a-zA-Z0-9_.:-]{1,120}|tt[0-9]{5,12})$/.test(id)) return [];
+      return [{
+        id, name: String(entry.name || 'Live channel').slice(0, 120),
+        poster: plavioSafePoster(entry.poster || entry.logo),
+        description: String(entry.description || '').slice(0, 240)
+      }];
+    });
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    return res.json({ provider: 'PlavioHD', category, items });
+  } catch {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(502).json({ error: 'Live channels temporarily unavailable', items: [] });
+  }
+});
+app.get('/api/stremio/plavio/live/streams', async (req: Request, res: Response) => {
+  const id = String(req.query.id || '');
+  if (!/^(?:plaviohdtv-[a-zA-Z0-9_.:-]{1,120}|tt[0-9]{5,12})$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid channel ID' });
+  }
+  try {
+    const payload = await fetchPlavioJson('/stream/tv/' + encodeURIComponent(id) + '.json');
+    const raw = Array.isArray(payload?.streams) ? payload.streams.slice(0, 40) : [];
+    const streams = raw.flatMap((entry: any) => {
+      if (typeof entry?.url !== 'string') return [];
+      let url: URL;
+      try { url = new URL(entry.url); } catch { return []; }
+      if (url.protocol !== 'https:' || url.username || url.password || !url.hostname.includes('.') ||
+          url.hostname === 'localhost' || url.hostname.endsWith('.local') || url.hostname.endsWith('.internal')) return [];
+      const pathname = url.pathname.toLowerCase();
+      const mime = String(entry.mimeType || '').toLowerCase();
+      const hls = pathname.endsWith('.m3u8') || mime.includes('mpegurl');
+      const direct = ['.mp4', '.webm', '.m4v', '.mov'].some(ext => pathname.endsWith(ext)) || mime.startsWith('video/');
+      const segment = pathname.split('/').pop() || '';
+      const extensionless = !segment.includes('.') && !/(embed|watch|view|page|player|login|redirect)/i.test(pathname);
+      if (!hls && !direct && !extensionless) return [];
+      const rawLabel = String(entry.title || entry.name || 'Live stream');
+      const label = rawLabel.split('https://')[0].trim().slice(0, 100);
+      const details = String(entry.title || '') + ' ' + String(entry.name || '');
+      const quality = /(?:2160p|4k|uhd)/i.test(details) ? '4K'
+        : /1080p/i.test(details) ? '1080p' : /720p/i.test(details) ? '720p'
+        : /480p/i.test(details) ? '480p' : 'Auto';
+      return [{ name: label || 'Live stream', url: url.href, quality,
+        streamType: hls ? 'hls' : 'direct-video' }];
+    });
+    const unique = [...new Map(streams.map((s: { url: string }) => [s.url, s])).values()];
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ provider: 'PlavioHD', streams: unique });
+  } catch {
+    return res.status(502).json({ error: 'Live stream lookup temporarily unavailable', streams: [] });
+  }
+});
 app.get('/api/stremio/streams', async (req: Request, res: Response) => {
   // Some mobile link handlers encode the ampersand into the type value.
   // Parse it safely without weakening title/episode validation.
@@ -919,7 +1012,7 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
       (type === 'series' && (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 1))) {
     return res.status(400).json({ error: 'Invalid title or episode', received: { type: String(type || ''), tmdb, season: Number.isFinite(season) ? season : null, episode: Number.isFinite(episode) ? episode : null } });
   }
-  const configured = (process.env.STREMIO_ADDON_URLS || '').split(',').map(x => x.trim()).filter(Boolean).slice(0, 5);
+  const configured = [...new Set([...(process.env.STREMIO_ADDON_URLS || '').split(',').map(x => x.trim()).filter(Boolean), PLAVIOHD_BASE])].slice(0, 6);
   if (!configured.length) return res.json({ streams: [], configured: false, message: 'No add-ons configured on Render' });
   const providers = configured.flatMap(value => {
     try {
@@ -948,7 +1041,7 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
     if (cooldownUntil) stremioProviderCooldown.delete(provider.hostname);
     const controller = new AbortController();
     // WebStreamr can need longer to aggregate multiple upstream sources.
-    const providerTimeoutMs = provider.hostname.includes('webstreamr') || provider.hostname.includes('baby-beamup.club') ? 18000 : 7500;
+    const providerTimeoutMs = provider.hostname === 'plaviohd.vercel.app' || provider.hostname.includes('webstreamr') || provider.hostname.includes('baby-beamup.club') ? 15000 : 7500;
     const timeout = setTimeout(() => controller.abort(), providerTimeoutMs);
     try {
       const response = await fetch(provider.base + '/stream/' + type + '/' + encodeURIComponent(target) + '.json',
