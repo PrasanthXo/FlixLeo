@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const net = require('node:net');
@@ -232,6 +232,13 @@ function createWindow() {
       backToFlixLeo();
     }
   });
+  win.on('focus', () => {
+    if (!globalShortcut.isRegistered('F11')) globalShortcut.register('F11', () => {
+      if (!win.isDestroyed()) win.setFullScreen(!win.isFullScreen());
+    });
+  });
+  win.on('blur', () => globalShortcut.unregister('F11'));
+  win.on('closed', () => globalShortcut.unregister('F11'));
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(({url})=>{
     if (/^https:\/\//i.test(url)) shell.openExternal(url);
@@ -248,4 +255,5 @@ app.whenReady().then(()=>{
   createWindow();
   app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)createWindow()});
 });
+app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed',()=>{stopPlayer();if(process.platform!=='darwin')app.quit()});
