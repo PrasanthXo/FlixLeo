@@ -44,7 +44,6 @@ function languageMatches(actual: string, preference: string) {
   return actual.toLowerCase() === preference.toLowerCase() || actual.toLowerCase() === lookup[preference];
 }
 export default function App() {
-  const isWindowsExe = Boolean((window as Window & { flixleoDesktop?: unknown }).flixleoDesktop);
   const [isTvDisplay] = useState(() => window.location.pathname.toLowerCase().replace(/\/$/, '') === '/tv6' || /smart-tv|smarttv|hbbtv|netcast|web0s|webos|tizen|android tv|googletv|aft[a-z]|bravia|viera|roku|vidaa/i.test(navigator.userAgent));
   // Catalog State
   const [catalog, setCatalog] = useState<MediaItem[]>(MEDIA_CATALOG);
