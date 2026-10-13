@@ -44,6 +44,8 @@ function languageMatches(actual: string, preference: string) {
   return actual.toLowerCase() === preference.toLowerCase() || actual.toLowerCase() === lookup[preference];
 }
 export default function App() {
+  // Native Android is a separate WebView app; preserve its existing home layout.
+  const isNativeAndroid = /FlixLeoNative\/[0-9]/i.test(navigator.userAgent);
   const [isTvDisplay] = useState(() => window.location.pathname.toLowerCase().replace(/\/$/, '') === '/tv6' || /smart-tv|smarttv|hbbtv|netcast|web0s|webos|tizen|android tv|googletv|aft[a-z]|bravia|viera|roku|vidaa/i.test(navigator.userAgent));
   // Catalog State
   const [catalog, setCatalog] = useState<MediaItem[]>(MEDIA_CATALOG);
@@ -758,9 +760,15 @@ export default function App() {
     return result;
   }, [tmdbMovies, tvShows, catalog]);
   const mobileWheelFeatured = mobileWheelItems[0] || featuredMedia;
-  // Home mirrors the mobile catalog/pattern on desktop web and Windows EXE.
-  // TV, Movies, Series, Search and other destinations retain their layouts.
-  const showMixedMobileWheel = !isTvDisplay && currentTab === 'browse';
+  // Reuse the mobile Home's mixed wheel for desktop web and Windows EXE.
+  // Preserve the existing native Android and smart-TV layouts.
+  const [isMobileHomeViewport, setIsMobileHomeViewport] = useState(() => window.innerWidth <= 640);
+  useEffect(() => {
+    const onResize = () => setIsMobileHomeViewport(window.innerWidth <= 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const showMixedMobileWheel = !isTvDisplay && (isMobileHomeViewport || !isNativeAndroid) && currentTab === 'browse';
 
   return (
     <div className={`${isTvDisplay ? "flixleo-tv" : ""} min-h-screen bg-[#080a0f] text-slate-100 flex flex-col selection:bg-amber-500 selection:text-black`}>
@@ -1113,7 +1121,7 @@ export default function App() {
         {/* The same live catalog rows and visual pattern for web Home and the Windows EXE. */}
         {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
           <MobileHomeCollections
-            desktopView={!isTvDisplay}
+            desktopView={!isTvDisplay && !isNativeAndroid}
             items={uniqueTitles([...tmdbMovies, ...tvShows, ...catalog])}
             additionalCollections={homeCollections}
             recent={continueWatching}
@@ -1129,7 +1137,7 @@ export default function App() {
           <PlavioLiveSection onPlay={handlePlayMedia} />
         )}
 
-        {currentTab !== 'live' && <div className={(!isTvDisplay && currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all') ? 'flixleo-mobile-home-hide-legacy flixleo-web-home-hide-legacy' : ''}>
+        {currentTab !== 'live' && <div className={(!isTvDisplay && currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all') ? (isNativeAndroid ? 'flixleo-mobile-home-hide-legacy' : 'flixleo-mobile-home-hide-legacy flixleo-web-home-hide-legacy') : ''}>
         {/* TMDB Movie Catalogs Selector */}
         {(currentTab === 'browse' || currentTab === 'movies') && !searchQuery && (
           <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-slate-900/90 via-[#0a101d] to-slate-950 border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
