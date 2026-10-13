@@ -28,6 +28,17 @@ class MainActivity : Activity() {
     private val home = "https://flixleo.cyou/"
     private var lastPolicyCheck = 0L
     private var blockingDialog: AlertDialog? = null
+    private fun installedVersionCode(): Int = try {
+        val details = packageManager.getPackageInfo(packageName, 0)
+        if (android.os.Build.VERSION.SDK_INT >= 28) details.longVersionCode.toInt()
+        else @Suppress("DEPRECATION") details.versionCode
+    } catch (_: Exception) { 1 }
+
+    private fun safeApkUpdateUrl(url: String): Boolean = try {
+        val uri = Uri.parse(url)
+        uri.scheme == "https" && !uri.host.isNullOrBlank() &&
+            uri.path?.endsWith(".apk", ignoreCase = true) == true
+    } catch (_: Exception) { false }
     private var updateBlocked = false
     private var lastOptionalVersion = 0
     private val shownNotices = mutableSetOf<String>()
@@ -103,10 +114,11 @@ class MainActivity : Activity() {
     private fun checkUpdatePolicy() {
         if (System.currentTimeMillis() - lastPolicyCheck < 30_000) return
         lastPolicyCheck = System.currentTimeMillis()
+        val installedCode = installedVersionCode()
         Thread {
             var conn: HttpURLConnection? = null
             try {
-                conn = (URL(home + "api/gateway/v1/check/flixleo-android?versionCode=1").openConnection() as HttpURLConnection).apply {
+                conn = (URL(home + "api/gateway/v1/check/flixleo-android?versionCode=" + installedCode).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 5000
                     readTimeout = 5000
                     requestMethod = "GET"
@@ -114,14 +126,17 @@ class MainActivity : Activity() {
                 if (conn.responseCode != 200) return@Thread
                 val body = conn.inputStream.bufferedReader().use { it.readText() }
                 val response = JSONObject(body)
+                if (!response.optBoolean("ready", false)) return@Thread
                 val policy = response.optJSONObject("policy") ?: return@Thread
                 val notices = response.optJSONArray("notices")
-                val latest = policy.optInt("latestVersionCode", 1)
+                val latest = policy.optInt("latestVersionCode", installedCode)
                 val minimum = policy.optInt("minVersionCode", 0)
-                val forced = policy.optBoolean("forceUpdate", false) && 1 < minimum
-                val optional = policy.optBoolean("updateAvailable", false) && latest > 1
-                val maintenance = policy.optBoolean("maintenance", false)
                 val url = policy.optString("updateUrl", "")
+                // Never lock out an existing installation with an invalid download link.
+                val available = latest > installedCode && safeApkUpdateUrl(url)
+                val forced = available && policy.optBoolean("forceUpdate", false) && installedCode < minimum
+                val optional = available && policy.optBoolean("updateAvailable", false)
+                val maintenance = policy.optBoolean("maintenance", false)
                 val notes = policy.optString("notes", "")
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
@@ -171,8 +186,8 @@ class MainActivity : Activity() {
 
     private fun openUpdatePage(link: String) {
         try {
+            if (!safeApkUpdateUrl(link)) return
             val uri = Uri.parse(link)
-            if (uri.scheme != "https" || uri.host.isNullOrBlank()) return
             startActivity(Intent(Intent.ACTION_VIEW, uri))
         } catch (_: Exception) { }
     }

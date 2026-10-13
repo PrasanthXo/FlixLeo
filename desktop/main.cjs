@@ -3,6 +3,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
+const https = require('node:https');
 
 const WEBSITE = 'https://flixleo.cyou';
 let mainWindow = null;
@@ -13,6 +14,62 @@ let nativeProcess = null;
 let embedProcess = null;
 let mpvPipe = null;
 let mpvSerial = 0;
+let updateCheckBusy = false;
+let lastUpdateNotice = '';
+// Match the gateway's version codes for the packaged app. 1.0.0 => 1,
+// 1.0.1 => 2, 1.1.0 => 1001. Increment package.json version for each release.
+function installedVersionCode(version = app.getVersion()) {
+  const match = /^(\\d+)\\.(\\d+)\\.(\\d+)/.exec(String(version));
+  if (!match) return 1;
+  return Math.max(1, (Number(match[1]) - 1) * 1000000 + Number(match[2]) * 1000 + Number(match[3]) + 1);
+}
+function fetchGatewayPolicy(versionCode) {
+  const endpoint = WEBSITE + '/api/gateway/v1/check/flixleo-windows?versionCode=' + versionCode;
+  return new Promise((resolve, reject) => {
+    const req = https.get(endpoint, { timeout: 7500, headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' } }, res => {
+      let body = '';
+      if (res.statusCode !== 200) { res.resume(); reject(new Error('Update check returned ' + res.statusCode)); return; }
+      res.on('data', chunk => { body += chunk; if (body.length > 64000) req.destroy(); });
+      res.on('end', () => { try { resolve(JSON.parse(body)); } catch (error) { reject(error); } });
+    });
+    req.on('timeout', () => req.destroy(new Error('Update check timed out')));
+    req.on('error', reject);
+  });
+}
+async function checkDesktopUpdate() {
+  if (!app.isPackaged || updateCheckBusy || !mainWindow || mainWindow.isDestroyed()) return;
+  updateCheckBusy = true;
+  try {
+    const versionCode = installedVersionCode();
+    const result = await fetchGatewayPolicy(versionCode);
+    if (result?.ready !== true) return; // Database outages never lock out users.
+    const policy = result?.policy;
+    const latest = Number(policy?.latestVersionCode);
+    if (!Number.isSafeInteger(latest) || latest <= versionCode || !policy?.updateAvailable) return;
+    const link = validUrl(policy.updateUrl);
+    if (!link || !/\\.exe(?:\\?|$)/i.test(link)) return;
+    const required = policy.forceUpdate === true && versionCode < Number(policy.minVersionCode);
+    const noticeKey = latest + ':' + String(required);
+    if (!required && lastUpdateNotice === noticeKey) return;
+    lastUpdateNotice = noticeKey;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const answer = await dialog.showMessageBox(mainWindow, {
+      type: required ? 'warning' : 'info',
+      title: required ? 'FlixLeo update required' : 'FlixLeo update available',
+      message: required ? 'Update FlixLeo to continue using the desktop app.' : 'A newer FlixLeo Windows app is available.',
+      detail: String(policy.notes || policy.latestVersionName || ''),
+      buttons: required ? ['Download update', 'Exit'] : ['Download update', 'Later'],
+      defaultId: 0, cancelId: 1, noLink: true
+    });
+    if (answer.response === 0) {
+      await shell.openExternal(link);
+      if (required) app.quit();
+    } else if (required) app.quit();
+  } catch (error) {
+    // The current installation remains usable if the update service is offline.
+    console.warn('FlixLeo update gateway check skipped:', String(error?.message || error));
+  } finally { updateCheckBusy = false; }
+}
 function trusted(event) {
   try {
     const url = new URL(event.senderFrame?.url || '');
@@ -332,7 +389,11 @@ function createWindow() {
 }
 app.whenReady().then(()=>{
   createWindow();
-  app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)createWindow()});
+  // The first check runs after the browser has opened; repeat every six hours.
+  setTimeout(() => { void checkDesktopUpdate(); }, 5000);
+  const updateTimer = setInterval(() => { void checkDesktopUpdate(); }, 6 * 60 * 60 * 1000);
+  updateTimer.unref?.();
+  app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0){createWindow();void checkDesktopUpdate();}});
 });
 app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed',()=>{stopPlayer();if(process.platform!=='darwin')app.quit()});

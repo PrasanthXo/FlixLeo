@@ -11,6 +11,16 @@ const idPattern = /^[a-z][a-z0-9-]{2,63}$/;
 const storeUrl = () => (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
 const storeKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const adminSecret = () => process.env.GATEWAY_ADMIN_TOKEN || '';
+const baselineVersions: Record<string, number> = {
+  'flixleo-android': 1, 'flixleo-windows': 1, 'sabdham-android': 17, 'sri-tunnel-android': 8
+};
+// Read-only, non-blocking fallback. Never invent a release or enforce an update when
+// the database, migration or credentials are missing.
+const safeDefaultPolicy = (appId: string, version: number) => ({
+  appId, latestVersionCode: baselineVersions[appId] || 0, minVersionCode: 0,
+  latestVersionName: '', updateAvailable: false, forceUpdate: false,
+  updateUrl: null, notes: '', maintenance: false, maintenanceMessage: ''
+});
 function isAdmin(req: Request) {
   const expected = adminSecret();
   const provided = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
@@ -41,6 +51,11 @@ function sanitizePolicy(row: any, clientVersion: number) {
     maintenanceMessage: row.maintenance_message || ''
   };
 }
+router.get('/api/gateway/v1/health', (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, databaseConfigured: Boolean(storeUrl() && storeKey()),
+    adminConfigured: adminSecret().length >= 32 });
+});
 router.get('/api/gateway/v1/check/:appId', async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
   const appId = String(req.params.appId || '');
@@ -50,11 +65,14 @@ router.get('/api/gateway/v1/check/:appId', async (req: Request, res: Response) =
   }
   try {
     const data = await supabase('app_update_policies?app_id=eq.' + encodeURIComponent(appId) + '&select=*&limit=1');
-    if (!Array.isArray(data) || !data.length) return res.status(404).json({ error: 'No update policy configured' });
+    if (!Array.isArray(data) || !data.length) return res.json({ policy: safeDefaultPolicy(appId, version), notices: [], ready: false, reason: 'policy_missing' });
     const notices = await supabase('app_update_notices?app_id=eq.' + encodeURIComponent(appId) +
       '&active=eq.true&select=id,title,body,severity,created_at&order=created_at.desc&limit=10');
-    return res.json({ policy: sanitizePolicy(data[0], version), notices: notices || [] });
-  } catch { return res.status(503).json({ error: 'Update service temporarily unavailable' }); }
+    return res.json({ policy: sanitizePolicy(data[0], version), notices: notices || [], ready: true });
+  } catch {
+    // Installed clients must continue to work if Supabase is temporarily offline.
+    return res.json({ policy: safeDefaultPolicy(appId, version), notices: [], ready: false, reason: 'gateway_unavailable' });
+  }
 });
 router.get('/api/gateway/v1/admin/apps', async (req: Request, res: Response) => {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -78,6 +96,13 @@ router.put('/api/gateway/v1/admin/apps/:appId', async (req: Request, res: Respon
   try {
     const dest = new URL(x.updateUrl);
     if (dest.protocol !== 'https:' || dest.username || dest.password) throw new Error();
+    // A required/optional upgrade must offer a real installer, not a homepage.
+    const isBinary = appId === 'flixleo-windows' ? /\\.exe$/i.test(dest.pathname)
+      : /\\.apk$/i.test(dest.pathname);
+    const olderBaseline = baselineVersions[appId] || 0;
+    if ((latest > olderBaseline || min > 0 || x.forceUpdate) && !isBinary) {
+      return res.status(400).json({ error: 'Updates require a direct HTTPS installer (.apk or .exe), not a homepage' });
+    }
   } catch { return res.status(400).json({ error: 'Update URL must be HTTPS' }); }
   try {
     const data = await supabase('app_update_policies?on_conflict=app_id', {
