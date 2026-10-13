@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('flixleoDesktop', Object.freeze({
   positionNative: (bounds) => ipcRenderer.invoke('flixleo:position-native', bounds),
   tracksNative: () => ipcRenderer.invoke('flixleo:tracks-native'),
   playbackStatus: () => ipcRenderer.invoke('flixleo:playback-status'),
+  durationNative: () => ipcRenderer.invoke('flixleo:duration-native'),
   commandNative: (action, value) => ipcRenderer.invoke('flixleo:command-native', action, value),
   stopNative: () => ipcRenderer.invoke('flixleo:stop-native'),
   isFullscreen: () => ipcRenderer.invoke('flixleo:fullscreen-state'),
