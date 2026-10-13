@@ -40,6 +40,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     } catch { window.alert('Fullscreen is unavailable for this player.'); }
   };
   const [docked, setDocked] = useState(false);
+  const manualMinimize = useRef(false);
   // Older saved catalogue entries can still contain the defunct embed.su mirror.
   const mirrors = (media.mirrors || []).filter(m => !/^https?:\/\/embed\.su(?:\/|$)/i.test(m.url));
   const [index, setIndex] = useState(() => Math.max(0, mirrors.findIndex(m => m.id === (initialMirrorId || (() => { try { const rows = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]'); const saved = Array.isArray(rows) ? rows.find((row: any) => row?.media && resumeKey(row.media) === resumeKey(media)) : undefined; return saved?.mirrorId && mirrors.some(m => m.id === saved.mirrorId) ? saved.mirrorId : undefined; } catch { return undefined; } })()))));
@@ -61,7 +62,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     void desktopBridge()?.commandNative('setAspectRatio', ratio);
   };
   useEffect(() => { setAspectRatio('no'); }, [active?.url]);
-  useEffect(() => { if (nativeFullscreen) setDocked(false); }, [nativeFullscreen]);
+  useEffect(() => { if (nativeFullscreen) { manualMinimize.current = false; setDocked(false); } }, [nativeFullscreen]);
   const hasShownMainPlayer = useRef(false);
   const lastMinimizeSignal = useRef(minimizeSignal);
   useEffect(() => {
@@ -91,7 +92,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     const check = () => {
       frame = 0;
       const end = videoEndSentinelRef.current;
-      if (!end || document.fullscreenElement) return;
+      if (!end || document.fullscreenElement || manualMinimize.current) return;
       const pastVideo = end.getBoundingClientRect().top < 12;
       setDocked(current => current === pastVideo ? current : pastVideo);
     };
@@ -249,7 +250,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           <h2 className="text-white font-semibold text-sm sm:text-lg truncate">{media.title}</h2>
           <p className="text-slate-400 text-xs truncate">{active?.label || 'No servers available'}</p>
         </div>
-        {desktopNative && !nativeFullscreen && !docked && <button type="button" onClick={() => setDocked(true)} className="shrink-0 rounded-lg border border-amber-500/30 bg-slate-800 px-3 py-2 text-xs text-white hover:bg-slate-700" aria-label="Minimize native video to mini player"><Minimize2 className="mr-1 inline h-4 w-4" />Mini player</button>}
+        {desktopNative && !nativeFullscreen && !docked && <button type="button" onClick={() => { manualMinimize.current = true; setDocked(true); }} className="shrink-0 rounded-lg border border-amber-500/30 bg-slate-800 px-3 py-2 text-xs text-white hover:bg-slate-700" aria-label="Minimize native video to mini player"><Minimize2 className="mr-1 inline h-4 w-4" />Mini player</button>}
         {!desktopNative && <div className="flex items-center gap-2 shrink-0"><button type="button" onClick={() => setDocked(true)} className="rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Minimize player">Mini player</button><button type="button" onClick={() => void shareMovie()} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Share movie"><Share2 className="h-4 w-4" /> Share</button><button type="button" onClick={() => { saveProgress(); onClose(); }} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white"><ArrowLeft className="h-4 w-4" /> Close</button></div>}
       </div>
       {docked && desktopNative && !nativeFullscreen && <div className="aspect-video w-full" aria-hidden="true" />}
@@ -266,7 +267,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           <button type="button" aria-label="Rewind 10 seconds" className="rounded-lg p-2 text-white" onClick={() => void desktopBridge()?.commandNative('seekBackward')}>↶</button>
           <button type="button" aria-label="Play or pause" className="rounded-lg bg-amber-400 px-3 py-2 text-black" onClick={() => void desktopBridge()?.commandNative('togglePause')}>▶Ⅱ</button>
           <button type="button" aria-label="Forward 10 seconds" className="rounded-lg p-2 text-white" onClick={() => void desktopBridge()?.commandNative('seekForward')}>↷</button>
-          <button type="button" aria-label="Expand mini player" className="rounded-lg p-2 text-white" onClick={() => { setDocked(false); playerAnchorRef.current?.scrollIntoView({ behavior:'smooth', block:'start' }); }}><Maximize2 size={18}/></button>
+          <button type="button" aria-label="Expand mini player" className="rounded-lg p-2 text-white" onClick={() => { manualMinimize.current = false; setDocked(false); playerAnchorRef.current?.scrollIntoView({ behavior:'smooth', block:'start' }); }}><Maximize2 size={18}/></button>
           <button type="button" aria-label="Close mini player" className="rounded-lg p-2 text-white" onClick={() => { saveProgress(); onClose(); }}>✕</button>
         </div>}
       </div>
