@@ -514,7 +514,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Expand mini player" onClick={() => { playerAnchor.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); setDocked(false); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
-      {desktopNative && active ? <div className={nativeFullscreen ? (fullscreenControlsVisible ? "h-[calc(100%-96px)] w-full" : "h-full w-full") : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
+      {desktopNative && active ? <div className={nativeFullscreen ? (fullscreenControlsVisible ? "h-[calc(100%-96px)] w-full" : "h-full w-full") : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain" onDoubleClick={() => void toggleDesktopFullscreen()}
         onPlay={() => { setPlaying(true); setBuffering(false); setError(''); }}
         onPause={() => { setPlaying(false); setBuffering(false); }}
         onWaiting={() => setBuffering(true)}
