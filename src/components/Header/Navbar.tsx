@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Home, Film, Search, Bookmark, Tv, UserRound, Download, X, Share2, MoreVertical } from 'lucide-react';
+import { Home, Film, Search, Bookmark, Tv, Radio, UserRound, Download, X, Share2, MoreVertical } from 'lucide-react';
 import { SourceType } from '../../types/stream';
 
 interface NavbarProps {
@@ -62,12 +62,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>FlixLeo</span>
         </button>
 
-        {/* Desktop uses the same five destinations as the mobile bottom navigation. */}
+        {/* Desktop mirrors the mobile bottom navigation destinations. */}
         <nav aria-label="Main navigation" className="hidden lg:flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/70 p-1 shadow-inner shadow-black/20">
           {([
             { tab: 'browse', title: 'Home', Icon: Home },
             { tab: 'movies', title: 'Movies', Icon: Film },
             { tab: 'series', title: 'Series', Icon: Tv },
+            { tab: 'live', title: 'Live TV', Icon: Radio },
             { tab: 'search', title: 'Search', Icon: Search },
           ] as const).map(({ tab, title, Icon }) => (
             <button
