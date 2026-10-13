@@ -100,7 +100,7 @@ router.put('/api/gateway/v1/admin/apps/:appId', async (req: Request, res: Respon
     const isBinary = appId === 'flixleo-windows' ? /\\.exe$/i.test(dest.pathname)
       : /\\.apk$/i.test(dest.pathname);
     const olderBaseline = baselineVersions[appId] || 0;
-    if ((latest > olderBaseline || min > 0 || x.forceUpdate) && !isBinary) {
+    if ((latest > olderBaseline || min > olderBaseline || x.forceUpdate) && !isBinary) {
       return res.status(400).json({ error: 'Updates require a direct HTTPS installer (.apk or .exe), not a homepage' });
     }
   } catch { return res.status(400).json({ error: 'Update URL must be HTTPS' }); }
