@@ -336,7 +336,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-amber-300">Video playing without sound?</p>
                   <p className="mt-1 text-xs leading-relaxed text-slate-200 sm:text-sm">
-                    Some 4K and surround-sound audio formats are not supported by web browsers. For wider playback compatibility, try our <strong className="text-white">FlixLeo Android app</strong> , or our <strong className="text-white">FlixLeo Windows app</strong> with native playback. Stream availability and audio support still depend on the source.
+                    Some 4K and surround-sound audio formats are not supported by web browsers. For wider playback compatibility, try our <strong className="text-white">FlixLeo Android app</strong> or our <strong className="text-white">FlixLeo Windows app</strong> with native playback. Stream availability and audio support still depend on the source.
                   </p>
                   <div className="mt-3 flex items-center gap-3" aria-label="FlixLeo Android and Windows apps">
                     <span title="FlixLeo for Android" role="img" aria-label="FlixLeo for Android"
