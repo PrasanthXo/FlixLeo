@@ -154,6 +154,8 @@ export default function App() {
   const [activeMedia, setActiveMedia] = useState<MediaItem | null>(null);
   const [activeMirrorId, setActiveMirrorId] = useState<string | undefined>(undefined);
   const [minimizeSignal, setMinimizeSignal] = useState(0);
+  // Each play action begins in the main video surface, including a new mirror of the same title.
+  const [playSession, setPlaySession] = useState(0);
   // Reset pagination whenever the underlying category changes.
   useEffect(() => {
     setMovieExtra([]);
@@ -568,6 +570,9 @@ export default function App() {
         streamType: stream.streamType === 'hls' ? 'hls' : 'direct-video', isDirect: true
       }));
       const nextMedia = { ...current, seasons: details.seasons, mirrors, playbackSeason: next.season, playbackEpisode: next.episode };
+      window.scrollTo(0, 0);
+      setMinimizeSignal(0);
+      setPlaySession(n => n + 1);
       setActiveMedia(nextMedia);
       setActiveMirrorId(mirrors[0].id);
       rememberPlayed(nextMedia);
@@ -576,12 +581,14 @@ export default function App() {
 
   // Launch Player
   const handlePlayMedia = (media: MediaItem, mirrorId?: string) => {
+    // Scroll synchronously before mounting the player: the old smooth scroll
+    // activated auto-docking while the page was moving up from a deep catalog.
+    window.scrollTo(0, 0);
+    setMinimizeSignal(0);
+    setPlaySession(n => n + 1);
     rememberPlayed(media);
     setActiveMedia(media);
     setActiveMirrorId(mirrorId || media.mirrors[0]?.id);
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 50);
   };
 
 
@@ -949,7 +956,7 @@ export default function App() {
         {activeMedia && (
           <div className="mb-10 animate-fade-in relative z-30">
             <CinemaPlayer
-              key={activeMedia.id + ':' + (activeMedia.playbackSeason ?? '') + ':' + (activeMedia.playbackEpisode ?? '')}
+              key={activeMedia.id + ':' + (activeMedia.playbackSeason ?? '') + ':' + (activeMedia.playbackEpisode ?? '') + ':' + playSession}
               media={activeMedia}
               initialMirrorId={activeMirrorId}
               minimizeSignal={minimizeSignal}
@@ -997,7 +1004,6 @@ export default function App() {
                       setDetailMedia(entry.media);
                     } else {
                       handlePlayMedia(entry.media);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                   }}
                   className={isTvDisplay ? "tv6-resume-tile" : "group text-left w-40 sm:w-48 shrink-0 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500 focus-visible:outline-2 focus-visible:outline-amber-400"}
