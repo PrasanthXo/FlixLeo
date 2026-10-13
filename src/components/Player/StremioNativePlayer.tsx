@@ -531,6 +531,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       <div className="mb-5 flex items-center justify-between gap-2">
         {!desktopNative && <button type="button" onClick={() => { save(); onClose(); }} className="rounded-full bg-slate-900/90 p-2" aria-label="Back"><ArrowLeft /></button>}
         {!desktopNative && <button type="button" onClick={() => setDocked(true)} className="flex items-center gap-2 rounded-lg bg-slate-900/90 px-3 py-2 text-xs text-white" aria-label="Minimize player"><Minimize2 size={16} /> Mini player</button>}
+        {desktopNative && !nativeFullscreen && !docked && <button type="button" onClick={() => setDocked(true)} className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-slate-900/90 px-3 py-2 text-xs text-white hover:bg-slate-800" aria-label="Minimize native video to mini player"><Minimize2 size={16} /> Mini player</button>}
       </div>
       <h2 className="text-lg font-bold">{media.title}</h2>
       <p className="text-xs text-slate-300">{media.year} · {media.duration}</p>
