@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const net = require('node:net');
 const path = require('node:path');
 
 const WEBSITE = 'https://flixleo.cyou';
@@ -10,6 +11,8 @@ let previousUrl = WEBSITE;
 let lastBounds = null;
 let nativeProcess = null;
 let embedProcess = null;
+let mpvPipe = null;
+let mpvSerial = 0;
 function trusted(event) {
   try {
     const url = new URL(event.senderFrame?.url || '');
@@ -22,6 +25,7 @@ function nativeExecutable() {
     : path.join(__dirname, 'vendor', 'mpv', 'mpv.exe');
 }
 function stopPlayer() {
+  mpvPipe = null;
   if (embedProcess) { try { embedProcess.kill(); } catch {} embedProcess = null; }
   if (nativeProcess) {
     try { nativeProcess.kill(); } catch {}
@@ -67,9 +71,12 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
     ? path.join(process.resourcesPath, 'mpv', 'FlixLeoEmbed.exe')
     : path.join(__dirname, 'vendor', 'mpv', 'FlixLeoEmbed.exe');
   if (!fs.existsSync(helper)) { backToFlixLeo(); return { ok:false, error:'FlixLeo video embedding component is missing.' }; }
+  mpvPipe = `\\\\.\\pipe\\flixleo-mpv-${process.pid}-${++mpvSerial}`;
   const args = [
     '--no-config', '--no-terminal', '--force-window=yes', '--idle=no',
     '--keep-open=no', '--osc=yes', '--input-default-bindings=yes',
+    '--input-cursor=yes', '--script-opts=osc-visibility=always',
+    `--input-ipc-server=${mpvPipe}`,
     '--hwdec=auto-safe', '--border=no', '--geometry=1280x720',
     '--title=FlixLeo Native Player', '--user-agent=FlixLeoDesktop/1.0',
     '--', url
@@ -101,6 +108,32 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
     backToFlixLeo();
     return { ok:false, error:'Unable to start native playback.' };
   }
+});
+// Control the embedded decoder instead of attempting to control the unused HTML video.
+ipcMain.handle('flixleo:command-native', async (event, action, value) => {
+  if (!trusted(event) || !playing || !mpvPipe) return false;
+  const commands = {
+    togglePause: ['cycle', 'pause'],
+    seekBackward: ['seek', -10, 'relative'],
+    seekForward: ['seek', 10, 'relative'],
+    toggleMute: ['cycle', 'mute'],
+    toggleSubtitles: ['cycle', 'sub-visibility'],
+  };
+  let command = commands[action];
+  if (action === 'setVolume' && Number.isFinite(value)) command = ['set_property', 'volume', Math.max(0, Math.min(100, Number(value)))];
+  if (!command) return false;
+  return await new Promise(resolve => {
+    const socket = net.connect(mpvPipe);
+    const timeout = setTimeout(() => { socket.destroy(); resolve(false); }, 1800);
+    socket.once('connect', () => socket.write(JSON.stringify({ command }) + '\\n'));
+    socket.once('data', data => {
+      clearTimeout(timeout);
+      socket.end();
+      try { resolve(JSON.parse(String(data).trim()).error === 'success'); } catch { resolve(false); }
+    });
+    socket.once('error', () => { clearTimeout(timeout); resolve(false); });
+    socket.once('close', () => { clearTimeout(timeout); resolve(false); });
+  });
 });
 ipcMain.handle('flixleo:stop-native', (event) => {
   if (!trusted(event)) return false;
