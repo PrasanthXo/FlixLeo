@@ -137,6 +137,30 @@ ipcMain.handle('flixleo:command-native', async (event, action, value) => {
     socket.once('close', () => { clearTimeout(timeout); resolve(false); });
   });
 });
+ipcMain.handle('flixleo:playback-status', async (event) => {
+  if (!trusted(event) || !playing || !mpvPipe) return { ready:false };
+  return await new Promise(resolve => {
+    const socket = net.connect(mpvPipe);
+    let completed = false;
+    const finish = value => {
+      if (completed) return;
+      completed = true;
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish({ ready:false }), 1100);
+    socket.once('connect', () => socket.write(JSON.stringify({ command:['get_property','time-pos'] }) + '\n'));
+    socket.once('data', data => {
+      try {
+        const response = JSON.parse(String(data).trim().split('\n')[0]);
+        finish({ ready:response.error === 'success' && typeof response.data === 'number' && response.data >= 0 });
+      } catch { finish({ ready:false }); }
+    });
+    socket.once('error', () => finish({ ready:false }));
+    socket.once('close', () => finish({ ready:false }));
+  });
+});
 ipcMain.handle('flixleo:stop-native', (event) => {
   if (!trusted(event)) return false;
   backToFlixLeo();
