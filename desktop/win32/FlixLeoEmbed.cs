@@ -17,6 +17,11 @@ internal static class FlixLeoEmbed {
     [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
     [DllImport("user32.dll")] static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vKey);
+    [DllImport("user32.dll")] static extern uint GetDoubleClickTime();
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
     [StructLayout(LayoutKind.Sequential)] struct Point { public int x, y; }
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd, int command);
@@ -67,6 +72,15 @@ internal static class FlixLeoEmbed {
                 bool controlsVisible = false;
                 int lastCursorX = int.MinValue, lastCursorY = int.MinValue;
                 DateTime lastCursorMotion = DateTime.UtcNow;
+                // Intercept double clicks over the child HWND. Chromium does not
+                // receive mouse events that belong to this separate mpv process.
+                // Use OS double-click time and movement limits, not arbitrary
+                // web-player hit targets.
+                const int VK_LBUTTON = 0x01;
+                const int SM_CXDOUBLECLK = 36, SM_CYDOUBLECLK = 37;
+                bool previousLeftDown = false;
+                DateTime firstClickAt = DateTime.MinValue;
+                int firstClickX = 0, firstClickY = 0;
                 var updates = new System.Collections.Concurrent.ConcurrentQueue<string>();
                 var reader = new Thread(() => {
                     try { string line; while ((line = Console.ReadLine()) != null) updates.Enqueue(line); }
@@ -122,8 +136,9 @@ internal static class FlixLeoEmbed {
                                 }
                             }
                             // A user operating the seek bar or menu must not lose it.
-                            if (inside && cursor.y >= parentRect.bottom - controlsHeight)
-                                lastCursorMotion = DateTime.UtcNow;
+                            // Only active interaction holds the toolbar open.
+                            // Merely parking the cursor near the controls should
+                            // still let the pointer and controls fade out.
                             if (controlsVisible && (DateTime.UtcNow - lastCursorMotion).TotalMilliseconds > 3000) {
                                 controlsVisible = false;
                                 Console.WriteLine("CONTROLS_HIDDEN"); Console.Out.Flush();
@@ -135,7 +150,30 @@ internal static class FlixLeoEmbed {
                             SWP_NOZORDER | SWP_NOACTIVATE);
                     } else
                         SetWindowPos(child, IntPtr.Zero, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE);
-                    Thread.Sleep(100);
+
+                    Point mouse;
+                    Rect videoWindow;
+                    bool leftDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+                    bool clickStart = leftDown && !previousLeftDown;
+                    previousLeftDown = leftDown;
+                    bool foreground = GetAncestor(GetForegroundWindow(), 2) == parent;
+                    if (clickStart && foreground && GetCursorPos(out mouse) && GetWindowRect(child, out videoWindow) &&
+                        mouse.x >= videoWindow.left && mouse.x < videoWindow.right &&
+                        mouse.y >= videoWindow.top && mouse.y < videoWindow.bottom) {
+                        var now = DateTime.UtcNow;
+                        bool samePoint = Math.Abs(mouse.x - firstClickX) <= Math.Max(4, GetSystemMetrics(SM_CXDOUBLECLK)) &&
+                            Math.Abs(mouse.y - firstClickY) <= Math.Max(4, GetSystemMetrics(SM_CYDOUBLECLK));
+                        if (firstClickAt != DateTime.MinValue &&
+                            (now - firstClickAt).TotalMilliseconds <= GetDoubleClickTime() && samePoint) {
+                            firstClickAt = DateTime.MinValue;
+                            Console.WriteLine("VIDEO_DOUBLE_CLICK"); Console.Out.Flush();
+                        } else {
+                            firstClickAt = now;
+                            firstClickX = mouse.x; firstClickY = mouse.y;
+                        }
+                    }
+                    // Sample at 40Hz so quick mouse clicks are not missed.
+                    Thread.Sleep(25);
                 }
                 return 0;
             }
