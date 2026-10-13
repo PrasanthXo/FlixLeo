@@ -128,12 +128,14 @@ ipcMain.handle('flixleo:command-native', async (event, action, value) => {
     seekForward: ['seek', 10, 'relative'],
     toggleMute: ['cycle', 'mute'],
     toggleSubtitles: ['cycle', 'sub-visibility'],
+    disableSubtitles: ['set_property', 'sid', 'no'],
     nextAudio: ['cycle', 'audio'],
     nextSubtitle: ['cycle', 'sub'],
   };
   let command = commands[action];
   if (action === 'setAudioTrack' && Number.isInteger(value) && value >= 0) command = ['set_property','aid',value];
   if (action === 'setSubtitleTrack' && Number.isInteger(value) && value >= 0) command = ['set_property','sid',value];
+  if (action === 'seekTo' && Number.isFinite(value) && value >= 0 && value <= 864000) command = ['seek', Number(value), 'absolute'];
   if (action === 'toggleFullscreen') { toggleVideoFullscreen(mainWindow); return true; }
   if (action === 'setVolume' && Number.isFinite(value)) command = ['set_property', 'volume', Math.max(0, Math.min(100, Number(value)))];
   if (!command) return false;
@@ -201,6 +203,30 @@ ipcMain.handle('flixleo:playback-status', async (event) => {
     });
     socket.once('error', () => finish({ ready:false }));
     socket.once('close', () => finish({ ready:false }));
+  });
+});
+ipcMain.handle('flixleo:duration-native', async (event) => {
+  if (!trusted(event) || !playing || !mpvPipe) return 0;
+  return await new Promise(resolve => {
+    const socket = net.connect(mpvPipe);
+    let finished = false;
+    const finish = duration => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeout);
+      socket.destroy();
+      resolve(duration);
+    };
+    const timeout = setTimeout(() => finish(0), 1300);
+    socket.once('connect', () => socket.write(JSON.stringify({ command:['get_property', 'duration'] }) + '\n'));
+    socket.once('data', data => {
+      try {
+        const response = JSON.parse(String(data).split('\n')[0]);
+        finish(response.error === 'success' && Number.isFinite(response.data) ? Math.max(0, response.data) : 0);
+      } catch { finish(0); }
+    });
+    socket.once('error', () => finish(0));
+    socket.once('close', () => finish(0));
   });
 });
 ipcMain.handle('flixleo:fullscreen-state', (event) => {
