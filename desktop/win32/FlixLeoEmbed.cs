@@ -123,7 +123,12 @@ internal static class FlixLeoEmbed {
                         if (parts.Length == 4 && int.TryParse(parts[0], out x) &&
                             int.TryParse(parts[1], out y) && int.TryParse(parts[2], out w) &&
                             int.TryParse(parts[3], out h)) {
-                            px = Math.Max(0, x); py = Math.Max(0, y);
+                            // Signed positions let Windows naturally clip a child
+                            // that has scrolled outside the Electron client area.
+                            // Never clamp negative y to zero: that leaves a giant
+                            // movie window covering the catalog instead of docking.
+                            px = Math.Max(-20000, Math.Min(20000, x));
+                            py = Math.Max(-20000, Math.Min(20000, y));
                             pw = Math.Max(1, w); ph = Math.Max(1, h);
                         }
                     }
