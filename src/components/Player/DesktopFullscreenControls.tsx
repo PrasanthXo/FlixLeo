@@ -1,6 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Minimize2, Pause, Play, RotateCcw, RotateCw, Subtitles, Volume2, VolumeX, X } from 'lucide-react';
 import { desktopBridge, fullLanguage, type NativeTrack } from './DesktopNativeSurface';
+
+export type NativeAspectRatio = 'no' | '16:9' | '4:3' | '21:9' | '1:1';
+const aspectChoices: NativeAspectRatio[] = ['no', '16:9', '4:3', '21:9', '1:1'];
+
+export function DesktopAspectRatioPicker({ value, onChange }: { value: NativeAspectRatio; onChange: (ratio: NativeAspectRatio) => void }) {
+  return <label className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-2 py-1 text-xs text-white">
+    <span>Aspect</span>
+    <select aria-label="Video aspect ratio" className="max-w-40 bg-slate-800 text-xs text-white" value={value} onChange={e => onChange(e.target.value as NativeAspectRatio)}>
+      {aspectChoices.map(item => <option value={item} key={item}>{item === 'no' ? 'Original (Auto)' : item}</option>)}
+    </select>
+  </label>;
+}
 
 const clock = (seconds: number): string => {
   const n = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
@@ -15,7 +27,17 @@ const clock = (seconds: number): string => {
  * video. The embedding helper reserves exactly 96 physical pixels along
  * the bottom of the fullscreen window for this clickable HTML toolbar.
  */
-export function DesktopFullscreenControls({ title, onClose }: { title: string; onClose: () => void }) {
+export function DesktopFullscreenControls({ title, onClose, visible, aspectRatio, onAspectRatioChange }: { title: string; onClose: () => void; visible: boolean; aspectRatio: NativeAspectRatio; onAspectRatioChange: (ratio: NativeAspectRatio) => void }) {
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const measure = () => {
+      const height = toolbarRef.current?.getBoundingClientRect().height;
+      if (height) void desktopBridge()?.setControlsHeight?.(Math.round(height * (window.devicePixelRatio || 1)));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
   const [tracks, setTracks] = useState<{ audio: NativeTrack[]; subtitles: NativeTrack[] }>({ audio: [], subtitles: [] });
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -47,7 +69,7 @@ export function DesktopFullscreenControls({ title, onClose }: { title: string; o
     try { await desktopBridge()?.commandNative('toggleFullscreen'); }
     finally { onClose(); }
   };
-  return <div className="absolute bottom-0 left-0 right-0 z-[200] flex h-[96px] flex-col border-t border-white/15 bg-[#101521] text-white shadow-[0_-8px_25px_rgba(0,0,0,0.6)]" role="toolbar" aria-label="Windows fullscreen video controls">
+  return <div ref={toolbarRef} className={`absolute bottom-0 left-0 right-0 z-[200] flex h-[96px] flex-col border-t border-white/15 bg-[#101521] text-white shadow-[0_-8px_25px_rgba(0,0,0,0.6)] transition-opacity duration-200 ${visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} role="toolbar" aria-label="Windows fullscreen video controls">
     <div className="flex h-[32px] shrink-0 items-center gap-3 px-4">
       <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-100" title={title}>{title}</span>
       <label className="flex max-w-[190px] shrink-0 items-center gap-1 text-xs text-slate-200" title="Audio language">
@@ -64,6 +86,7 @@ export function DesktopFullscreenControls({ title, onClose }: { title: string; o
           {tracks.subtitles.map(track => <option key={track.id} value={track.id}>{fullLanguage(track.language, track.title)}</option>)}
         </select>
       </label>
+      <DesktopAspectRatioPicker value={aspectRatio} onChange={onAspectRatioChange}/>
     </div>
     <div className="flex h-[14px] shrink-0 items-center gap-2 px-4">
       <span className="w-10 shrink-0 text-right text-[10px] tabular-nums text-slate-300">{clock(position)}</span>
