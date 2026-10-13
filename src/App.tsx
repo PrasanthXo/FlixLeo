@@ -46,6 +46,7 @@ function languageMatches(actual: string, preference: string) {
 export default function App() {
   // Native Android is a separate WebView app; preserve its existing home layout.
   const isNativeAndroid = /FlixLeoNative\/[0-9]/i.test(navigator.userAgent);
+  const isWindowsExe = Boolean((window as Window & { flixleoDesktop?: unknown }).flixleoDesktop);
   const [isTvDisplay] = useState(() => window.location.pathname.toLowerCase().replace(/\/$/, '') === '/tv6' || /smart-tv|smarttv|hbbtv|netcast|web0s|webos|tizen|android tv|googletv|aft[a-z]|bravia|viera|roku|vidaa/i.test(navigator.userAgent));
   // Catalog State
   const [catalog, setCatalog] = useState<MediaItem[]>(MEDIA_CATALOG);
@@ -966,7 +967,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-12">
         {/* Active Cinema Video Player (if active) */}
         {activeMedia && (
-          <div className="mb-10 animate-fade-in relative z-30">
+          <div className={isWindowsExe ? "mb-10 relative z-30" : "mb-10 animate-fade-in relative z-30"}>
             <CinemaPlayer
               key={activeMedia.id + ':' + (activeMedia.playbackSeason ?? '') + ':' + (activeMedia.playbackEpisode ?? '') + ':' + playSession}
               media={activeMedia}
@@ -1122,7 +1123,7 @@ export default function App() {
         {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
           <MobileHomeCollections
             desktopView={!isTvDisplay && !isNativeAndroid}
-            windowsExe={Boolean((window as Window & { flixleoDesktop?: unknown }).flixleoDesktop)}
+            windowsExe={isWindowsExe}
             items={uniqueTitles([...tmdbMovies, ...tvShows, ...catalog])}
             additionalCollections={homeCollections}
             recent={continueWatching}
