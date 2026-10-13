@@ -185,10 +185,11 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     } catch { /* playback continues even without storage */ }
   };
 
-  // Stremio streams use the original custom native-style controls only.
-  // Other providers retain the existing CinemaPlayer implementation.
-  if (initialMirrorId?.startsWith('stremio-')) {
-    return <StremioNativePlayer media={media} mirrors={mirrors.filter(m => m.id.startsWith('stremio-'))}
+  // PlavioHD live channels are also Stremio streams, not legacy catalog videos.
+  // Use the HLS/DASH-capable player (and its per-source retry handling) for both.
+  if (initialMirrorId?.startsWith('stremio-') || media.id.startsWith('plavio-live-')) {
+    const compatibleMirrors = mirrors.filter(m => m.id.startsWith('stremio-') || m.id.startsWith('plavio-live-'));
+    return <StremioNativePlayer media={media} mirrors={compatibleMirrors.length ? compatibleMirrors : mirrors}
       initialMirrorId={initialMirrorId} minimizeSignal={minimizeSignal} onClose={onClose} onProgressSaved={onProgressSaved} onEpisodeEnded={onEpisodeEnded} />;
   }
 
