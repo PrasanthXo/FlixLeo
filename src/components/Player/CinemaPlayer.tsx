@@ -239,7 +239,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           {!mirrors.length && <option value="">No streams available</option>}
           {mirrors.map((mirror, i) => (
             <option key={mirror.id + i} value={i}>
-              {mirror.quality} · {mirror.label}
+              {mirror.quality} · {mirror.label}{mirror.fileSize ? ' · ' + mirror.fileSize : ''}
             </option>
           ))}
         </select>
