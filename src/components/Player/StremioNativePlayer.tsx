@@ -40,6 +40,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     } catch { setError('Fullscreen could not be activated.'); }
   };
   const [docked, setDocked] = useState(false);
+  const manualMinimize = useRef(false);
   const hasShownMainPlayer = useRef(false);
   const lastMinimizeSignal = useRef(minimizeSignal);
   useEffect(() => {
@@ -109,7 +110,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     void desktopBridge()?.commandNative('setAspectRatio', ratio);
   };
   useEffect(() => { setAspectRatio('no'); }, [active?.url]);
-  useEffect(() => { if (nativeFullscreen) setDocked(false); }, [nativeFullscreen]);
+  useEffect(() => { if (nativeFullscreen) { manualMinimize.current = false; setDocked(false); } }, [nativeFullscreen]);
   // Keep the video in one React tree and the mpv process alive while its
   // fixed mini-frame follows scrolling. The marker stays at the original
   // bottom edge because docking inserts a same-size flow placeholder.
@@ -119,7 +120,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     const update = () => {
       frame = 0;
       const marker = videoEndSentinel.current;
-      if (!marker || document.fullscreenElement) return;
+      if (!marker || document.fullscreenElement || manualMinimize.current) return;
       const below = marker.getBoundingClientRect().top < 12;
       setDocked(prev => prev === below ? prev : below);
     };
@@ -531,7 +532,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       <div className="mb-5 flex items-center justify-between gap-2">
         {!desktopNative && <button type="button" onClick={() => { save(); onClose(); }} className="rounded-full bg-slate-900/90 p-2" aria-label="Back"><ArrowLeft /></button>}
         {!desktopNative && <button type="button" onClick={() => setDocked(true)} className="flex items-center gap-2 rounded-lg bg-slate-900/90 px-3 py-2 text-xs text-white" aria-label="Minimize player"><Minimize2 size={16} /> Mini player</button>}
-        {desktopNative && !nativeFullscreen && !docked && <button type="button" onClick={() => setDocked(true)} className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-slate-900/90 px-3 py-2 text-xs text-white hover:bg-slate-800" aria-label="Minimize native video to mini player"><Minimize2 size={16} /> Mini player</button>}
+        {desktopNative && !nativeFullscreen && !docked && <button type="button" onClick={() => { manualMinimize.current = true; setDocked(true); }} className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-slate-900/90 px-3 py-2 text-xs text-white hover:bg-slate-800" aria-label="Minimize native video to mini player"><Minimize2 size={16} /> Mini player</button>}
       </div>
       <h2 className="text-lg font-bold">{media.title}</h2>
       <p className="text-xs text-slate-300">{media.year} · {media.duration}</p>
@@ -557,7 +558,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Rewind 10 seconds" title="Rewind" className="rounded-lg p-2 hover:bg-white/15" onClick={() => void desktopBridge()?.commandNative('seekBackward')}><RotateCcw size={19}/></button>
         <button type="button" aria-label="Play or pause" title="Play / Pause" className="rounded-lg bg-amber-400 p-2 text-black" onClick={() => void desktopBridge()?.commandNative('togglePause')}><Play size={19}/></button>
         <button type="button" aria-label="Forward 10 seconds" title="Forward" className="rounded-lg p-2 hover:bg-white/15" onClick={() => void desktopBridge()?.commandNative('seekForward')}><RotateCw size={19}/></button>
-        <button type="button" aria-label="Expand mini player" title="Expand" className="rounded-lg p-2 hover:bg-white/15" onClick={() => { setDocked(false); playerAnchor.current?.scrollIntoView({ behavior:'smooth', block:'start' }); }}><Maximize2 size={19}/></button>
+        <button type="button" aria-label="Expand mini player" title="Expand" className="rounded-lg p-2 hover:bg-white/15" onClick={() => { manualMinimize.current = false; setDocked(false); playerAnchor.current?.scrollIntoView({ behavior:'smooth', block:'start' }); }}><Maximize2 size={19}/></button>
         <button type="button" aria-label="Close mini player" title="Close" className="rounded-lg p-2 hover:bg-red-500/30" onClick={() => { save(); onClose(); }}>✕</button>
       </div>}
       {!desktopNative && buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
