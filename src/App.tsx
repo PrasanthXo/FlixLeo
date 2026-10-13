@@ -1122,6 +1122,7 @@ export default function App() {
         {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
           <MobileHomeCollections
             desktopView={!isTvDisplay && !isNativeAndroid}
+            windowsExe={Boolean((window as Window & { flixleoDesktop?: unknown }).flixleoDesktop)}
             items={uniqueTitles([...tmdbMovies, ...tvShows, ...catalog])}
             additionalCollections={homeCollections}
             recent={continueWatching}
