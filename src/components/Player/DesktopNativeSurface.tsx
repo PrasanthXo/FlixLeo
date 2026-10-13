@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 type DesktopBridge = {
   playNative: (url: string) => Promise<{ ok: boolean; error?: string }>;
   positionNative: (bounds: number[]) => Promise<boolean>;
   stopNative: () => Promise<boolean>;
+  playbackStatus?: () => Promise<{ready:boolean}>;
   commandNative: (action: 'togglePause' | 'seekBackward' | 'seekForward' | 'toggleMute' | 'toggleSubtitles' | 'setVolume', value?: number) => Promise<boolean>;
 };
 export const desktopBridge = (): DesktopBridge | undefined =>
@@ -13,11 +14,17 @@ export const desktopBridge = (): DesktopBridge | undefined =>
  * process follows this element on dock/undock rather than restarting. */
 export function DesktopNativeSurface({ url }: { url: string }) {
   const surface = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     const bridge = desktopBridge();
     const el = surface.current;
     if (!bridge || !el || !/^https:\/\//i.test(url)) return;
     let active = true;
+    setReady(false);
+    const statusTimer = window.setInterval(() => {
+      if (!active || !bridge.playbackStatus) return;
+      void bridge.playbackStatus().then(status => { if (active && status.ready) setReady(true); }).catch(() => {});
+    }, 750);
     let last = '';
     const reposition = () => {
       if (!active || !surface.current) return;
@@ -42,10 +49,16 @@ export function DesktopNativeSurface({ url }: { url: string }) {
     return () => {
       active = false;
       window.clearInterval(timer);
+      window.clearInterval(statusTimer);
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('resize', reposition);
       void bridge.stopNative();
     };
   }, [url]);
-  return <div ref={surface} className="w-full h-full min-h-0 bg-black" aria-label="FlixLeo native Windows video surface" />;
+  return <div ref={surface} className="relative w-full h-full min-h-0 bg-black" aria-label="FlixLeo native Windows video surface">
+    {!ready && <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black text-sm text-slate-300 pointer-events-none">
+      <span className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-amber-400" />
+      <span>Loading video…</span>
+    </div>}
+  </div>;
 }
