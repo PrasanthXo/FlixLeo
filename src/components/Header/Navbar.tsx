@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Home, Film, Search, Bookmark, Tv, Radio, UserRound, Download, X, Share2, MoreVertical } from 'lucide-react';
+import { Home, Film, Search, Bookmark, Tv, Radio, UserRound, Download, MonitorDown, X, Share2, MoreVertical } from 'lucide-react';
 import { SourceType } from '../../types/stream';
 
 interface NavbarProps {
@@ -113,7 +113,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Bookmark className="w-4.5 h-4.5" aria-hidden="true" />
             {bookmarkCount > 0 && <span className="absolute -top-1 -right-1 min-w-4 h-4 rounded-full bg-amber-500 px-1 text-[10px] leading-4 text-black font-bold">{bookmarkCount}</span>}
           </button>
-          {!installed && (
+          {platform === 'desktop' ? (
+            <a href="https://github.com/PrasanthXo/FlixLeo/actions/workflows/build-flixleo-windows.yml"
+              target="_blank" rel="noopener noreferrer"
+              title="Download FlixLeo for Windows" aria-label="Download Windows App"
+              className="hidden sm:inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-amber-300 hover:bg-amber-500/25 transition-colors shrink-0 text-xs font-semibold">
+              <MonitorDown className="h-4 w-4" aria-hidden="true" /><span>Download Windows App</span>
+            </a>
+          ) : !installed && (
             <button type="button" onClick={() => void requestInstall()} title="Install FlixLeo web app" aria-label="Install FlixLeo web app"
               className="flex items-center justify-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-2.5 sm:px-3 py-2 text-amber-300 hover:bg-amber-500/25 transition-colors shrink-0 text-xs font-semibold">
               <Download className="w-4 h-4" /><span>Install App</span>
