@@ -230,6 +230,10 @@
 
 /* Stage 2 mobile Home: remove the old Movie Catalogs selector and its entire legacy grid below. */
 @media(max-width:640px){.flixleo-mobile-home-hide-legacy{display:none!important}}
+/* Desktop browser and Windows EXE mirror mobile Home's catalog pattern;
+   hide only the redundant legacy Home chooser/grid on these two surfaces. */
+@media(min-width:641px){.flixleo-web-home-hide-legacy{display:none!important}}
+
 
 /* Native Windows fullscreen: hide the Chromium pointer with the embedded mpv cursor. */
 html.flixleo-native-cursor-hidden,
