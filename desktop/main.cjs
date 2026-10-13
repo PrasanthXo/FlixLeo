@@ -351,7 +351,8 @@ ipcMain.handle('flixleo:stop-native', (event) => {
 });
 ipcMain.handle('flixleo:position-native', (event, bounds) => {
   if (!trusted(event) || !Array.isArray(bounds) || bounds.length !== 4 ||
-      !bounds.every(x => Number.isFinite(x) && x >= 0 && x < 20000)) return false;
+      !bounds.every(x => Number.isFinite(x) && x > -20000 && x < 20000) ||
+      bounds[2] <= 0 || bounds[3] <= 0) return false;
   lastBounds = bounds.map(Math.round);
   if (embedProcess?.stdin?.writable) embedProcess.stdin.write(lastBounds.join(',') + '\n');
   return true;
