@@ -4,6 +4,7 @@ type DesktopBridge = {
   playNative: (url: string) => Promise<{ ok: boolean; error?: string }>;
   positionNative: (bounds: number[]) => Promise<boolean>;
   stopNative: () => Promise<boolean>;
+  commandNative: (action: 'togglePause' | 'seekBackward' | 'seekForward' | 'toggleMute' | 'toggleSubtitles' | 'setVolume', value?: number) => Promise<boolean>;
 };
 export const desktopBridge = (): DesktopBridge | undefined =>
   (window as Window & { flixleoDesktop?: DesktopBridge }).flixleoDesktop;
