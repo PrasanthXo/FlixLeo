@@ -81,6 +81,10 @@ internal static class FlixLeoEmbed {
                 bool previousLeftDown = false;
                 DateTime firstClickAt = DateTime.MinValue;
                 int firstClickX = 0, firstClickY = 0;
+                // Avoid resizing the mpv child 40 times a second when neither
+                // the Electron player rectangle nor toolbar state has changed.
+                int appliedX = int.MinValue, appliedY = int.MinValue;
+                int appliedW = int.MinValue, appliedH = int.MinValue;
                 var updates = new System.Collections.Concurrent.ConcurrentQueue<string>();
                 var reader = new Thread(() => {
                     try { string line; while ((line = Console.ReadLine()) != null) updates.Enqueue(line); }
@@ -119,6 +123,7 @@ internal static class FlixLeoEmbed {
                             pw = Math.Max(1, w); ph = Math.Max(1, h);
                         }
                     }
+                    int desiredX = px, desiredY = py, desiredW = pw, desiredH = ph;
                     Rect client;
                     if (fullscreen && GetClientRect(parent, out client)) {
                         Point cursor;
@@ -144,12 +149,16 @@ internal static class FlixLeoEmbed {
                                 Console.WriteLine("CONTROLS_HIDDEN"); Console.Out.Flush();
                             }
                         }
-                        SetWindowPos(child, IntPtr.Zero, 0, 0,
-                            Math.Max(1, Math.Min(client.right - client.left, pw)),
-                            Math.Max(1, Math.Min(client.bottom - client.top - (controlsVisible ? controlsHeight : 0), ph)),
+                        desiredX = 0; desiredY = 0;
+                        desiredW = Math.Max(1, Math.Min(client.right - client.left, pw));
+                        desiredH = Math.Max(1, Math.Min(client.bottom - client.top - (controlsVisible ? controlsHeight : 0), ph));
+                    }
+                    if (appliedX != desiredX || appliedY != desiredY ||
+                        appliedW != desiredW || appliedH != desiredH) {
+                        SetWindowPos(child, IntPtr.Zero, desiredX, desiredY, desiredW, desiredH,
                             SWP_NOZORDER | SWP_NOACTIVATE);
-                    } else
-                        SetWindowPos(child, IntPtr.Zero, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE);
+                        appliedX = desiredX; appliedY = desiredY; appliedW = desiredW; appliedH = desiredH;
+                    }
 
                     Point mouse;
                     Rect videoWindow;
