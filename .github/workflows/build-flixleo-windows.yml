@@ -20,9 +20,17 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Download verified bundled mpv decoder
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $release = Invoke-RestMethod 'https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/tags/20261012'
+          # Authenticate to avoid the GitHub-hosted runner's shared anonymous API limit.
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'User-Agent' = 'FlixLeo-Windows-Build'
+          }
+          $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/tags/20261012' -Headers $headers -TimeoutSec 45
           $asset = @($release.assets | Where-Object { $_.name -eq 'mpv-x86_64-20261012-git-88eb9f2e73.7z' }) | Select-Object -First 1
           if (-not $asset) { throw 'Pinned Windows x64 mpv build not found' }
           New-Item -ItemType Directory -Force desktop/vendor/mpv | Out-Null
