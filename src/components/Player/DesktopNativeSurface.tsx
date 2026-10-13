@@ -46,6 +46,12 @@ export function useDesktopControlsVisible(fullscreen: boolean): boolean {
     const off = desktopBridge()?.onNativeControlsVisible?.(setVisible);
     return () => off?.();
   }, [fullscreen]);
+  // Hide the Chromium cursor too; mpv hides its own native cursor.
+  // A class is used so interactive child elements cannot override it.
+  useEffect(() => {
+    document.documentElement.classList.toggle('flixleo-native-cursor-hidden', fullscreen && !visible);
+    return () => document.documentElement.classList.remove('flixleo-native-cursor-hidden');
+  }, [fullscreen, visible]);
   return visible;
 }
 
