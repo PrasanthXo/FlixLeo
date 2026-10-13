@@ -58,8 +58,8 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
   const win = mainWindow;
   if (!win || win.isDestroyed()) return { ok:false, error:'FlixLeo window is unavailable' };
   if (process.platform !== 'win32') return { ok:false, error:'Native playback is supported only on Windows.' };
-  // mpv --wid paints in the EXISTING native window. Chromium must release its
-  // compositor surface first or users can hear audio while seeing black video.
+  // The Win32 helper attaches mpv as a child surface inside the Electron window.
+  // Keep Chromium mounted for FlixLeo navigation and native playback controls.
   stopPlayer();
   playing = true;
   win.setTitle('FlixLeo');
@@ -158,7 +158,7 @@ function createWindow() {
   });
   mainWindow = win;
   win.webContents.on('before-input-event', (event, input) => {
-    if (playing && (input.key === 'Escape' || (input.alt && input.key === 'Left'))) {
+    if (playing && input.alt && input.key === 'Left') {
       event.preventDefault();
       backToFlixLeo();
     }
