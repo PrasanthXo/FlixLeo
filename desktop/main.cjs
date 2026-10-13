@@ -124,6 +124,8 @@ ipcMain.handle('flixleo:command-native', async (event, action, value) => {
     nextSubtitle: ['cycle', 'sub'],
   };
   let command = commands[action];
+  if (action === 'setAudioTrack' && Number.isInteger(value) && value >= 0) command = ['set_property','aid',value];
+  if (action === 'setSubtitleTrack' && Number.isInteger(value) && value >= 0) command = ['set_property','sid',value];
   if (action === 'toggleFullscreen') { mainWindow?.setFullScreen(!mainWindow.isFullScreen()); return true; }
   if (action === 'setVolume' && Number.isFinite(value)) command = ['set_property', 'volume', Math.max(0, Math.min(100, Number(value)))];
   if (!command) return false;
@@ -138,6 +140,35 @@ ipcMain.handle('flixleo:command-native', async (event, action, value) => {
     });
     socket.once('error', () => { clearTimeout(timeout); resolve(false); });
     socket.once('close', () => { clearTimeout(timeout); resolve(false); });
+  });
+});
+ipcMain.handle('flixleo:tracks-native', async (event) => {
+  if (!trusted(event) || !playing || !mpvPipe) return { audio:[], subtitles:[] };
+  return await new Promise(resolve => {
+    const socket = net.connect(mpvPipe);
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      socket.destroy();
+      resolve(result);
+    };
+    const timeout = setTimeout(() => finish({ audio:[], subtitles:[] }), 1200);
+    socket.once('connect', () => socket.write(JSON.stringify({ command:['get_property','track-list'] }) + '\n'));
+    socket.once('data', data => {
+      try {
+        const response = JSON.parse(String(data).split('\n')[0]);
+        const tracks = Array.isArray(response.data) ? response.data : [];
+        const mapped = type => tracks.filter(t => t.type === type).map(t => ({
+          id:t.id, selected:!!t.selected, language:typeof t.lang === 'string' ? t.lang : '',
+          title:typeof t.title === 'string' ? t.title : ''
+        }));
+        finish({ audio:mapped('audio'), subtitles:mapped('sub') });
+      } catch { finish({ audio:[], subtitles:[] }); }
+    });
+    socket.once('error', () => finish({ audio:[], subtitles:[] }));
+    socket.once('close', () => finish({ audio:[], subtitles:[] }));
   });
 });
 ipcMain.handle('flixleo:playback-status', async (event) => {
