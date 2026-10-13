@@ -759,13 +759,9 @@ export default function App() {
     return result;
   }, [tmdbMovies, tvShows, catalog]);
   const mobileWheelFeatured = mobileWheelItems[0] || featuredMedia;
-  const [isMobileHomeViewport, setIsMobileHomeViewport] = useState(() => window.innerWidth <= 640);
-  useEffect(() => {
-    const updateMobileViewport = () => setIsMobileHomeViewport(window.innerWidth <= 640);
-    window.addEventListener('resize', updateMobileViewport);
-    return () => window.removeEventListener('resize', updateMobileViewport);
-  }, []);
-  const showMixedMobileWheel = !isTvDisplay && isMobileHomeViewport && currentTab === 'browse';
+  // Home mirrors the mobile catalog/pattern on desktop web and Windows EXE.
+  // TV, Movies, Series, Search and other destinations retain their layouts.
+  const showMixedMobileWheel = !isTvDisplay && currentTab === 'browse';
 
   return (
     <div className={`${isTvDisplay ? "flixleo-tv" : ""} min-h-screen bg-[#080a0f] text-slate-100 flex flex-col selection:bg-amber-500 selection:text-black`}>
@@ -983,7 +979,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Mobile Home: 3D wheel comes before the original Continue Watching row. */}
+        {/* Shared web/Windows Home: mixed movie+series 3D wheel, then Continue Watching. */}
         {showMixedMobileWheel && sourceFilter === 'all' && !searchQuery.trim() && !activeMedia && mobileWheelFeatured && (
           <HeroBanner
             media={mobileWheelFeatured}
@@ -1115,10 +1111,10 @@ export default function App() {
           />
         )}
 
-        {/* Mobile Home-only curated discovery, immediately under the hero rather than after the long grid. */}
+        {/* The same live catalog rows and visual pattern for web Home and the Windows EXE. */}
         {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
           <MobileHomeCollections
-            desktopView={isWindowsExe}
+            desktopView={!isTvDisplay}
             items={uniqueTitles([...tmdbMovies, ...tvShows, ...catalog])}
             additionalCollections={homeCollections}
             recent={continueWatching}
@@ -1134,7 +1130,7 @@ export default function App() {
           <PlavioLiveSection onPlay={handlePlayMedia} />
         )}
 
-        {currentTab !== 'live' && <div className={(!isTvDisplay && currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all') ? 'flixleo-mobile-home-hide-legacy' : ''}>
+        {currentTab !== 'live' && <div className={(!isTvDisplay && currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all') ? 'flixleo-mobile-home-hide-legacy flixleo-web-home-hide-legacy' : ''}>
         {/* TMDB Movie Catalogs Selector */}
         {(currentTab === 'browse' || currentTab === 'movies') && !searchQuery && (
           <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-slate-900/90 via-[#0a101d] to-slate-950 border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
