@@ -463,19 +463,19 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   return <section ref={playerAnchor} className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700 bg-[#090b11] text-white">
     <div className="relative min-h-32 bg-cover bg-center p-4" style={{ backgroundImage: `linear-gradient(to top, #090b11, transparent), url("${media.backdropUrl}")` }}>
       <div className="mb-5 flex items-center justify-between gap-2">
-        <button type="button" onClick={() => { save(); onClose(); }} className="rounded-full bg-slate-900/90 p-2" aria-label="Back"><ArrowLeft /></button>
-        <button type="button" onClick={() => setDocked(true)} className="flex items-center gap-2 rounded-lg bg-slate-900/90 px-3 py-2 text-xs text-white" aria-label="Minimize player"><Minimize2 size={16} /> Mini player</button>
+        {!desktopNative && <button type="button" onClick={() => { save(); onClose(); }} className="rounded-full bg-slate-900/90 p-2" aria-label="Back"><ArrowLeft /></button>}
+        {!desktopNative && <button type="button" onClick={() => setDocked(true)} className="flex items-center gap-2 rounded-lg bg-slate-900/90 px-3 py-2 text-xs text-white" aria-label="Minimize player"><Minimize2 size={16} /> Mini player</button>}
       </div>
       <h2 className="text-lg font-bold">{media.title}</h2>
       <p className="text-xs text-slate-300">{media.year} · {media.duration}</p>
     </div>
-    <div ref={fullscreenFrame} className={docked ? "fixed z-[80] right-3 bottom-24 md:bottom-8 w-[min(72vw,300px)] aspect-video overflow-hidden rounded-xl border border-amber-500/60 bg-black shadow-2xl" : "relative aspect-video bg-black"} style={desktopFullscreen ? { position: "fixed", inset: 0, top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh", maxWidth: "none", aspectRatio: "auto" } : undefined}>
-      {<button type="button" className="absolute right-3 top-3 z-[60] rounded-lg bg-black/85 px-3 py-2 text-xs text-white border border-white/20" onClick={() => void toggleDesktopFullscreen()}>{desktopFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
-      {docked && <div className="absolute right-1 top-1 z-20 flex gap-1">
+    <div ref={fullscreenFrame} className={docked ? "fixed z-[80] right-3 bottom-24 md:bottom-8 w-[min(72vw,300px)] h-[220px] overflow-hidden rounded-xl border border-amber-500/60 bg-black shadow-2xl" : "relative aspect-video bg-black"} style={desktopFullscreen ? { position: "fixed", inset: 0, top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh", maxWidth: "none", aspectRatio: "auto" } : undefined}>
+      {!desktopNative && <button type="button" className="absolute right-3 top-3 z-[60] rounded-lg bg-black/85 px-3 py-2 text-xs text-white border border-white/20" onClick={() => void toggleDesktopFullscreen()}>{desktopFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
+      {docked && !desktopNative && <div className="absolute right-1 top-1 z-20 flex gap-1">
         <button type="button" aria-label="Expand mini player" onClick={() => { setDocked(false); playerAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
-      {desktopNative && active ? <DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
+      {desktopNative && active ? <div className={docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
         onPlay={() => { setPlaying(true); setBuffering(false); setError(''); }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBuffering(true)}
@@ -484,6 +484,13 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         onEnded={() => { setPlaying(false); save(); onEpisodeEnded?.(); }}>
         {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={uploadedRef.current || selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>}
+      {docked && desktopNative && <div className="absolute bottom-0 left-0 right-0 z-[90] flex h-[52px] items-center justify-around gap-1 border-t border-white/15 bg-[#151925] px-2 text-white">
+        <button type="button" aria-label="Rewind 10 seconds" title="Rewind" className="rounded-lg p-2 hover:bg-white/15" onClick={() => void desktopBridge()?.commandNative('seekBackward')}><RotateCcw size={19}/></button>
+        <button type="button" aria-label="Play or pause" title="Play / Pause" className="rounded-lg bg-amber-400 p-2 text-black" onClick={() => void desktopBridge()?.commandNative('togglePause')}><Play size={19}/></button>
+        <button type="button" aria-label="Forward 10 seconds" title="Forward" className="rounded-lg p-2 hover:bg-white/15" onClick={() => void desktopBridge()?.commandNative('seekForward')}><RotateCw size={19}/></button>
+        <button type="button" aria-label="Expand mini player" title="Expand" className="rounded-lg p-2 hover:bg-white/15" onClick={() => { setDocked(false); playerAnchor.current?.scrollIntoView({ behavior:'smooth', block:'start' }); }}><Maximize2 size={19}/></button>
+        <button type="button" aria-label="Close mini player" title="Close" className="rounded-lg p-2 hover:bg-red-500/30" onClick={() => { save(); onClose(); }}>✕</button>
+      </div>}
       {!desktopNative && buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
       {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/85 p-3 text-xs text-amber-300">
         <p>{error}</p>
