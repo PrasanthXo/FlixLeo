@@ -1,0 +1,19 @@
+name: Audit production update gateways
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'server/updateGateway.ts'
+      - '.github/workflows/check-update-gates.yml'
+      - '.github/scripts/check-update-gates.mjs'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check production gateway endpoints and safe fallback
+        run: node .github/scripts/check-update-gates.mjs
