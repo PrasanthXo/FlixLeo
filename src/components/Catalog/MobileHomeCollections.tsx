@@ -3,6 +3,7 @@ import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import type { MediaItem } from '../../types/stream';
 import { TmdbArtwork } from './TmdbArtwork';
 import { PosterOptions } from './PosterOptions';
+import { WindowsCatalogRail } from './WindowsCatalogRail';
 import './MobileHomeCollections.css';
 
 type Props = {
@@ -13,11 +14,12 @@ type Props = {
   onOpen: (item: MediaItem) => void;
   onPlay: (item: MediaItem) => void;
   desktopView?: boolean;
+  windowsExe?: boolean;
   bookmarkedIds?: string[];
   onToggleBookmark?: (item: MediaItem) => void;
 };
 
-export function MobileHomeCollections({ items, southIndianMovies = [], additionalCollections = {}, recent, onOpen, onPlay, bookmarkedIds = [], onToggleBookmark, desktopView = false }: Props) {
+export function MobileHomeCollections({ items, southIndianMovies = [], additionalCollections = {}, recent, onOpen, onPlay, bookmarkedIds = [], onToggleBookmark, desktopView = false, windowsExe = false }: Props) {
   const unique = useMemo(() => {
     const seen = new Set<string>();
     return items.filter(item => {
@@ -70,7 +72,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
     <div className="flixleo-mobile-collections-intro"><Sparkles size={17}/> Explore your universe</div>
     {rows.map(row => <section key={row.label} className="flixleo-mobile-collection" aria-label={row.label}>
       <div className="flixleo-mobile-collection-head"><div><h2>{row.label}</h2><p>{row.subtitle}</p></div><ArrowRight size={19} aria-hidden="true"/></div>
-      {row.list.length === 0 ? <p className="flixleo-mobile-collection-empty">No titles available in this collection right now.</p> : <div className="flixleo-mobile-collection-scroll">
+      {row.list.length === 0 ? <p className="flixleo-mobile-collection-empty">No titles available in this collection right now.</p> : <WindowsCatalogRail windowsExe={windowsExe} title={row.label} itemCount={row.list.length}>
         {row.list.map(item => {
           return <div className="flixleo-mobile-collection-card relative" key={item.id}>
             <div className="flixleo-mobile-collection-poster-wrap">
@@ -82,7 +84,7 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
             <div className="flixleo-mobile-collection-card-foot"><span title={item.title}>{item.title}</span><button type="button" onClick={() => onPlay(item)} aria-label={`Play ${item.title}`}><Play size={12} fill="currentColor"/></button></div>
           </div>;
         })}
-      </div>}
+      </WindowsCatalogRail>}
     </section>)}
   </div>;
 }
