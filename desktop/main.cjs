@@ -125,7 +125,7 @@ ipcMain.handle('flixleo:command-native', async (event, action, value) => {
   return await new Promise(resolve => {
     const socket = net.connect(mpvPipe);
     const timeout = setTimeout(() => { socket.destroy(); resolve(false); }, 1800);
-    socket.once('connect', () => socket.write(JSON.stringify({ command }) + '\\n'));
+    socket.once('connect', () => socket.write(JSON.stringify({ command }) + '\n'));
     socket.once('data', data => {
       clearTimeout(timeout);
       socket.end();
