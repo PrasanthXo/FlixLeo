@@ -196,6 +196,10 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   const desktopVlc = (window as Window & { flixleoDesktop?: { playNative: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
   const isFlixLeoNative = /FlixLeoNative\/1\.0/i.test(navigator.userAgent);
   const appleVlcTarget = getAppleVlcTarget();
+  // Recommend only the playback option relevant to the visitor's device.
+  // iPadOS desktop-mode user agents must still be treated as Apple devices.
+  const audioHelpPlatform = appleVlcTarget ? 'apple' : /Android/i.test(navigator.userAgent)
+    ? 'android' : /Windows NT|Windows|Win32|Win64/i.test(navigator.userAgent) ? 'windows' : null;
   const canUseVlc = isFlixLeoNative || Boolean(desktopVlc) || Boolean(appleVlcTarget);
   const playInVlc = async (mirror: StreamMirror) => {
     // Keep the Android native bridge and desktop bridge; Apple web browsers
@@ -329,28 +333,42 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 <span className="text-slate-200">{activeMedia.cast.join(', ')}</span>
               </div>
             )}
-            {!desktopVlc && (
-            <div className="md:col-span-2 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/10 to-slate-900/70 p-4 sm:p-5" role="note" aria-label="Audio playback help">
-              <div className="flex items-start gap-3">
-                <Volume2 className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" aria-hidden="true" />
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-amber-300">Video playing without sound?</p>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-200 sm:text-sm">
-                    Some 4K and surround-sound audio formats are not supported by web browsers. For wider playback compatibility, try our <strong className="text-white">FlixLeo Android app</strong> or our <strong className="text-white">FlixLeo Windows app</strong> with native playback. Stream availability and audio support still depend on the source.
-                  </p>
-                  <div className="mt-3 flex items-center gap-3" aria-label="FlixLeo Android and Windows apps">
-                    <span title="FlixLeo for Android" role="img" aria-label="FlixLeo for Android"
-                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-300">
-                      <Smartphone className="h-6 w-6" aria-hidden="true" />
-                    </span>
-                    <span title="FlixLeo for Windows" role="img" aria-label="FlixLeo for Windows"
-                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-sky-400/40 bg-sky-500/15 text-sky-300">
-                      <Monitor className="h-6 w-6" aria-hidden="true" />
-                    </span>
+            {audioHelpPlatform && !desktopVlc && (
+              <div className="md:col-span-2 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/10 to-slate-900/70 p-4 sm:p-5" role="note" aria-label="Audio playback help">
+                <div className="flex items-start gap-3">
+                  <Volume2 className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-amber-300">Video playing without sound?</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-200 sm:text-sm">
+                      Some 4K and surround-sound audio formats are not supported by web browsers.{' '}
+                      {audioHelpPlatform === 'android' && <>For better playback compatibility, try our <strong className="text-white">FlixLeo Android app</strong>.</>}
+                      {audioHelpPlatform === 'windows' && <>For better playback compatibility, try our <strong className="text-white">FlixLeo Windows app</strong> with native playback.</>}
+                      {audioHelpPlatform === 'apple' && <>If audio does not work, select <strong className="text-white">VLC Play</strong> beside a streaming server to try playing it in VLC. {appleVlcTarget === 'mac' ? 'On Mac, a registered VLC link handler is required.' : 'VLC must be installed on your iPhone or iPad.'}</>}
+                      {' '}Stream availability and audio support still depend on the source.
+                    </p>
+                    <div className="mt-3 flex items-center gap-3" aria-label={audioHelpPlatform === 'android' ? 'FlixLeo Android app' : audioHelpPlatform === 'windows' ? 'FlixLeo Windows app' : 'VLC Play'}>
+                      {audioHelpPlatform === 'android' && (
+                        <span title="FlixLeo for Android" role="img" aria-label="FlixLeo for Android"
+                          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-300">
+                          <Smartphone className="h-6 w-6" aria-hidden="true" />
+                        </span>
+                      )}
+                      {audioHelpPlatform === 'windows' && (
+                        <span title="FlixLeo for Windows" role="img" aria-label="FlixLeo for Windows"
+                          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-sky-400/40 bg-sky-500/15 text-sky-300">
+                          <Monitor className="h-6 w-6" aria-hidden="true" />
+                        </span>
+                      )}
+                      {audioHelpPlatform === 'apple' && (
+                        <span title="VLC Play" role="img" aria-label="VLC Play"
+                          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-orange-400/40 bg-orange-500/15 text-orange-200">
+                          <Play className="h-6 w-6" aria-hidden="true" />
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
             )}
           </div>
 
