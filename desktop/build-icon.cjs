@@ -8,7 +8,7 @@ const sharp = require('sharp');
 async function main() {
   const root = path.resolve(__dirname, '..');
   const svg = fs.readFileSync(path.join(root, 'public', 'flixleo-logo.svg'), 'utf8');
-  const image = /data:image\/webp;base64,([^"'<>\\s]+)/i.exec(svg);
+  const image = /data:image\/webp;base64,([A-Za-z0-9+/=]+)/i.exec(svg);
   if (!image) throw new Error('Official FlixLeo brand image was not found.');
   const source = Buffer.from(image[1], 'base64');
   const sizes = [16, 24, 32, 48, 64, 128, 256];
