@@ -114,12 +114,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             {bookmarkCount > 0 && <span className="absolute -top-1 -right-1 min-w-4 h-4 rounded-full bg-amber-500 px-1 text-[10px] leading-4 text-black font-bold">{bookmarkCount}</span>}
           </button>
           {platform === 'desktop' ? (
-            <a href="https://github.com/PrasanthXo/FlixLeo/actions/workflows/build-flixleo-windows.yml"
-              target="_blank" rel="noopener noreferrer"
-              title="Download FlixLeo for Windows" aria-label="Download Windows App"
-              className="hidden sm:inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-amber-300 hover:bg-amber-500/25 transition-colors shrink-0 text-xs font-semibold">
+            <span aria-label="Download Windows App (unavailable)" title="Windows app download temporarily unavailable"
+              className="hidden sm:inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-amber-300 cursor-not-allowed select-none shrink-0 text-xs font-semibold opacity-65">
               <MonitorDown className="h-4 w-4" aria-hidden="true" /><span>Download Windows App</span>
-            </a>
+            </span>
           ) : !installed && (
             <button type="button" onClick={() => void requestInstall()} title="Install FlixLeo web app" aria-label="Install FlixLeo web app"
               className="flex items-center justify-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-2.5 sm:px-3 py-2 text-amber-300 hover:bg-amber-500/25 transition-colors shrink-0 text-xs font-semibold">
