@@ -47,7 +47,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     lastMinimizeSignal.current = minimizeSignal;
   }, [minimizeSignal]);
   useEffect(() => {
-    if (desktopBridge()) return; // Native docking is based on video viewport, not section.
+    if (desktopNative) return; // Native docking is based on video viewport, not section.
     let lastScroll = window.scrollY;
     const onScroll = () => {
       const anchor = playerAnchor.current;
@@ -66,7 +66,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [docked]);
+  }, [docked, selected]);
   const hlsRef = useRef<Hls | null>(null);
   const shakaRef = useRef<any>(null);
   const uploadedRef = useRef<string | null>(null);
