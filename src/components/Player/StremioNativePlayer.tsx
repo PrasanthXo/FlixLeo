@@ -35,12 +35,29 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     } catch { setError('Fullscreen could not be activated.'); }
   };
   const [docked, setDocked] = useState(false);
-  useEffect(() => { if (minimizeSignal > 0) setDocked(true); }, [minimizeSignal]);
+  const hasShownMainPlayer = useRef(false);
+  const lastMinimizeSignal = useRef(minimizeSignal);
   useEffect(() => {
+    if (minimizeSignal > lastMinimizeSignal.current) setDocked(true);
+    lastMinimizeSignal.current = minimizeSignal;
+  }, [minimizeSignal]);
+  useEffect(() => {
+    let lastScroll = window.scrollY;
     const onScroll = () => {
       const anchor = playerAnchor.current;
-      if (anchor && !docked && anchor.getBoundingClientRect().bottom < 0) setDocked(true);
+      if (!anchor || document.fullscreenElement) return;
+      const rect = anchor.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 48 && rect.bottom > 48) {
+        hasShownMainPlayer.current = true;
+      }
+      // Minimize only on a later downward scroll, after the big player has
+      // actually been visible. Initial scrolling from a distant movie row
+      // must not turn a new playback request into a floating mini-player.
+      if (!docked && hasShownMainPlayer.current && rect.bottom < -8 &&
+          window.scrollY > lastScroll + 1) setDocked(true);
+      lastScroll = window.scrollY;
     };
+    onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, [docked]);
@@ -177,13 +194,18 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     const url = audioFix && active.audioFixUrl ? active.audioFixUrl : active.url;
     let autoplayBlocked = false;
     const startPlayback = () => {
+      if (disposed) return;
       void video.play().catch((reason: unknown) => {
         if (disposed) return;
         setPlaying(false);
-        if ((reason as { name?: string })?.name === 'NotAllowedError') {
+        const name = (reason as { name?: string })?.name;
+        if (name === 'NotAllowedError') {
           autoplayBlocked = true;
           setBuffering(false);
-          setError('Press Play to start this channel.');
+          setError('Autoplay was blocked. Press Play to start the video.');
+        } else if (name !== 'AbortError') {
+          setBuffering(false);
+          setError('Playback did not start. Press Play to retry or choose another stream.');
         }
       });
     };
@@ -229,7 +251,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         shakaPlayer.addEventListener('adaptation', refreshTracks);
         shakaPlayer.addEventListener('error', () => { if (!disposed) fail(); });
         await shakaPlayer.load(url);
-        if (!disposed) { refreshTracks(); void video.play().catch(() => setPlaying(false)); }
+        if (!disposed) { refreshTracks(); startPlayback(); }
       } catch {
         if (disposed) return;
         if (shakaPlayer) { void shakaPlayer.destroy(); shakaPlayer = null; shakaRef.current = null; }
@@ -242,7 +264,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
             fallback.loadSource(url); fallback.attachMedia(video);
           } else fail();
         } else video.src = url;
-        void video.play().catch(() => setPlaying(false));
+        startPlayback();
       }
     };
     if (isAdaptive) { void setupShaka(); }
@@ -472,12 +494,12 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     <div ref={fullscreenFrame} className={docked ? "fixed z-[80] right-3 bottom-24 md:bottom-8 w-[min(72vw,300px)] h-[220px] overflow-hidden rounded-xl border border-amber-500/60 bg-black shadow-2xl" : "relative aspect-video bg-black"} style={desktopFullscreen ? { position: "fixed", inset: 0, top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh", maxWidth: "none", aspectRatio: "auto" } : undefined}>
       {!desktopNative && <button type="button" className="absolute right-3 top-3 z-[60] rounded-lg bg-black/85 px-3 py-2 text-xs text-white border border-white/20" onClick={() => void toggleDesktopFullscreen()}>{desktopFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
       {docked && !desktopNative && <div className="absolute right-1 top-1 z-20 flex gap-1">
-        <button type="button" aria-label="Expand mini player" onClick={() => { setDocked(false); playerAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
+        <button type="button" aria-label="Expand mini player" onClick={() => { playerAnchor.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); setDocked(false); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
       {desktopNative && active ? <div className={docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
         onPlay={() => { setPlaying(true); setBuffering(false); setError(''); }}
-        onPause={() => setPlaying(false)}
+        onPause={() => { setPlaying(false); setBuffering(false); }}
         onWaiting={() => setBuffering(true)}
         onCanPlay={() => setBuffering(false)}
         onTimeUpdate={event => { setPosition(event.currentTarget.currentTime); setDuration(event.currentTarget.duration || 0); save(); }}
@@ -492,6 +514,15 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Close mini player" title="Close" className="rounded-lg p-2 hover:bg-red-500/30" onClick={() => { save(); onClose(); }}>✕</button>
       </div>}
       {!desktopNative && buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
+      {!desktopNative && !playing && !buffering && active && <button type="button"
+        className="absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 grid h-16 w-16 place-items-center rounded-full border border-white/30 bg-amber-500/95 text-black shadow-xl hover:scale-105"
+        aria-label="Play video" title="Play video"
+        onClick={() => {
+          const video = videoRef.current;
+          if (!video) return;
+          setError(''); setBuffering(true);
+          void video.play().catch(() => { setBuffering(false); setError('Cannot play this stream in the browser. Try another server.'); });
+        }}><Play size={30} fill="currentColor" /></button>
       {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/85 p-3 text-xs text-amber-300">
         <p>{error}</p>
         {liveChannel && <button type="button" onClick={() => { failedLiveSources.current.clear(); setError(''); setSelected(sorted[0]?.id || ''); setRetryToken(n => n + 1); }}
