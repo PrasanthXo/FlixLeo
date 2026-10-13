@@ -105,15 +105,29 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     const controller = new AbortController();
     const id = media.id.match(/^(?:tmdb-|tv-)(\d+)$/)?.[1];
     if (!id) return;
+    if (media.type === 'tv' && (media.playbackSeason === undefined || media.playbackEpisode === undefined)) return;
     setSubtitleLoading(true);
-    const params = new URLSearchParams({ type: media.type === 'tv' ? 'series' : 'movie', tmdb: id, title: media.title, year: String(media.year || '') });
+    const params = new URLSearchParams({ type: media.type === 'tv' ? 'series' : 'movie', tmdb: id });
+    if (media.type === 'tv') {
+      params.set('season', String(media.playbackSeason));
+      params.set('episode', String(media.playbackEpisode));
+    }
     fetch('/api/stremio/subtitles?' + params, { signal: controller.signal })
       .then(response => response.ok ? response.json() : { subtitles: [] })
-      .then(data => { if (!controller.signal.aborted) setSubtitles(Array.isArray(data.subtitles) ? data.subtitles : []); })
-      .catch(() => {})
+      .then(data => {
+        if (controller.signal.aborted) return;
+        const online: Track[] = Array.isArray(data.subtitles) ? data.subtitles.filter(
+          (t: any) => typeof t?.url === 'string' && typeof t?.language === 'string' && typeof t?.label === 'string'
+        ) : [];
+        setSubtitles(previous => [
+          ...previous.filter(t => /^(?:hls-sub:|native-sub:|shaka-sub:|blob:)/.test(t.url)),
+          ...online
+        ]);
+      })
+      .catch(() => { /* Embedded and local subtitles remain available. */ })
       .finally(() => { if (!controller.signal.aborted) setSubtitleLoading(false); });
     return () => controller.abort();
-  }, [media.id, media.type]);
+  }, [media.id, media.type, media.playbackSeason, media.playbackEpisode]);
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !active || desktopNative) return;

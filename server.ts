@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import updateGateway from './server/updateGateway';
+import { installSubtitleGateway } from './server/subtitleGateway';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -1140,56 +1141,8 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
   return res.json({ streams, configured: true, diagnostics });
 });
 
-// Discover subtitle tracks advertised by configured Stremio add-ons.
-// Only HTTPS WebVTT files are directly usable by the browser; local SRT imports
-// are converted in the client. Provider-hosted subtitles must permit CORS.
-app.get('/api/stremio/subtitles', async (req: Request, res: Response) => {
-  const type = String(req.query.type || '');
-  const tmdb = String(req.query.tmdb || '');
-  if (!['movie', 'series'].includes(type) || !/^\d{1,12}$/.test(tmdb)) {
-    return res.status(400).json({ error: 'Invalid title' });
-  }
-  try {
-    const external = await fetchFromTmdb('/' + (type === 'series' ? 'tv' : 'movie') + '/' + tmdb + '/external_ids');
-    const imdb = String(external?.imdb_id || '');
-    if (!/^tt\d{5,12}$/.test(imdb)) return res.json({ subtitles: [] });
-    const configs = (process.env.STREMIO_ADDON_URLS || '').split(',').map(x => x.trim()).filter(Boolean).slice(0, 5);
-    const sources = configs.flatMap(value => {
-      try {
-        const u = new URL(value.replace(/\/manifest\.json$/, '').replace(/\/$/, ''));
-        return u.protocol === 'https:' && u.hostname.includes('.') && !u.username && !u.password &&
-          !/^(localhost|.*\.local|.*\.internal)$/i.test(u.hostname) ? [u.toString().replace(/\/$/, '')] : [];
-      } catch { return []; }
-    });
-    const results = await Promise.allSettled(sources.map(async base => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4500);
-      try {
-        const response = await fetch(base + '/subtitles/' + type + '/' + imdb + '.json', {
-          signal: controller.signal, redirect: 'error', headers: { Accept: 'application/json' }
-        });
-        if (!response.ok || Number(response.headers.get('content-length') || 0) > 1000000) return [];
-        const raw = await response.text();
-        if (raw.length > 1000000) return [];
-        const data = JSON.parse(raw);
-        return (Array.isArray(data.subtitles) ? data.subtitles : []).slice(0, 30).flatMap((track: any) => {
-          if (typeof track.url !== 'string') return [];
-          try {
-            const u = new URL(track.url);
-            if (u.protocol !== 'https:' || u.username || u.password || !u.hostname.includes('.') ||
-                !/\.(?:vtt|srt)$/i.test(u.pathname)) return [];
-            return [{ url: u.toString(), label: String(track.name || track.id || track.lang || 'Subtitles').slice(0, 70),
-              language: String(track.lang || 'und').slice(0, 12) }];
-          } catch { return []; }
-        });
-      } finally { clearTimeout(timer); }
-    }));
-    const tracks = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-    const unique = [...new Map(tracks.map(t => [t.url, t])).values()].slice(0, 50);
-    res.setHeader('Cache-Control', 'private, max-age=120');
-    return res.json({ subtitles: unique });
-  } catch { return res.json({ subtitles: [] }); }
-});
+// Online Stremio subtitles (including configured OpenSubtitles PRO), with a safe caption relay.
+installSubtitleGateway(app, fetchFromTmdb);
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
