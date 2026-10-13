@@ -101,7 +101,7 @@ export function DesktopFullscreenControls({ title, onClose, visible, aspectRatio
       <button type="button" aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'} onClick={() => { command('toggleMute'); setMuted(m => !m); }} className="rounded-lg p-2 hover:bg-white/10">{muted ? <VolumeX size={18}/> : <Volume2 size={18}/>}</button>
       <input aria-label="Volume" title="Volume" type="range" min="0" max="100" value={volume} onChange={e => { const next = Number(e.target.value); setVolume(next); command('setVolume', next); }} className="w-20 accent-amber-400"/>
       <span className="mx-1 h-5 w-px bg-white/15" />
-      <button type="button" title="Exit fullscreen (F11)" aria-label="Exit fullscreen" onClick={() => command('toggleFullscreen')} className="rounded-lg p-2 hover:bg-white/10"><Minimize2 size={20}/></button>
+      <button type="button" title="Exit fullscreen (Esc)" aria-label="Exit fullscreen" onClick={() => command('toggleFullscreen')} className="rounded-lg p-2 hover:bg-white/10"><Minimize2 size={20}/></button>
       <button type="button" title="Close player" aria-label="Close player" onClick={() => void close()} className="rounded-lg p-2 hover:bg-red-500/20"><X size={21}/></button>
     </div>
   </div>;
