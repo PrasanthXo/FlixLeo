@@ -1,4 +1,5 @@
-import { DesktopNativeSurface, desktopBridge } from './DesktopNativeSurface';
+import { DesktopNativeSurface, desktopBridge, useDesktopWindowFullscreen } from './DesktopNativeSurface';
+import { DesktopFullscreenControls } from './DesktopFullscreenControls';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { StremioNativePlayer } from './StremioNativePlayer';
@@ -24,6 +25,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const playerAnchorRef = useRef<HTMLDivElement>(null);
   const playerFrameRef = useRef<HTMLDivElement>(null);
   const [frameFullscreen, setFrameFullscreen] = useState(false);
+  const nativeWindowFullscreen = useDesktopWindowFullscreen();
   useEffect(() => {
     const update = () => setFrameFullscreen(document.fullscreenElement === playerFrameRef.current);
     document.addEventListener('fullscreenchange', update);
@@ -49,6 +51,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const lastSaveRef = useRef(0);
   const active = mirrors[index];
   const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
+  const nativeFullscreen = desktopNative && nativeWindowFullscreen;
+  useEffect(() => { if (nativeFullscreen) setDocked(false); }, [nativeFullscreen]);
   const hasShownMainPlayer = useRef(false);
   const lastMinimizeSignal = useRef(minimizeSignal);
   useEffect(() => {
@@ -212,14 +216,15 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         </div>
         {!desktopNative && <div className="flex items-center gap-2 shrink-0"><button type="button" onClick={() => setDocked(true)} className="rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Minimize player">Mini player</button><button type="button" onClick={() => void shareMovie()} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Share movie"><Share2 className="h-4 w-4" /> Share</button><button type="button" onClick={() => { saveProgress(); onClose(); }} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white"><ArrowLeft className="h-4 w-4" /> Close</button></div>}
       </div>
-      <div ref={playerFrameRef} className={docked ? "fixed z-[65] right-3 bottom-28 md:bottom-8 w-[min(60vw,240px)] md:w-80 h-[232px] rounded-xl overflow-hidden border border-amber-500/60 shadow-2xl bg-black" : "tv6-cinema-frame aspect-video w-full bg-black relative"} style={frameFullscreen ? { position: "fixed", inset: 0, top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh", maxWidth: "none", maxHeight: "none", aspectRatio: "auto" } : undefined}>
+      <div ref={playerFrameRef} className={nativeFullscreen ? "fixed inset-0 z-[200] h-screen w-screen overflow-hidden bg-black" : docked ? "fixed z-[65] right-3 bottom-28 md:bottom-8 w-[min(60vw,240px)] md:w-80 h-[232px] rounded-xl overflow-hidden border border-amber-500/60 shadow-2xl bg-black" : "tv6-cinema-frame aspect-video w-full bg-black relative"} style={frameFullscreen && !desktopNative ? { position: "fixed", inset: 0, top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh", maxWidth: "none", maxHeight: "none", aspectRatio: "auto" } : undefined}>
         {!desktopNative && !docked && <button type="button" onClick={() => void toggleFrameFullscreen()} className="absolute z-[60] right-3 top-3 rounded-lg bg-black/85 px-3 py-2 text-xs font-semibold text-white hover:bg-black border border-white/20" aria-label={frameFullscreen ? "Exit fullscreen player" : "Fullscreen player"}>{frameFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
         {docked && !desktopNative && <div className="absolute z-[70] left-2 top-2 flex gap-1"><button type="button" onClick={() => { playerAnchorRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); setDocked(false); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
-          : desktopNative ? <div className={docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div>
+          : desktopNative ? <div className={nativeFullscreen ? "h-[calc(100%-96px)] w-full" : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div>
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
             : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); onEpisodeEnded?.(); }} className="h-full w-full object-contain" />}
+        {nativeFullscreen && <DesktopFullscreenControls title={media.title} onClose={() => { saveProgress(); onClose(); }} />}
         {docked && desktopNative && <div className="absolute bottom-0 left-0 right-0 z-[90] flex h-[52px] items-center justify-around gap-1 border-t border-white/15 bg-[#151925] px-2 text-white">
           <button type="button" aria-label="Rewind 10 seconds" className="rounded-lg p-2 text-white" onClick={() => void desktopBridge()?.commandNative('seekBackward')}>↶</button>
           <button type="button" aria-label="Play or pause" className="rounded-lg bg-amber-400 px-3 py-2 text-black" onClick={() => void desktopBridge()?.commandNative('togglePause')}>▶Ⅱ</button>
