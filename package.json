@@ -1,7 +1,7 @@
 {
   "name": "flixleo",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -79,7 +79,8 @@
           "**/*"
         ]
       }
-    ]
+    ],
+    "forceCodeSigning": true
   },
   "main": "desktop/main.cjs",
   "author": "FlixLeo"
