@@ -16,7 +16,7 @@ const proSettings = {
   autoAdjustment: false
 };
 const proBase = 'https://opensubtitlesv3-pro.dexter21767.com';
-const proManifest = proBase + '/' + Buffer.from(JSON.stringify(proSettings)).toString('base64url') + '/manifest.json';
+const proManifest = proBase + '/' + Buffer.from(JSON.stringify(proSettings)).toString('base64') + '/manifest.json';
 
 function addonBase(value: string): string | null {
   try {
