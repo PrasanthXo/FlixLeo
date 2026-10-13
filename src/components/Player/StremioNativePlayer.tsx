@@ -480,22 +480,10 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       </div>}
     </div>
     {desktopNative ? <div className="space-y-3 p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-black" onClick={() => void desktopBridge()?.commandNative('togglePause')}>Play / Pause</button>
-        <button type="button" className="rounded-lg bg-slate-800 p-2" aria-label="Rewind 10 seconds" onClick={() => void desktopBridge()?.commandNative('seekBackward')}><RotateCcw size={18}/></button>
-        <button type="button" className="rounded-lg bg-slate-800 p-2" aria-label="Forward 10 seconds" onClick={() => void desktopBridge()?.commandNative('seekForward')}><RotateCw size={18}/></button>
-        <button type="button" className="rounded-lg bg-slate-800 p-2" onClick={() => void desktopBridge()?.commandNative('toggleMute')} aria-label="Mute or unmute"><Volume2 size={18}/></button>
-        <button type="button" className="rounded-lg bg-slate-800 px-3 py-2 text-xs" onClick={() => void desktopBridge()?.commandNative('toggleSubtitles')}>Subtitles on / off</button>
-        <button type="button" className="ml-auto rounded-lg bg-slate-800 px-3 py-2 text-xs" onClick={() => void toggleDesktopFullscreen()}>{desktopFullscreen ? 'Exit fullscreen' : '⛶ Fullscreen'}</button>
-      </div>
-      <div className="flex items-center gap-3">
-        <label htmlFor="flixleo-native-volume" className="text-xs text-slate-300">Volume</label>
-        <input id="flixleo-native-volume" type="range" min="0" max="100" value={Math.round(volume * 100)} className="w-40 accent-amber-500" onChange={e => { const next = Number(e.target.value); setVolume(next / 100); void desktopBridge()?.commandNative('setVolume', next); }} />
-        <span className="text-xs text-slate-400">Use the controls on the video for seeking and track selection.</span>
-      </div>
+      <p className="text-xs text-slate-400">Playback controls appear over the video when you move the pointer. They hide automatically when idle.</p>
       <label className="block text-xs text-slate-300">Video quality / stream
-        <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => { failedLiveSources.current.clear(); setSelected(e.target.value); setRetryToken(n => n + 1); }}>
-          {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}</option>)}
+        <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => setSelected(e.target.value)}>
+          {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}{m.fileSize ? ' · ' + m.fileSize : ''}</option>)}
         </select>
       </label>
     </div> : <div className="space-y-3 p-4">
@@ -523,7 +511,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       {settingsOpen && <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-900 p-3">
         <label className="block text-xs text-slate-300">Video quality / stream
           <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => { failedLiveSources.current.clear(); setAudioFix(false); setSelected(e.target.value); setRetryToken(n => n + 1); }}>
-            {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}</option>)}
+            {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}{m.fileSize ? ' · ' + m.fileSize : ''}</option>)}
           </select>
         </label>
         <div className="flex flex-wrap gap-2">
