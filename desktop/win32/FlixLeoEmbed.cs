@@ -84,7 +84,10 @@ internal static class FlixLeoEmbed {
                     }
                     Rect client;
                     if (fullscreen && GetClientRect(parent, out client))
-                        SetWindowPos(child, IntPtr.Zero, 0, 0, Math.Max(1, client.right - client.left), Math.Max(1, client.bottom - client.top - FullscreenControlsHeight), SWP_NOZORDER | SWP_NOACTIVATE);
+                        SetWindowPos(child, IntPtr.Zero, 0, 0,
+                            Math.Max(1, Math.Min(client.right - client.left, pw)),
+                            Math.Max(1, Math.Min(client.bottom - client.top - FullscreenControlsHeight, ph)),
+                            SWP_NOZORDER | SWP_NOACTIVATE);
                     else
                         SetWindowPos(child, IntPtr.Zero, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE);
                     Thread.Sleep(100);
