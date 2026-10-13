@@ -323,6 +323,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 <span className="text-slate-200">{activeMedia.cast.join(', ')}</span>
               </div>
             )}
+            {!desktopVlc && (
             <div className="md:col-span-2 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/10 to-slate-900/70 p-4 sm:p-5" role="note" aria-label="Audio playback help">
               <div className="flex items-start gap-3">
                 <Volume2 className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" aria-hidden="true" />
@@ -344,6 +345,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 </div>
               </div>
             </div>
+            )}
           </div>
 
           {/* Stream Mirrors or TV Seasons */}
