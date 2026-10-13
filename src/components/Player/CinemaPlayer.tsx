@@ -249,6 +249,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           <h2 className="text-white font-semibold text-sm sm:text-lg truncate">{media.title}</h2>
           <p className="text-slate-400 text-xs truncate">{active?.label || 'No servers available'}</p>
         </div>
+        {desktopNative && !nativeFullscreen && !docked && <button type="button" onClick={() => setDocked(true)} className="shrink-0 rounded-lg border border-amber-500/30 bg-slate-800 px-3 py-2 text-xs text-white hover:bg-slate-700" aria-label="Minimize native video to mini player"><Minimize2 className="mr-1 inline h-4 w-4" />Mini player</button>}
         {!desktopNative && <div className="flex items-center gap-2 shrink-0"><button type="button" onClick={() => setDocked(true)} className="rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Minimize player">Mini player</button><button type="button" onClick={() => void shareMovie()} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Share movie"><Share2 className="h-4 w-4" /> Share</button><button type="button" onClick={() => { saveProgress(); onClose(); }} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white"><ArrowLeft className="h-4 w-4" /> Close</button></div>}
       </div>
       {docked && desktopNative && !nativeFullscreen && <div className="aspect-video w-full" aria-hidden="true" />}
