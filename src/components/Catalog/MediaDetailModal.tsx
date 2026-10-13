@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { MediaItem, StreamMirror, getSourceDisplayBadge } from '../../types/stream';
 import { getAppleVlcTarget, getAppleVlcLaunchUrl } from '../../lib/appleVlc';
+import { downloadFlixLeoWindows } from '../../lib/windowsDownload';
 
 interface MediaDetailModalProps {
   media: MediaItem | null;
@@ -354,10 +355,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                         </span>
                       )}
                       {audioHelpPlatform === 'windows' && (
-                        <span title="FlixLeo for Windows" role="img" aria-label="FlixLeo for Windows"
-                          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-sky-400/40 bg-sky-500/15 text-sky-300">
+                        <button type="button" title="Download FlixLeo for Windows" aria-label="Download FlixLeo for Windows"
+                          onClick={() => void downloadFlixLeoWindows()}
+                          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-sky-400/40 bg-sky-500/15 text-sky-300 hover:bg-sky-500/30 hover:border-sky-400 transition-colors">
                           <Monitor className="h-6 w-6" aria-hidden="true" />
-                        </span>
+                        </button>
                       )}
                       {audioHelpPlatform === 'apple' && (
                         <span title="VLC Play" role="img" aria-label="VLC Play"
@@ -365,7 +367,14 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           <Play className="h-6 w-6" aria-hidden="true" />
                         </span>
                       )}
-                      {audioHelpPlatform !== 'apple' && <span className="text-sm font-semibold text-white">Download</span>}
+                      {audioHelpPlatform === 'windows' && (
+                        <button type="button" onClick={() => void downloadFlixLeoWindows()}
+                          title="Download FlixLeo for Windows"
+                          className="rounded-lg px-2 py-1 text-sm font-semibold text-white hover:bg-sky-500/20 hover:text-sky-200 transition-colors">
+                          Download
+                        </button>
+                      )}
+                      {audioHelpPlatform === 'android' && <span className="text-sm font-semibold text-white">Download</span>}
                     </div>
                   </div>
                 </div>
