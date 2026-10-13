@@ -76,9 +76,10 @@ internal static class FlixLeoEmbed {
                 // receive mouse events that belong to this separate mpv process.
                 // Use OS double-click time and movement limits, not arbitrary
                 // web-player hit targets.
-                const int VK_LBUTTON = 0x01;
+                const int VK_LBUTTON = 0x01, VK_ESCAPE = 0x1B, VK_SPACE = 0x20;
                 const int SM_CXDOUBLECLK = 36, SM_CYDOUBLECLK = 37;
                 bool previousLeftDown = false;
+                bool previousEscapeDown = false, previousSpaceDown = false;
                 DateTime firstClickAt = DateTime.MinValue;
                 int firstClickX = 0, firstClickY = 0;
                 // Avoid resizing the mpv child 40 times a second when neither
@@ -181,6 +182,25 @@ internal static class FlixLeoEmbed {
                             firstClickX = mouse.x; firstClickY = mouse.y;
                         }
                     }
+                    // These keys are ignored by mpv's own bindings; the
+                    // Electron host owns fullscreen and playback state.
+                    bool escapeDown = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
+                    bool spaceDown = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+                    bool focusedHere = GetAncestor(GetForegroundWindow(), 2) == parent;
+                    if (focusedHere && fullscreen && escapeDown && !previousEscapeDown) {
+                        Console.WriteLine("VIDEO_ESCAPE"); Console.Out.Flush();
+                    }
+                    if (focusedHere && spaceDown && !previousSpaceDown) {
+                        Point keyCursor; Rect keyVideo;
+                        bool cursorOverVideo = GetCursorPos(out keyCursor) && GetWindowRect(child, out keyVideo) &&
+                            keyCursor.x >= keyVideo.left && keyCursor.x < keyVideo.right &&
+                            keyCursor.y >= keyVideo.top && keyCursor.y < keyVideo.bottom;
+                        if (fullscreen || cursorOverVideo) {
+                            Console.WriteLine("VIDEO_SPACE"); Console.Out.Flush();
+                        }
+                    }
+                    previousEscapeDown = escapeDown;
+                    previousSpaceDown = spaceDown;
                     // Sample at 40Hz so quick mouse clicks are not missed.
                     Thread.Sleep(25);
                 }
