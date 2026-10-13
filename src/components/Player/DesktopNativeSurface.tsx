@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
+import type { MediaItem } from '../../types/stream';
 
 export type NativeTrack = { id:number; selected:boolean; language:string; title:string };
 type DesktopBridge = {
-  playNative: (url: string) => Promise<{ ok: boolean; error?: string }>;
+  playNative: (url: string, position?: number) => Promise<{ ok: boolean; error?: string }>;
   positionNative: (bounds: number[]) => Promise<boolean>;
   stopNative: () => Promise<boolean>;
-  playbackStatus?: () => Promise<{ready:boolean}>;
+  playbackStatus?: () => Promise<{ready:boolean;position?:number}>;
   tracksNative?: () => Promise<{ audio:NativeTrack[]; subtitles:NativeTrack[] }>;
   commandNative: (action: 'togglePause' | 'seekBackward' | 'seekForward' | 'toggleMute' | 'toggleSubtitles' | 'setVolume' | 'toggleFullscreen' | 'nextAudio' | 'nextSubtitle' | 'setAudioTrack' | 'setSubtitleTrack', value?: number) => Promise<boolean>;
 };
@@ -22,7 +23,7 @@ export const desktopBridge = (): DesktopBridge | undefined =>
 
 /** Video remains inside the existing React big/mini player; the same mpv
  * process follows this element on dock/undock rather than restarting. */
-export function DesktopNativeSurface({ url }: { url: string }) {
+export function DesktopNativeSurface({ url, media, mirrorId, onProgressSaved }: { url: string; media?: MediaItem; mirrorId?: string; onProgressSaved?: () => void }) {
   const surface = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -31,9 +32,31 @@ export function DesktopNativeSurface({ url }: { url: string }) {
     if (!bridge || !el || !/^https:\/\//i.test(url)) return;
     let active = true;
     setReady(false);
+    const keyFor = (m: MediaItem) => m.id + (m.playbackSeason !== undefined && m.playbackEpisode !== undefined ? ':s' + m.playbackSeason + 'e' + m.playbackEpisode : '');
+    let startAt = 0;
+    try {
+      if (media) {
+        const rows = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
+        const previous = Array.isArray(rows) ? rows.find((row: any) => row?.media && keyFor(row.media) === keyFor(media)) : undefined;
+        if (previous && (!mirrorId || previous.mirrorId === mirrorId)) startAt = Math.max(0, Number(previous.progress) || 0);
+      }
+    } catch {}
+    let lastSaved = 0;
+    const savePosition = (position: number) => {
+      if (!media || !mirrorId || !Number.isFinite(position) || position < 1 || Date.now() - lastSaved < 4500) return;
+      lastSaved = Date.now();
+      try {
+        const old = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
+        const rows = Array.isArray(old) ? old : [];
+        const entry = { media, mirrorId, progress: position, duration: 0, updatedAt: Date.now() };
+        localStorage.setItem('flixleo_continue_watching', JSON.stringify([entry, ...rows.filter((row: any) => !row?.media || keyFor(row.media) !== keyFor(media))].slice(0, 20)));
+        onProgressSaved?.();
+      } catch {}
+    };
+
     const statusTimer = window.setInterval(() => {
       if (!active || !bridge.playbackStatus) return;
-      void bridge.playbackStatus().then(status => { if (active && status.ready) setReady(true); }).catch(() => {});
+      void bridge.playbackStatus().then(status => { if (active && status.ready) { setReady(true); if (typeof status.position === 'number') savePosition(status.position); } }).catch(() => {});
     }, 750);
     let last = '';
     const reposition = () => {
@@ -47,7 +70,7 @@ export function DesktopNativeSurface({ url }: { url: string }) {
         void bridge.positionNative(bounds);
       }
     };
-    void bridge.playNative(url).then(result => {
+    void bridge.playNative(url, startAt).then(result => {
       if (!active) { void bridge.stopNative(); return; }
       if (!result.ok) window.alert(result.error || 'Native video unavailable');
       reposition();
@@ -64,7 +87,7 @@ export function DesktopNativeSurface({ url }: { url: string }) {
       window.removeEventListener('resize', reposition);
       void bridge.stopNative();
     };
-  }, [url]);
+  }, [url, mirrorId, media?.id, media?.playbackSeason, media?.playbackEpisode]);
   return <div ref={surface} className="relative w-full h-full min-h-0 bg-black" aria-label="FlixLeo native Windows video surface">
     {!ready && <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black text-sm text-slate-300 pointer-events-none">
       <span className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-amber-400" />
