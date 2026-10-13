@@ -1,5 +1,5 @@
-import { DesktopNativeSurface, desktopBridge, fullLanguage, useDesktopWindowFullscreen, type NativeTrack } from './DesktopNativeSurface';
-import { DesktopFullscreenControls } from './DesktopFullscreenControls';
+import { DesktopNativeSurface, desktopBridge, fullLanguage, useDesktopWindowFullscreen, useDesktopControlsVisible, type NativeTrack } from './DesktopNativeSurface';
+import { DesktopFullscreenControls, DesktopAspectRatioPicker, type NativeAspectRatio } from './DesktopFullscreenControls';
 import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2 } from 'lucide-react';
@@ -100,6 +100,13 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const active = sorted.find(m => m.id === selected) || sorted[0];
   const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
   const nativeFullscreen = desktopNative && nativeWindowFullscreen;
+  const fullscreenControlsVisible = useDesktopControlsVisible(nativeFullscreen);
+  const [aspectRatio, setAspectRatio] = useState<NativeAspectRatio>('no');
+  const changeAspectRatio = (ratio: NativeAspectRatio) => {
+    setAspectRatio(ratio);
+    void desktopBridge()?.commandNative('setAspectRatio', ratio);
+  };
+  useEffect(() => { setAspectRatio('no'); }, [active?.url]);
   useEffect(() => { if (nativeFullscreen) setDocked(false); }, [nativeFullscreen]);
   const [nativeTracks, setNativeTracks] = useState<{audio:NativeTrack[]; subtitles:NativeTrack[]}>({audio:[], subtitles:[]});
   useEffect(() => {
@@ -507,7 +514,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Expand mini player" onClick={() => { playerAnchor.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); setDocked(false); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
-      {desktopNative && active ? <div className={nativeFullscreen ? "h-[calc(100%-96px)] w-full" : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
+      {desktopNative && active ? <div className={nativeFullscreen ? (fullscreenControlsVisible ? "h-[calc(100%-96px)] w-full" : "h-full w-full") : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
         onPlay={() => { setPlaying(true); setBuffering(false); setError(''); }}
         onPause={() => { setPlaying(false); setBuffering(false); }}
         onWaiting={() => setBuffering(true)}
@@ -516,7 +523,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         onEnded={() => { setPlaying(false); save(); onEpisodeEnded?.(); }}>
         {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={uploadedRef.current || selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>}
-      {nativeFullscreen && <DesktopFullscreenControls title={media.title} onClose={() => { save(); onClose(); }} />}
+      {nativeFullscreen && <DesktopFullscreenControls title={media.title} onClose={() => { save(); onClose(); }} visible={fullscreenControlsVisible} aspectRatio={aspectRatio} onAspectRatioChange={changeAspectRatio} />}
       {docked && desktopNative && <div className="absolute bottom-0 left-0 right-0 z-[90] flex h-[52px] items-center justify-around gap-1 border-t border-white/15 bg-[#151925] px-2 text-white">
         <button type="button" aria-label="Rewind 10 seconds" title="Rewind" className="rounded-lg p-2 hover:bg-white/15" onClick={() => void desktopBridge()?.commandNative('seekBackward')}><RotateCcw size={19}/></button>
         <button type="button" aria-label="Play or pause" title="Play / Pause" className="rounded-lg bg-amber-400 p-2 text-black" onClick={() => void desktopBridge()?.commandNative('togglePause')}><Play size={19}/></button>
@@ -543,6 +550,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     {desktopNative ? <div className="space-y-3 p-4">
       <div className="flex items-center gap-2 flex-wrap">
         <button type="button" className="inline-flex items-center justify-center rounded-xl bg-slate-800 p-3 hover:bg-slate-700" aria-label={desktopFullscreen ? 'Exit fullscreen' : 'Fullscreen'} title="Fullscreen (F11)" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')}><Maximize2 size={21}/></button>
+        <DesktopAspectRatioPicker value={aspectRatio} onChange={changeAspectRatio} />
         <label className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2" title="Audio language">
           <Volume2 size={21}/>
           <select aria-label="Audio language" className="max-w-56 bg-transparent text-sm text-white outline-none" value={nativeTracks.audio.find(t => t.selected)?.id ?? ''} onChange={e => void desktopBridge()?.commandNative('setAudioTrack', Number(e.target.value))}>
