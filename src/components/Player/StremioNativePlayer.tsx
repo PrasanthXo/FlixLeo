@@ -17,6 +17,20 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const [audioFix, setAudioFix] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerAnchor = useRef<HTMLDivElement>(null);
+  const fullscreenFrame = useRef<HTMLDivElement>(null);
+  const [desktopFullscreen, setDesktopFullscreen] = useState(false);
+  useEffect(() => {
+    const onFullscreen = () => setDesktopFullscreen(document.fullscreenElement === fullscreenFrame.current);
+    document.addEventListener('fullscreenchange', onFullscreen);
+    return () => document.removeEventListener('fullscreenchange', onFullscreen);
+  }, []);
+  const toggleDesktopFullscreen = async () => {
+    if (!fullscreenFrame.current) return;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await fullscreenFrame.current.requestFullscreen();
+    } catch { setError('Fullscreen could not be activated.'); }
+  };
   const [docked, setDocked] = useState(false);
   useEffect(() => { if (minimizeSignal > 0) setDocked(true); }, [minimizeSignal]);
   useEffect(() => {
@@ -382,7 +396,8 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       <h2 className="text-lg font-bold">{media.title}</h2>
       <p className="text-xs text-slate-300">{media.year} · {media.duration}</p>
     </div>
-    <div className={docked ? "fixed z-[80] right-3 bottom-24 md:bottom-8 w-[min(72vw,300px)] aspect-video overflow-hidden rounded-xl border border-amber-500/60 bg-black shadow-2xl" : "relative aspect-video bg-black"}>
+    <div ref={fullscreenFrame} className={docked ? "fixed z-[80] right-3 bottom-24 md:bottom-8 w-[min(72vw,300px)] aspect-video overflow-hidden rounded-xl border border-amber-500/60 bg-black shadow-2xl" : "relative aspect-video bg-black"} style={desktopFullscreen ? { width: "100vw", height: "100vh", maxWidth: "none", aspectRatio: "auto" } : undefined}>
+      {desktopBridge() && <button type="button" className="absolute right-3 top-3 z-[60] rounded-lg bg-black/85 px-3 py-2 text-xs text-white border border-white/20" onClick={() => void toggleDesktopFullscreen()}>{desktopFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
       {docked && <div className="absolute right-1 top-1 z-20 flex gap-1">
         <button type="button" aria-label="Expand mini player" onClick={() => { setDocked(false); playerAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
@@ -414,7 +429,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         }}><Volume2 className={muted || volume === 0 ? 'text-amber-400' : ''}/></button>
         <input aria-label="Volume" title="Volume" type="range" min="0" max="1" step="0.05" value={volume}
           className="w-16 sm:w-24 accent-amber-500" onChange={e => { const v = videoRef.current; if (!v) return; v.volume = Number(e.target.value); v.muted = false; setVolume(v.volume); setMuted(false); }} />
-        <button type="button" className="ml-auto" aria-label="Fullscreen" onClick={() => videoRef.current?.requestFullscreen?.()}><Maximize /></button>
+        <button type="button" className="ml-auto" aria-label="Fullscreen" onClick={() => desktopBridge() ? void toggleDesktopFullscreen() : videoRef.current?.requestFullscreen?.()}><Maximize /></button>
       </div>
       <div className="flex items-center gap-2">
         <span className="rounded-lg border border-amber-500/50 bg-slate-800 px-3 py-2 text-xs font-bold text-amber-400">{active?.quality || 'Auto'}</span>
