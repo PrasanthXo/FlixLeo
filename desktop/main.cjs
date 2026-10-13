@@ -79,10 +79,24 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
     : path.join(__dirname, 'vendor', 'mpv', 'FlixLeoEmbed.exe');
   if (!fs.existsSync(helper)) { backToFlixLeo(); return { ok:false, error:'FlixLeo video embedding component is missing.' }; }
   mpvPipe = `\\\\.\\pipe\\flixleo-mpv-${process.pid}-${++mpvSerial}`;
+  // The child mpv window receives native mouse input directly.
+  // Disable its own double-click fullscreen shortcut, otherwise Electron
+  // and mpv would each independently toggle fullscreen on one gesture.
+  const mpvInputConf = path.join(app.getPath('userData'), 'flixleo-embedded-input.conf');
+  let inputOverrides = [];
+  try {
+    fs.mkdirSync(path.dirname(mpvInputConf), { recursive:true });
+    fs.writeFileSync(mpvInputConf, 'MBTN_LEFT_DBL ignore\\n', 'utf8');
+    inputOverrides = [`--input-conf=${mpvInputConf}`];
+  } catch {
+    // Prevent double toggles if the user's application data is read-only.
+    inputOverrides = ['--no-input-default-bindings'];
+  }
   const args = [
     '--no-config', '--no-terminal', '--force-window=yes', '--idle=no',
     '--keep-open=no', '--osc=yes', '--input-default-bindings=yes',
-    '--input-cursor=yes',
+    '--input-cursor=yes', '--cursor-autohide=3000',
+    ...inputOverrides,
     // Modern minimal overlay; disappears shortly after mouse movement.
     '--script-opts=osc-visibility=auto,osc-layout=bottombar,osc-hidetimeout=2000,osc-fadeduration=180,osc-deadzonesize=0,osc-scalewindowed=1.7,osc-scalefullscreen=1.8',
     `--input-ipc-server=${mpvPipe}`,
@@ -114,6 +128,8 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
         }
         if ((line === 'CONTROLS_VISIBLE' || line === 'CONTROLS_HIDDEN') && !win.isDestroyed())
           win.webContents.send('flixleo:native-controls-visible', line === 'CONTROLS_VISIBLE');
+        if (line === 'VIDEO_DOUBLE_CLICK' && playing && nativeProcess === proc &&
+            embedProcess === helperProc && !win.isDestroyed()) toggleVideoFullscreen(win);
       }
     });
     helperProc.on('exit', code => {
