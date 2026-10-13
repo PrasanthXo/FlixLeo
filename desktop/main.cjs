@@ -120,8 +120,11 @@ ipcMain.handle('flixleo:command-native', async (event, action, value) => {
     seekForward: ['seek', 10, 'relative'],
     toggleMute: ['cycle', 'mute'],
     toggleSubtitles: ['cycle', 'sub-visibility'],
+    nextAudio: ['cycle', 'audio'],
+    nextSubtitle: ['cycle', 'sub'],
   };
   let command = commands[action];
+  if (action === 'toggleFullscreen') { mainWindow?.setFullScreen(!mainWindow.isFullScreen()); return true; }
   if (action === 'setVolume' && Number.isFinite(value)) command = ['set_property', 'volume', Math.max(0, Math.min(100, Number(value)))];
   if (!command) return false;
   return await new Promise(resolve => {
@@ -183,7 +186,16 @@ function createWindow() {
     }
   });
   mainWindow = win;
+  // Fullscreen is controlled by Electron's window, not by the mpv child window.
+  // F11 works even if native-video controls are unavailable.
+  win.on('leave-full-screen', () => { if (playing) win.webContents.send('flixleo:fullscreen', false); });
+  win.on('enter-full-screen', () => { if (playing) win.webContents.send('flixleo:fullscreen', true); });
   win.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F11') {
+      event.preventDefault();
+      win.setFullScreen(!win.isFullScreen());
+      return;
+    }
     if (playing && input.alt && input.key === 'Left') {
       event.preventDefault();
       backToFlixLeo();
