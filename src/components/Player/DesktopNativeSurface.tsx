@@ -1,11 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+export type NativeTrack = { id:number; selected:boolean; language:string; title:string };
 type DesktopBridge = {
   playNative: (url: string) => Promise<{ ok: boolean; error?: string }>;
   positionNative: (bounds: number[]) => Promise<boolean>;
   stopNative: () => Promise<boolean>;
   playbackStatus?: () => Promise<{ready:boolean}>;
-  commandNative: (action: 'togglePause' | 'seekBackward' | 'seekForward' | 'toggleMute' | 'toggleSubtitles' | 'setVolume', value?: number) => Promise<boolean>;
+  tracksNative?: () => Promise<{ audio:NativeTrack[]; subtitles:NativeTrack[] }>;
+  commandNative: (action: 'togglePause' | 'seekBackward' | 'seekForward' | 'toggleMute' | 'toggleSubtitles' | 'setVolume' | 'toggleFullscreen' | 'nextAudio' | 'nextSubtitle' | 'setAudioTrack' | 'setSubtitleTrack', value?: number) => Promise<boolean>;
+};
+export const fullLanguage = (code: string, title?: string): string => {
+  const lang = (code || '').trim().replace(/_/g, '-').toLowerCase();
+  const synonyms: Record<string, string> = { eng:'en', hin:'hi', tam:'ta', tel:'te', mal:'ml', kan:'kn', sin:'si', jpn:'ja', kor:'ko', spa:'es', fra:'fr', fre:'fr', ger:'de', deu:'de', und:'' };
+  const normalized = synonyms[lang] ?? lang;
+  let name = '';
+  try { if (normalized) name = new Intl.DisplayNames(['en'], { type:'language' }).of(normalized) || ''; } catch {}
+  return [name || title || (lang ? lang.toUpperCase() : 'Unknown language'), title && title !== name ? title : ''].filter(Boolean).join(' · ');
 };
 export const desktopBridge = (): DesktopBridge | undefined =>
   (window as Window & { flixleoDesktop?: DesktopBridge }).flixleoDesktop;
