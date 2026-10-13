@@ -77,7 +77,7 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
     '--keep-open=no', '--osc=yes', '--input-default-bindings=yes',
     '--input-cursor=yes',
     // Modern minimal overlay; disappears shortly after mouse movement.
-    '--script-opts=osc-visibility=auto,osc-layout=box,osc-hidetimeout=1200,osc-fadeduration=250,osc-deadzonesize=0',
+    '--script-opts=osc-visibility=auto,osc-layout=box,osc-hidetimeout=2000,osc-fadeduration=200,osc-deadzonesize=0',
     `--input-ipc-server=${mpvPipe}`,
     '--hwdec=auto-safe', '--border=no', '--geometry=1280x720',
     '--title=FlixLeo', '--user-agent=FlixLeoDesktop/1.0',
