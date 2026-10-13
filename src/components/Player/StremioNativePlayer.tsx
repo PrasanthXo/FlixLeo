@@ -16,7 +16,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const liveChannel = media.id.startsWith('plavio-live-');
   const failedLiveSources = useRef<Set<string>>(new Set());
   const [retryToken, setRetryToken] = useState(0);
-  const [selected, setSelected] = useState(initialMirrorId || sorted[0]?.id || '');
+  const [selected, setSelected] = useState(initialMirrorId || (() => { try { const rows = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]'); const saved = Array.isArray(rows) ? rows.find((row: any) => row?.media && resumeKey(row.media) === resumeKey(media)) : undefined; return saved?.mirrorId && sorted.some(m => m.id === saved.mirrorId) ? saved.mirrorId : undefined; } catch { return undefined; } })() || sorted[0]?.id || '');
   const [audioFix, setAudioFix] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerAnchor = useRef<HTMLDivElement>(null);
@@ -112,7 +112,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     try {
       const data = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
       const rows = Array.isArray(data) ? data : [];
-      localStorage.setItem('flixleo_continue_watching', JSON.stringify([{ media, progress: video.currentTime, duration: video.duration || 0, updatedAt: Date.now() }, ...rows.filter((r: any) => !r?.media || resumeKey(r.media) !== resumeKey(media))].slice(0, 20)));
+      localStorage.setItem('flixleo_continue_watching', JSON.stringify([{ media, mirrorId: active?.id, progress: video.currentTime, duration: video.duration || 0, updatedAt: Date.now() }, ...rows.filter((r: any) => !r?.media || resumeKey(r.media) !== resumeKey(media))].slice(0, 20)));
       onProgressSaved?.();
     } catch { /* storage is optional */ }
   };
@@ -475,7 +475,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Expand mini player" onClick={() => { setDocked(false); playerAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
-      {desktopNative && active ? <DesktopNativeSurface key={active.id} url={active.url} /> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
+      {desktopNative && active ? <DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain"
         onPlay={() => { setPlaying(true); setBuffering(false); setError(''); }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBuffering(true)}
