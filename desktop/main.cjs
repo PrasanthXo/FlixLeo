@@ -86,7 +86,7 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
   let inputOverrides = [];
   try {
     fs.mkdirSync(path.dirname(mpvInputConf), { recursive:true });
-    fs.writeFileSync(mpvInputConf, 'MBTN_LEFT_DBL ignore\\n', 'utf8');
+    fs.writeFileSync(mpvInputConf, 'MBTN_LEFT_DBL ignore\n', 'utf8');
     inputOverrides = [`--input-conf=${mpvInputConf}`];
   } catch {
     // Prevent double toggles if the user's application data is read-only.
