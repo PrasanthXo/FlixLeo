@@ -8,6 +8,12 @@ contextBridge.exposeInMainWorld('flixleoDesktop', Object.freeze({
   commandNative: (action, value) => ipcRenderer.invoke('flixleo:command-native', action, value),
   stopNative: () => ipcRenderer.invoke('flixleo:stop-native'),
   isFullscreen: () => ipcRenderer.invoke('flixleo:fullscreen-state'),
+  setControlsHeight: (physicalPixels) => ipcRenderer.invoke('flixleo:controls-height', physicalPixels),
+  onNativeControlsVisible: (callback) => {
+    const handler = (_event, value) => { if (typeof value === 'boolean') callback(value); };
+    ipcRenderer.on('flixleo:native-controls-visible', handler);
+    return () => ipcRenderer.removeListener('flixleo:native-controls-visible', handler);
+  },
   onFullscreenChanged: (callback) => {
     const handler = (_event, value) => { if (typeof value === 'boolean') callback(value); };
     ipcRenderer.on('flixleo:fullscreen-changed', handler);
