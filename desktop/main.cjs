@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const net = require('node:net');
@@ -143,7 +143,7 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
   let inputOverrides = [];
   try {
     fs.mkdirSync(path.dirname(mpvInputConf), { recursive:true });
-    fs.writeFileSync(mpvInputConf, 'MBTN_LEFT_DBL ignore\n', 'utf8');
+    fs.writeFileSync(mpvInputConf, 'MBTN_LEFT_DBL ignore\nESC ignore\nSPACE ignore\nF11 ignore\n', 'utf8');
     inputOverrides = [`--input-conf=${mpvInputConf}`];
   } catch {
     // Prevent double toggles if the user's application data is read-only.
@@ -185,8 +185,11 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
         }
         if ((line === 'CONTROLS_VISIBLE' || line === 'CONTROLS_HIDDEN') && !win.isDestroyed())
           win.webContents.send('flixleo:native-controls-visible', line === 'CONTROLS_VISIBLE');
-        if (line === 'VIDEO_DOUBLE_CLICK' && playing && nativeProcess === proc &&
-            embedProcess === helperProc && !win.isDestroyed()) toggleVideoFullscreen(win);
+        if (playing && nativeProcess === proc && embedProcess === helperProc && !win.isDestroyed()) {
+          if (line === 'VIDEO_DOUBLE_CLICK') toggleVideoFullscreen(win);
+          if (line === 'VIDEO_ESCAPE' && win.isFullScreen()) win.setFullScreen(false);
+          if (line === 'VIDEO_SPACE') void sendNativeCommand(['cycle', 'pause']);
+        }
       }
     });
     helperProc.on('exit', code => {
@@ -205,6 +208,29 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
     return { ok:false, error:'Unable to start native playback.' };
   }
 });
+function sendNativeCommand(command) {
+  if (!playing || !mpvPipe) return Promise.resolve(false);
+  const pipe = mpvPipe;
+  return new Promise(resolve => {
+    const socket = net.connect(pipe);
+    let finished = false;
+    const finish = ok => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeout);
+      socket.destroy();
+      resolve(ok);
+    };
+    const timeout = setTimeout(() => finish(false), 1800);
+    socket.once('connect', () => socket.write(JSON.stringify({ command }) + '\n'));
+    socket.once('data', data => {
+      try { finish(JSON.parse(String(data).split('\n')[0]).error === 'success'); }
+      catch { finish(false); }
+    });
+    socket.once('error', () => finish(false));
+    socket.once('close', () => finish(false));
+  });
+}
 // Control the embedded decoder instead of attempting to control the unused HTML video.
 ipcMain.handle('flixleo:command-native', async (event, action, value) => {
   if (!trusted(event) || !playing || !mpvPipe) return false;
@@ -227,18 +253,7 @@ ipcMain.handle('flixleo:command-native', async (event, action, value) => {
   if (action === 'toggleFullscreen') { toggleVideoFullscreen(mainWindow); return true; }
   if (action === 'setVolume' && Number.isFinite(value)) command = ['set_property', 'volume', Math.max(0, Math.min(100, Number(value)))];
   if (!command) return false;
-  return await new Promise(resolve => {
-    const socket = net.connect(mpvPipe);
-    const timeout = setTimeout(() => { socket.destroy(); resolve(false); }, 1800);
-    socket.once('connect', () => socket.write(JSON.stringify({ command }) + '\n'));
-    socket.once('data', data => {
-      clearTimeout(timeout);
-      socket.end();
-      try { resolve(JSON.parse(String(data).trim()).error === 'success'); } catch { resolve(false); }
-    });
-    socket.once('error', () => { clearTimeout(timeout); resolve(false); });
-    socket.once('close', () => { clearTimeout(timeout); resolve(false); });
-  });
+  return sendNativeCommand(command);
 });
 ipcMain.handle('flixleo:tracks-native', async (event) => {
   if (!trusted(event) || !playing || !mpvPipe) return { audio:[], subtitles:[] };
@@ -348,7 +363,7 @@ function createWindow() {
   });
   mainWindow = win;
   // Fullscreen is controlled by Electron's window, not by the mpv child window.
-  // F11 works even if native-video controls are unavailable.
+  // Escape exits fullscreen; F11 must not toggle fullscreen in the desktop app.
   win.on('leave-full-screen', () => {
     if (playing && embedProcess?.stdin?.writable) embedProcess.stdin.write('RESTORE\n');
     win.webContents.send('flixleo:fullscreen-changed', false);
@@ -360,7 +375,11 @@ function createWindow() {
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && input.key === 'F11') {
       event.preventDefault();
-      toggleVideoFullscreen(win);
+      return;
+    }
+    if (input.type === 'keyDown' && input.key === 'Escape' && win.isFullScreen() && !playing) {
+      event.preventDefault();
+      win.setFullScreen(false);
       return;
     }
     if (playing && input.alt && input.key === 'Left') {
@@ -368,13 +387,6 @@ function createWindow() {
       backToFlixLeo();
     }
   });
-  win.on('focus', () => {
-    if (!globalShortcut.isRegistered('F11')) globalShortcut.register('F11', () => {
-      if (!win.isDestroyed()) win.setFullScreen(!win.isFullScreen());
-    });
-  });
-  win.on('blur', () => globalShortcut.unregister('F11'));
-  win.on('closed', () => globalShortcut.unregister('F11'));
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(({url})=>{
     if (/^https:\/\//i.test(url)) shell.openExternal(url);
@@ -395,5 +407,4 @@ app.whenReady().then(()=>{
   updateTimer.unref?.();
   app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0){createWindow();void checkDesktopUpdate();}});
 });
-app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed',()=>{stopPlayer();if(process.platform!=='darwin')app.quit()});
