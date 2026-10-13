@@ -1009,11 +1009,13 @@ app.get('/api/stremio/plavio/live/streams', async (req: Request, res: Response) 
           url.hostname === 'localhost' || url.hostname.endsWith('.local') || url.hostname.endsWith('.internal')) return [];
       const pathname = url.pathname.toLowerCase();
       const mime = String(entry.mimeType || '').toLowerCase();
-      const hls = pathname.endsWith('.m3u8') || mime.includes('mpegurl');
+      const hls = pathname.endsWith('.m3u8') || mime.includes('mpegurl') ||
+        /\\.m3u8(?:[?&]|$)/i.test(url.search);
+      const dash = pathname.endsWith('.mpd') || mime.includes('dash+xml');
       const direct = ['.mp4', '.webm', '.m4v', '.mov'].some(ext => pathname.endsWith(ext)) || mime.startsWith('video/');
       const segment = pathname.split('/').pop() || '';
       const extensionless = !segment.includes('.') && !/(embed|watch|view|page|player|login|redirect)/i.test(pathname);
-      if (!hls && !direct && !extensionless) return [];
+      if (!hls && !dash && !direct && !extensionless) return [];
       const rawLabel = String(entry.title || entry.name || 'Live stream');
       const label = rawLabel.split('https://')[0].trim().slice(0, 100);
       const details = String(entry.title || '') + ' ' + String(entry.name || '');
@@ -1021,7 +1023,7 @@ app.get('/api/stremio/plavio/live/streams', async (req: Request, res: Response) 
         : /1080p/i.test(details) ? '1080p' : /720p/i.test(details) ? '720p'
         : /480p/i.test(details) ? '480p' : 'Auto';
       return [{ name: label || 'Live stream', url: url.href, quality,
-        streamType: hls ? 'hls' : 'direct-video' }];
+        streamType: hls ? 'hls' : 'direct-video' }]; // DASH URLs use Shaka in the live player.
     });
     const unique = [...new Map(streams.map((s: { url: string }) => [s.url, s])).values()];
     res.setHeader('Cache-Control', 'no-store');
