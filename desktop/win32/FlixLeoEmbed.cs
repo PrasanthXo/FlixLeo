@@ -15,6 +15,9 @@ internal static class FlixLeoEmbed {
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)] static extern IntPtr SetWindowLongPtr64(IntPtr hwnd, int index, IntPtr value);
     [DllImport("user32.dll", EntryPoint = "SetWindowLongW", SetLastError = true)] static extern int SetWindowLong32(IntPtr hwnd, int index, int value);
     [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
+    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out Point point);
+    [StructLayout(LayoutKind.Sequential)] struct Point { public int x, y; }
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd, int command);
     [StructLayout(LayoutKind.Sequential)] struct Rect { public int left, top, right, bottom; }
@@ -57,10 +60,13 @@ internal static class FlixLeoEmbed {
                 Console.WriteLine("EMBEDDED");
                 Console.Out.Flush();
                 int px = 0, py = 0, pw = 1280, ph = 720;
-                // Keep a native-free strip for the HTML controls: embedded mpv is a
-                // real HWND and otherwise paints over every Chromium overlay.
-                const int FullscreenControlsHeight = 96;
+                // mpv is a real HWND painted above Chromium; reserve the HTML
+                // toolbar area only while the cursor has recently moved.
+                int controlsHeight = 96;
                 bool fullscreen = false;
+                bool controlsVisible = false;
+                int lastCursorX = int.MinValue, lastCursorY = int.MinValue;
+                DateTime lastCursorMotion = DateTime.UtcNow;
                 var updates = new System.Collections.Concurrent.ConcurrentQueue<string>();
                 var reader = new Thread(() => {
                     try { string line; while ((line = Console.ReadLine()) != null) updates.Enqueue(line); }
@@ -71,8 +77,25 @@ internal static class FlixLeoEmbed {
                 while (IsWindow(parent) && IsWindow(child) && !process.HasExited) {
                     string line;
                     while (updates.TryDequeue(out line)) {
-                        if (line == "FULLSCREEN") { fullscreen = true; continue; }
-                        if (line == "RESTORE") { fullscreen = false; continue; }
+                        if (line == "FULLSCREEN") {
+                            fullscreen = true;
+                            controlsVisible = true;
+                            lastCursorMotion = DateTime.UtcNow;
+                            Console.WriteLine("CONTROLS_VISIBLE"); Console.Out.Flush();
+                            continue;
+                        }
+                        if (line == "RESTORE") {
+                            fullscreen = false;
+                            controlsVisible = false;
+                            Console.WriteLine("CONTROLS_HIDDEN"); Console.Out.Flush();
+                            continue;
+                        }
+                        if (line.StartsWith("CONTROL_HEIGHT ", StringComparison.Ordinal)) {
+                            int value;
+                            if (int.TryParse(line.Substring("CONTROL_HEIGHT ".Length), out value))
+                                controlsHeight = Math.Max(48, Math.Min(300, value));
+                            continue;
+                        }
                         var parts = line.Split(',');
                         int x, y, w, h;
                         if (parts.Length == 4 && int.TryParse(parts[0], out x) &&
@@ -83,12 +106,34 @@ internal static class FlixLeoEmbed {
                         }
                     }
                     Rect client;
-                    if (fullscreen && GetClientRect(parent, out client))
+                    if (fullscreen && GetClientRect(parent, out client)) {
+                        Point cursor;
+                        Rect parentRect;
+                        if (GetCursorPos(out cursor) && GetWindowRect(parent, out parentRect)) {
+                            bool inside = cursor.x >= parentRect.left && cursor.x < parentRect.right &&
+                                cursor.y >= parentRect.top && cursor.y < parentRect.bottom;
+                            bool moved = cursor.x != lastCursorX || cursor.y != lastCursorY;
+                            lastCursorX = cursor.x; lastCursorY = cursor.y;
+                            if (inside && moved) {
+                                lastCursorMotion = DateTime.UtcNow;
+                                if (!controlsVisible) {
+                                    controlsVisible = true;
+                                    Console.WriteLine("CONTROLS_VISIBLE"); Console.Out.Flush();
+                                }
+                            }
+                            // A user operating the seek bar or menu must not lose it.
+                            if (inside && cursor.y >= parentRect.bottom - controlsHeight)
+                                lastCursorMotion = DateTime.UtcNow;
+                            if (controlsVisible && (DateTime.UtcNow - lastCursorMotion).TotalMilliseconds > 3000) {
+                                controlsVisible = false;
+                                Console.WriteLine("CONTROLS_HIDDEN"); Console.Out.Flush();
+                            }
+                        }
                         SetWindowPos(child, IntPtr.Zero, 0, 0,
                             Math.Max(1, Math.Min(client.right - client.left, pw)),
-                            Math.Max(1, Math.Min(client.bottom - client.top - FullscreenControlsHeight, ph)),
+                            Math.Max(1, Math.Min(client.bottom - client.top - (controlsVisible ? controlsHeight : 0), ph)),
                             SWP_NOZORDER | SWP_NOACTIVATE);
-                    else
+                    } else
                         SetWindowPos(child, IntPtr.Zero, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE);
                     Thread.Sleep(100);
                 }
