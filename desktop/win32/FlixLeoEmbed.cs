@@ -57,6 +57,9 @@ internal static class FlixLeoEmbed {
                 Console.WriteLine("EMBEDDED");
                 Console.Out.Flush();
                 int px = 0, py = 0, pw = 1280, ph = 720;
+                // Keep a native-free strip for the HTML controls: embedded mpv is a
+                // real HWND and otherwise paints over every Chromium overlay.
+                const int FullscreenControlsHeight = 96;
                 bool fullscreen = false;
                 var updates = new System.Collections.Concurrent.ConcurrentQueue<string>();
                 var reader = new Thread(() => {
@@ -81,7 +84,7 @@ internal static class FlixLeoEmbed {
                     }
                     Rect client;
                     if (fullscreen && GetClientRect(parent, out client))
-                        SetWindowPos(child, IntPtr.Zero, 0, 0, Math.Max(1, client.right - client.left), Math.Max(1, client.bottom - client.top), SWP_NOZORDER | SWP_NOACTIVATE);
+                        SetWindowPos(child, IntPtr.Zero, 0, 0, Math.Max(1, client.right - client.left), Math.Max(1, client.bottom - client.top - FullscreenControlsHeight), SWP_NOZORDER | SWP_NOACTIVATE);
                     else
                         SetWindowPos(child, IntPtr.Zero, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE);
                     Thread.Sleep(100);
