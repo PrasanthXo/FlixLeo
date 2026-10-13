@@ -242,7 +242,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       </div>
       <div className="p-3 sm:p-4 space-y-3">
         {desktopNative && !nativeFullscreen && <div className="flex flex-wrap items-center gap-3">
-          <button type="button" aria-label="Fullscreen" title="Fullscreen (F11)" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')} className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-white">⛶ Fullscreen</button>
+          <button type="button" aria-label="Fullscreen" title="Fullscreen · Esc to exit" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')} className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-white">⛶ Fullscreen</button>
           <DesktopAspectRatioPicker value={aspectRatio} onChange={changeAspectRatio} />
         </div>}
         {/^(tamil|ta)(?:\\b|\\s|\\W)/i.test(media.language.trim()) && <div className="rounded-lg border border-amber-500/40 bg-slate-900 p-3">
