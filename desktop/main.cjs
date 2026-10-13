@@ -87,6 +87,7 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
     '--script-opts=osc-visibility=auto,osc-layout=bottombar,osc-hidetimeout=2000,osc-fadeduration=180,osc-deadzonesize=0,osc-scalewindowed=1.7,osc-scalefullscreen=1.8',
     `--input-ipc-server=${mpvPipe}`,
     '--hwdec=auto-safe', '--border=no', '--geometry=1280x720',
+    '--keepaspect=yes', '--keepaspect-window=no', '--video-aspect-override=no',
     '--title=FlixLeo', '--user-agent=FlixLeoDesktop/1.0',
     ...(Number.isFinite(resumeSeconds) && resumeSeconds >= 5 && resumeSeconds < 86400 ? [`--start=${Math.floor(resumeSeconds)}`] : []),
     '--', url
@@ -100,8 +101,20 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
     embedProcess = helperProc;
     if (lastBounds) helperProc.stdin.write(lastBounds.join(',') + '\n');
     let embedded = false;
+    let embedStdoutBuffer = '';
     helperProc.stdout.on('data', chunk => {
-      if (String(chunk).includes('EMBEDDED')) embedded = true;
+      embedStdoutBuffer += String(chunk);
+      let end;
+      while ((end = embedStdoutBuffer.indexOf('\n')) >= 0) {
+        const line = embedStdoutBuffer.slice(0, end).trim();
+        embedStdoutBuffer = embedStdoutBuffer.slice(end + 1);
+        if (line === 'EMBEDDED') {
+          embedded = true;
+          if (win.isFullScreen() && helperProc.stdin.writable) helperProc.stdin.write('FULLSCREEN\n');
+        }
+        if ((line === 'CONTROLS_VISIBLE' || line === 'CONTROLS_HIDDEN') && !win.isDestroyed())
+          win.webContents.send('flixleo:native-controls-visible', line === 'CONTROLS_VISIBLE');
+      }
     });
     helperProc.on('exit', code => {
       if (!embedded && nativeProcess === proc && playing) {
@@ -136,6 +149,8 @@ ipcMain.handle('flixleo:command-native', async (event, action, value) => {
   if (action === 'setAudioTrack' && Number.isInteger(value) && value >= 0) command = ['set_property','aid',value];
   if (action === 'setSubtitleTrack' && Number.isInteger(value) && value >= 0) command = ['set_property','sid',value];
   if (action === 'seekTo' && Number.isFinite(value) && value >= 0 && value <= 864000) command = ['seek', Number(value), 'absolute'];
+  if (action === 'setAspectRatio' && ['no', '16:9', '4:3', '21:9', '1:1'].includes(value))
+    command = ['set_property', 'video-aspect-override', value];
   if (action === 'toggleFullscreen') { toggleVideoFullscreen(mainWindow); return true; }
   if (action === 'setVolume' && Number.isFinite(value)) command = ['set_property', 'volume', Math.max(0, Math.min(100, Number(value)))];
   if (!command) return false;
@@ -228,6 +243,11 @@ ipcMain.handle('flixleo:duration-native', async (event) => {
     socket.once('error', () => finish(0));
     socket.once('close', () => finish(0));
   });
+});
+ipcMain.handle('flixleo:controls-height', (event, height) => {
+  if (!trusted(event) || !Number.isFinite(height) || !embedProcess?.stdin?.writable) return false;
+  embedProcess.stdin.write('CONTROL_HEIGHT ' + Math.max(48, Math.min(300, Math.round(height))) + '\n');
+  return true;
 });
 ipcMain.handle('flixleo:fullscreen-state', (event) => {
   return trusted(event) && Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFullScreen());
