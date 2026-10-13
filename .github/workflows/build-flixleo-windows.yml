@@ -43,9 +43,23 @@ jobs:
           if (-not (Test-Path $compiler)) { throw 'Windows .NET Framework C# compiler not found' }
           $source = (Resolve-Path 'desktop/win32/FlixLeoEmbed.cs' -ErrorAction Stop).Path
           $destination = Join-Path (Resolve-Path 'desktop/vendor/mpv').Path 'FlixLeoEmbed.exe'
-          & $compiler /nologo /target:exe /platform:x64 "/out:$destination" "$source"
-          if ($LASTEXITCODE -ne 0) { throw 'Unable to compile FlixLeo native embedding helper' }
+          # Pass source and output paths in a response file so Windows PowerShell,
+          # the legacy .NET Framework compiler and path separators cannot mangle them.
+          $response = Join-Path $env:RUNNER_TEMP 'flixleo-embed.rsp'
+          @(
+            '/nologo'
+            '/target:exe'
+            '/platform:x64'
+            ('/out:"' + $destination + '"')
+            ('"' + $source + '"')
+          ) | Set-Content -LiteralPath $response -Encoding Ascii
+          & $compiler ("@" + $response)
+          if ($LASTEXITCODE -ne 0) { throw "Unable to compile FlixLeo native embedding helper (csc exit $LASTEXITCODE)" }
           if (-not (Test-Path desktop/vendor/mpv/FlixLeoEmbed.exe)) { throw 'Embedding helper missing' }
+      - name: Validate Electron scripts before packaging
+        run: |
+          node --check desktop/main.cjs
+          node --check desktop/preload.cjs
       - name: Package installer and portable Windows app
         run: npm run desktop:dist
         env:
