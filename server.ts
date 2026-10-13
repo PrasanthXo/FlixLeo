@@ -908,12 +908,8 @@ const stremioProviderCooldown = new Map<string, number>();
 
 const PLAVIOHD_BASE = 'https://plaviohd.vercel.app';
 // PlavioHD is an additive built-in provider; existing Render add-ons remain intact.
-const plavioLiveCatalogs: Record<string, string> = {
-  live: 'plaviohd-live',
-  cricket: 'plaviohd-cricket',
-  football: 'plaviohd-football',
-  networks: 'plaviohd-networks'
-};
+// A manifest-driven channel list avoids guessing vendor-specific catalog IDs.
+let cachedPlavioChannels: { expires: number; items: { id: string; name: string; poster: string; description: string }[] } | null = null;
 async function fetchPlavioJson(route: string, timeoutMs = 14000): Promise<any> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -938,24 +934,45 @@ function plavioSafePoster(candidate: unknown): string {
   } catch { return ''; }
 }
 // Only known catalog IDs are exposed; this is not an arbitrary upstream URL proxy.
-app.get('/api/stremio/plavio/live/catalog', async (req: Request, res: Response) => {
-  const category = String(req.query.category || 'live');
-  const catalogId = Object.prototype.hasOwnProperty.call(plavioLiveCatalogs, category) ? plavioLiveCatalogs[category] : undefined;
-  if (!catalogId) return res.status(400).json({ error: 'Unknown live category' });
+
+app.get('/api/stremio/plavio/live/catalog', async (_req: Request, res: Response) => {
+  if (cachedPlavioChannels && cachedPlavioChannels.expires > Date.now()) {
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    return res.json({ provider: 'PlavioHD', items: cachedPlavioChannels.items });
+  }
   try {
-    const data = await fetchPlavioJson('/catalog/tv/' + catalogId + '.json');
-    const metas = Array.isArray(data?.metas) ? data.metas.slice(0, 100) : [];
+    // Each addon advertises its real catalog IDs in its manifest.
+    // Nothing is shown on FlixLeo Home or in movie/series catalogs.
+    const manifest = await fetchPlavioJson('/manifest.json', 6000);
+    const announced = Array.isArray(manifest?.catalogs) ? manifest.catalogs : [];
+    const channelCatalogs = announced.filter((entry: any) =>
+      entry?.type === 'tv' && typeof entry.id === 'string' && /^[a-zA-Z0-9._:-]{1,100}$/.test(entry.id) &&
+      !(Array.isArray(entry.extra) && entry.extra.some((e: any) => e?.isRequired))
+    ).slice(0, 8);
+    if (!channelCatalogs.length) return res.json({
+      provider: 'PlavioHD', items: [],
+      message: 'This add-on does not currently advertise a Live TV channel list.'
+    });
+    const responses = await Promise.allSettled(channelCatalogs.map(async (c: { id: string }) =>
+      fetchPlavioJson('/catalog/tv/' + encodeURIComponent(c.id) + '.json', 12000)
+    ));
+    const metas = responses.flatMap(response => response.status === 'fulfilled'
+      ? (Array.isArray(response.value?.metas) ? response.value.metas.slice(0, 120) : [])
+      : []);
+    const ids = new Set<string>();
     const items = metas.flatMap((entry: any) => {
       const id = typeof entry?.id === 'string' ? entry.id : '';
-      if (!/^(?:plaviohdtv-[a-zA-Z0-9_.:-]{1,120}|tt[0-9]{5,12})$/.test(id)) return [];
+      if (!/^[a-zA-Z0-9._:-]{1,180}$/.test(id) || ids.has(id)) return [];
+      ids.add(id);
       return [{
         id, name: String(entry.name || 'Live channel').slice(0, 120),
         poster: plavioSafePoster(entry.poster || entry.logo),
         description: String(entry.description || '').slice(0, 240)
       }];
-    });
-    res.setHeader('Cache-Control', 'public, max-age=60');
-    return res.json({ provider: 'PlavioHD', category, items });
+    }).slice(0, 200);
+    if (items.length) cachedPlavioChannels = { items, expires: Date.now() + 60_000 };
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    return res.json({ provider: 'PlavioHD', items });
   } catch {
     res.setHeader('Cache-Control', 'no-store');
     return res.status(502).json({ error: 'Live channels temporarily unavailable', items: [] });
@@ -963,7 +980,7 @@ app.get('/api/stremio/plavio/live/catalog', async (req: Request, res: Response) 
 });
 app.get('/api/stremio/plavio/live/streams', async (req: Request, res: Response) => {
   const id = String(req.query.id || '');
-  if (!/^(?:plaviohdtv-[a-zA-Z0-9_.:-]{1,120}|tt[0-9]{5,12})$/.test(id)) {
+  if (!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) {
     return res.status(400).json({ error: 'Invalid channel ID' });
   }
   try {
