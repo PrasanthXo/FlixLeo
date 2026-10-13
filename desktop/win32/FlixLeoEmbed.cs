@@ -77,9 +77,12 @@ internal static class FlixLeoEmbed {
                 // Use OS double-click time and movement limits, not arbitrary
                 // web-player hit targets.
                 const int VK_LBUTTON = 0x01, VK_ESCAPE = 0x1B, VK_SPACE = 0x20;
+                const int VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28;
                 const int SM_CXDOUBLECLK = 36, SM_CYDOUBLECLK = 37;
                 bool previousLeftDown = false;
                 bool previousEscapeDown = false, previousSpaceDown = false;
+                bool previousArrowLeft = false, previousArrowRight = false;
+                bool previousArrowUp = false, previousArrowDown = false;
                 DateTime firstClickAt = DateTime.MinValue;
                 int firstClickX = 0, firstClickY = 0;
                 // Avoid resizing the mpv child 40 times a second when neither
@@ -199,6 +202,29 @@ internal static class FlixLeoEmbed {
                             Console.WriteLine("VIDEO_SPACE"); Console.Out.Flush();
                         }
                     }
+                    // Capture all four arrow keys while the native video
+                    // is active. MPV's own arrow bindings are disabled by the
+                    // host, avoiding duplicate seeks and volume changes.
+                    bool arrowLeft = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
+                    bool arrowRight = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
+                    bool arrowUp = (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
+                    bool arrowDown = (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
+                    if (focusedHere) {
+                        Point keyCursor; Rect keyVideo;
+                        bool cursorOverVideo = GetCursorPos(out keyCursor) && GetWindowRect(child, out keyVideo) &&
+                            keyCursor.x >= keyVideo.left && keyCursor.x < keyVideo.right &&
+                            keyCursor.y >= keyVideo.top && keyCursor.y < keyVideo.bottom;
+                        if (fullscreen || cursorOverVideo) {
+                            if (arrowLeft && !previousArrowLeft) { Console.WriteLine("VIDEO_LEFT"); Console.Out.Flush(); }
+                            if (arrowRight && !previousArrowRight) { Console.WriteLine("VIDEO_RIGHT"); Console.Out.Flush(); }
+                            if (arrowUp && !previousArrowUp) { Console.WriteLine("VIDEO_UP"); Console.Out.Flush(); }
+                            if (arrowDown && !previousArrowDown) { Console.WriteLine("VIDEO_DOWN"); Console.Out.Flush(); }
+                        }
+                    }
+                    previousArrowLeft = arrowLeft;
+                    previousArrowRight = arrowRight;
+                    previousArrowUp = arrowUp;
+                    previousArrowDown = arrowDown;
                     previousEscapeDown = escapeDown;
                     previousSpaceDown = spaceDown;
                     // Sample at 40Hz so quick mouse clicks are not missed.
