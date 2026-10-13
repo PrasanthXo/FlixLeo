@@ -143,7 +143,7 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
   let inputOverrides = [];
   try {
     fs.mkdirSync(path.dirname(mpvInputConf), { recursive:true });
-    fs.writeFileSync(mpvInputConf, 'MBTN_LEFT_DBL ignore\nESC ignore\nSPACE ignore\nF11 ignore\n', 'utf8');
+    fs.writeFileSync(mpvInputConf, 'MBTN_LEFT_DBL ignore\nESC ignore\nSPACE ignore\nF11 ignore\nLEFT ignore\nRIGHT ignore\nUP ignore\nDOWN ignore\n', 'utf8');
     inputOverrides = [`--input-conf=${mpvInputConf}`];
   } catch {
     // Prevent double toggles if the user's application data is read-only.
@@ -152,7 +152,7 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
   const args = [
     '--no-config', '--no-terminal', '--force-window=yes', '--idle=no',
     '--keep-open=no', '--osc=yes', '--input-default-bindings=yes',
-    '--input-cursor=yes', '--cursor-autohide=3000',
+    '--input-cursor=yes', '--cursor-autohide=3000', '--volume-max=100',
     ...inputOverrides,
     // Modern minimal overlay; disappears shortly after mouse movement.
     '--script-opts=osc-visibility=auto,osc-layout=bottombar,osc-hidetimeout=2000,osc-fadeduration=180,osc-deadzonesize=0,osc-scalewindowed=1.7,osc-scalefullscreen=1.8',
@@ -189,6 +189,10 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0
           if (line === 'VIDEO_DOUBLE_CLICK') toggleVideoFullscreen(win);
           if (line === 'VIDEO_ESCAPE' && win.isFullScreen()) win.setFullScreen(false);
           if (line === 'VIDEO_SPACE') void sendNativeCommand(['cycle', 'pause']);
+          if (line === 'VIDEO_LEFT') void sendNativeCommand(['seek', -10, 'relative']);
+          if (line === 'VIDEO_RIGHT') void sendNativeCommand(['seek', 10, 'relative']);
+          if (line === 'VIDEO_UP') void sendNativeCommand(['add', 'volume', 5]);
+          if (line === 'VIDEO_DOWN') void sendNativeCommand(['add', 'volume', -5]);
         }
       }
     });
