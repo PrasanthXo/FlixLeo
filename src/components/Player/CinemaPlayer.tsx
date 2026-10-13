@@ -49,19 +49,29 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const lastSaveRef = useRef(0);
   const active = mirrors[index];
   const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
+  const hasShownMainPlayer = useRef(false);
+  const lastMinimizeSignal = useRef(minimizeSignal);
   useEffect(() => {
     const anchor = playerAnchorRef.current;
     if (!anchor || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(entries => {
       const entry = entries[0];
-      if (!entry) return;
-      const above = entry.boundingClientRect.bottom < 0;
-      setDocked(!entry.isIntersecting && above);
+      if (!entry || document.fullscreenElement) return;
+      // Never create a mini-player until the large player was visible once.
+      if (entry.isIntersecting) {
+        hasShownMainPlayer.current = true;
+        setDocked(false);
+      } else if (hasShownMainPlayer.current && entry.boundingClientRect.bottom < -8) {
+        setDocked(true);
+      }
     }, { threshold: 0 });
     observer.observe(anchor);
     return () => observer.disconnect();
   }, []);
-  useEffect(() => { if (minimizeSignal > 0) setDocked(true); }, [minimizeSignal]);
+  useEffect(() => {
+    if (minimizeSignal > lastMinimizeSignal.current) setDocked(true);
+    lastMinimizeSignal.current = minimizeSignal;
+  }, [minimizeSignal]);
   const shareMovie = async () => {
     const tmdbMatch = media.id.match(/^(?:tmdb-|tv-)([0-9]+)$/);
     const link = tmdbMatch
@@ -204,7 +214,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       </div>
       <div ref={playerFrameRef} className={docked ? "fixed z-[65] right-3 bottom-28 md:bottom-8 w-[min(60vw,240px)] md:w-80 h-[232px] rounded-xl overflow-hidden border border-amber-500/60 shadow-2xl bg-black" : "tv6-cinema-frame aspect-video w-full bg-black relative"} style={frameFullscreen ? { position: "fixed", inset: 0, top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh", maxWidth: "none", maxHeight: "none", aspectRatio: "auto" } : undefined}>
         {!desktopNative && <button type="button" onClick={() => void toggleFrameFullscreen()} className="absolute z-[60] right-3 top-3 rounded-lg bg-black/85 px-3 py-2 text-xs font-semibold text-white hover:bg-black border border-white/20" aria-label={frameFullscreen ? "Exit fullscreen player" : "Fullscreen player"}>{frameFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
-        {docked && !desktopNative && <div className="absolute z-20 right-1 top-1 flex gap-1"><button type="button" onClick={() => { setDocked(false); playerAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
+        {docked && !desktopNative && <div className="absolute z-20 right-1 top-1 flex gap-1"><button type="button" onClick={() => { playerAnchorRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); setDocked(false); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
           : desktopNative ? <div className={docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div>
           : active.streamType === 'embed-iframe'
