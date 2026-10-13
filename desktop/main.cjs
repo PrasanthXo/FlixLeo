@@ -49,7 +49,7 @@ function backToFlixLeo() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.setTitle('FlixLeo');
 }
-ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
+ipcMain.handle('flixleo:play-native', async (event, streamUrl, resumeSeconds = 0) => {
   if (!trusted(event)) return { ok:false, error:'Untrusted page' };
   const url = validUrl(streamUrl);
   if (!url) return { ok:false, error:'Unsupported stream URL' };
@@ -81,6 +81,7 @@ ipcMain.handle('flixleo:play-native', async (event, streamUrl) => {
     `--input-ipc-server=${mpvPipe}`,
     '--hwdec=auto-safe', '--border=no', '--geometry=1280x720',
     '--title=FlixLeo', '--user-agent=FlixLeoDesktop/1.0',
+    ...(Number.isFinite(resumeSeconds) && resumeSeconds >= 5 && resumeSeconds < 86400 ? [`--start=${Math.floor(resumeSeconds)}`] : []),
     '--', url
   ];
   try {
@@ -188,7 +189,7 @@ ipcMain.handle('flixleo:playback-status', async (event) => {
     socket.once('data', data => {
       try {
         const response = JSON.parse(String(data).trim().split('\n')[0]);
-        finish({ ready:response.error === 'success' && typeof response.data === 'number' && response.data >= 0 });
+        finish({ ready:response.error === 'success' && typeof response.data === 'number' && response.data >= 0, position: typeof response.data === 'number' ? response.data : 0 });
       } catch { finish({ ready:false }); }
     });
     socket.once('error', () => finish({ ready:false }));
