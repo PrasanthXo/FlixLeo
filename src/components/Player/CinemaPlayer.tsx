@@ -1,5 +1,5 @@
-import { DesktopNativeSurface, desktopBridge, useDesktopWindowFullscreen } from './DesktopNativeSurface';
-import { DesktopFullscreenControls } from './DesktopFullscreenControls';
+import { DesktopNativeSurface, desktopBridge, useDesktopWindowFullscreen, useDesktopControlsVisible } from './DesktopNativeSurface';
+import { DesktopFullscreenControls, DesktopAspectRatioPicker, type NativeAspectRatio } from './DesktopFullscreenControls';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { StremioNativePlayer } from './StremioNativePlayer';
@@ -52,6 +52,13 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const active = mirrors[index];
   const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
   const nativeFullscreen = desktopNative && nativeWindowFullscreen;
+  const fullscreenControlsVisible = useDesktopControlsVisible(nativeFullscreen);
+  const [aspectRatio, setAspectRatio] = useState<NativeAspectRatio>('no');
+  const changeAspectRatio = (ratio: NativeAspectRatio) => {
+    setAspectRatio(ratio);
+    void desktopBridge()?.commandNative('setAspectRatio', ratio);
+  };
+  useEffect(() => { setAspectRatio('no'); }, [active?.url]);
   useEffect(() => { if (nativeFullscreen) setDocked(false); }, [nativeFullscreen]);
   const hasShownMainPlayer = useRef(false);
   const lastMinimizeSignal = useRef(minimizeSignal);
@@ -220,11 +227,11 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         {!desktopNative && !docked && <button type="button" onClick={() => void toggleFrameFullscreen()} className="absolute z-[60] right-3 top-3 rounded-lg bg-black/85 px-3 py-2 text-xs font-semibold text-white hover:bg-black border border-white/20" aria-label={frameFullscreen ? "Exit fullscreen player" : "Fullscreen player"}>{frameFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
         {docked && !desktopNative && <div className="absolute z-[70] left-2 top-2 flex gap-1"><button type="button" onClick={() => { playerAnchorRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); setDocked(false); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
-          : desktopNative ? <div className={nativeFullscreen ? "h-[calc(100%-96px)] w-full" : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div>
+          : desktopNative ? <div className={nativeFullscreen ? (fullscreenControlsVisible ? "h-[calc(100%-96px)] w-full" : "h-full w-full") : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div>
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
             : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); onEpisodeEnded?.(); }} className="h-full w-full object-contain" />}
-        {nativeFullscreen && <DesktopFullscreenControls title={media.title} onClose={() => { saveProgress(); onClose(); }} />}
+        {nativeFullscreen && <DesktopFullscreenControls title={media.title} onClose={() => { saveProgress(); onClose(); }} visible={fullscreenControlsVisible} aspectRatio={aspectRatio} onAspectRatioChange={changeAspectRatio} />}
         {docked && desktopNative && <div className="absolute bottom-0 left-0 right-0 z-[90] flex h-[52px] items-center justify-around gap-1 border-t border-white/15 bg-[#151925] px-2 text-white">
           <button type="button" aria-label="Rewind 10 seconds" className="rounded-lg p-2 text-white" onClick={() => void desktopBridge()?.commandNative('seekBackward')}>↶</button>
           <button type="button" aria-label="Play or pause" className="rounded-lg bg-amber-400 px-3 py-2 text-black" onClick={() => void desktopBridge()?.commandNative('togglePause')}>▶Ⅱ</button>
@@ -234,6 +241,10 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         </div>}
       </div>
       <div className="p-3 sm:p-4 space-y-3">
+        {desktopNative && !nativeFullscreen && <div className="flex flex-wrap items-center gap-3">
+          <button type="button" aria-label="Fullscreen" title="Fullscreen (F11)" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')} className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-white">⛶ Fullscreen</button>
+          <DesktopAspectRatioPicker value={aspectRatio} onChange={changeAspectRatio} />
+        </div>}
         {/^(tamil|ta)(?:\\b|\\s|\\W)/i.test(media.language.trim()) && <div className="rounded-lg border border-amber-500/40 bg-slate-900 p-3">
           <p className="text-sm font-semibold text-white">Tamil movies · Einthusan preferred</p>
           <p className="mt-1 text-xs text-slate-300">Browse the official Einthusan Tamil catalogue first. FlixLeo cannot confirm a matching movie or embed permission automatically; existing in-player servers remain available below.</p>
