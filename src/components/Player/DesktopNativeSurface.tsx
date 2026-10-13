@@ -97,7 +97,15 @@ export function DesktopNativeSurface({ url, media, mirrorId, onProgressSaved }: 
       if (!active || !surface.current) return;
       const rect = surface.current.getBoundingClientRect();
       const zoom = window.devicePixelRatio || 1;
-      const bounds = [rect.left, rect.top, rect.width, rect.height].map(v => Math.max(0, Math.round(v * zoom)));
+      // Allow signed left/top: native Win32 child windows are clipped by their
+      // parent. Clamping a scrolled-off video to (0,0) pins a huge video over
+      // the Home page and prevents the mini-player from appearing properly.
+      const bounds = [
+        Math.round(rect.left * zoom),
+        Math.round(rect.top * zoom),
+        Math.max(1, Math.round(rect.width * zoom)),
+        Math.max(1, Math.round(rect.height * zoom))
+      ];
       const key = bounds.join(',');
       if (key !== last && bounds[2] > 0 && bounds[3] > 0) {
         last = key;
