@@ -23,7 +23,12 @@ export function PlavioLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirro
         return response.json();
       })
       .then(data => {
-        if (!controller.signal.aborted) setChannels(Array.isArray(data.items) ? data.items : []);
+        if (!controller.signal.aborted) {
+          setChannels(Array.isArray(data.items) ? data.items : []);
+          if (!Array.isArray(data.items) || data.items.length === 0) {
+            setError(typeof data.message === 'string' ? data.message : 'No live channels are currently available.');
+          }
+        }
       })
       .catch(() => { if (!controller.signal.aborted) setError('Live catalog temporarily unavailable. Try refreshing.'); })
       .finally(() => { window.clearTimeout(timeout); setLoading(false); });
