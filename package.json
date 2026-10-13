@@ -10,7 +10,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "desktop": "electron desktop/main.cjs",
-    "desktop:dist": "electron-builder --win nsis --x64 --publish never"
+    "desktop:dist": "node desktop/build-icon.cjs && electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -38,7 +38,8 @@
     "typescript": "^7.0.2",
     "@types/express": "^4.17.21",
     "electron": "^38.0.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "sharp": "^0.34.4"
   },
   "description": "FlixLeo Windows desktop app and web platform",
   "build": {
@@ -59,12 +60,16 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "desktop/brand-icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "FlixLeo-Setup-${version}-${arch}.${ext}"
+      "artifactName": "FlixLeo-Setup-${version}-${arch}.${ext}",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FlixLeo"
     },
     "extraResources": [
       {
