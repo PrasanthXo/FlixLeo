@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Maximize2, Minimize2, Pause, Play, RotateCcw, RotateCw, Subtitles, Volume2, VolumeX, X } from 'lucide-react';
+import { Minimize2, Pause, Play, RotateCcw, RotateCw, Subtitles, Volume2, VolumeX, X } from 'lucide-react';
 import { desktopBridge, fullLanguage, type NativeTrack } from './DesktopNativeSurface';
 
 const clock = (seconds: number): string => {
