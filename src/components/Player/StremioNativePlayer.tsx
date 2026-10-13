@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
+import { getAppleVlcTarget, getAppleVlcLaunchUrl } from '../../lib/appleVlc';
 
 const resumeKey = (m: MediaItem) => m.id + (m.playbackSeason !== undefined && m.playbackEpisode !== undefined ? ':s' + m.playbackSeason + 'e' + m.playbackEpisode : '');
 type Props = { media: MediaItem; mirrors: StreamMirror[]; initialMirrorId?: string; minimizeSignal?: number; onClose: () => void; onProgressSaved?: () => void; onEpisodeEnded?: () => void };
@@ -15,6 +16,7 @@ const parseSrt = (text: string) => 'WEBVTT\n\n' + text.replace(/\r/g, '').replac
 export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved, onEpisodeEnded }) => {
   const sorted = [...mirrors].sort((a, b) => qualitySort(b) - qualitySort(a));
   const liveChannel = media.id.startsWith('plavio-live-');
+  const appleVlcTarget = getAppleVlcTarget();
   const failedLiveSources = useRef<Set<string>>(new Set());
   const [retryToken, setRetryToken] = useState(0);
   const [selected, setSelected] = useState(initialMirrorId || (() => { try { const rows = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]'); const saved = Array.isArray(rows) ? rows.find((row: any) => row?.media && resumeKey(row.media) === resumeKey(media)) : undefined; return saved?.mirrorId && sorted.some(m => m.id === saved.mirrorId) ? saved.mirrorId : undefined; } catch { return undefined; } })() || sorted[0]?.id || '');
@@ -113,17 +115,21 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
 
   const [vlcNotice, setVlcNotice] = useState('');
   const openInVlc = () => {
-    if (!active?.url || !/^https:\/\//i.test(active.url)) {
+    if (!appleVlcTarget) return; // The web-app VLC option is Apple-only.
+    if (!active?.url || active.streamType === 'embed-iframe') {
+      setVlcNotice('This stream cannot be opened directly in VLC.');
+      return;
+    }
+    // Send the original HTTPS stream (not a short-lived audio conversion URL).
+    const vlcUrl = getAppleVlcLaunchUrl(active.url, appleVlcTarget);
+    if (!vlcUrl) {
       setVlcNotice('This stream has no VLC-compatible HTTPS link.');
       return;
     }
-    // Open only the original source, never the short-lived AAC conversion ticket.
-    // Android Chrome can dispatch this intent to installed VLC.
-    const source = active.url;
-    const intent = 'intent://' + source.slice('https://'.length) +
-      '#Intent;scheme=https;package=org.videolan.vlc;type=video/*;end';
-    setVlcNotice('Opening VLC. If it does not open, check VLC is installed and the streaming source allows external playback.');
-    window.location.href = intent;
+    setVlcNotice(appleVlcTarget === 'ios'
+      ? 'Opening VLC. VLC must be installed and the source must allow external playback.'
+      : 'Opening VLC. On Mac, a separate registered VLC URL handler is required in addition to VLC.');
+    window.location.href = vlcUrl;
   };
   const lastSave = useRef(0);
   const save = () => {
@@ -585,14 +591,18 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
             {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}{m.fileSize ? ' · ' + m.fileSize : ''}</option>)}
           </select>
         </label>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={openInVlc}
-            className="rounded-lg border border-orange-400/50 bg-orange-500/15 px-3 py-2 text-xs font-semibold text-orange-200">
-            {liveChannel ? 'Open channel in VLC' : 'Open in VLC (4K audio)'}
-          </button>
-        </div>
-        {vlcNotice && <p role="status" className="text-xs text-slate-300">{vlcNotice}</p>}
-        <p className="text-xs text-slate-400">VLC is an external app. Some streaming hosts may block playback outside FlixLeo.</p>
+        {appleVlcTarget && <>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={openInVlc} disabled={active?.streamType === 'embed-iframe'}
+              className="rounded-lg border border-orange-400/50 bg-orange-500/15 px-3 py-2 text-xs font-semibold text-orange-200 disabled:opacity-40">
+              {liveChannel ? 'Open channel in VLC' : 'Open in VLC'}
+            </button>
+          </div>
+          {vlcNotice && <p role="status" className="text-xs text-slate-300">{vlcNotice}</p>}
+          <p className="text-xs text-slate-400">{appleVlcTarget === 'mac'
+            ? 'Mac browsers require a separate registered VLC URL handler; installing VLC alone does not enable direct browser launch.'
+            : 'VLC must be installed on this iPhone or iPad.'} Some streaming hosts may block external playback.</p>
+        </>}
         {active?.audioFixUrl && <button type="button" onClick={() => setAudioFix(current => !current)}
           className="w-full rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-left text-xs font-semibold text-amber-300">
           {audioFix ? 'Use original audio' : 'Audio Fix · Convert audio to AAC (video unchanged)'}

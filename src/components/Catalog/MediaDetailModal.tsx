@@ -5,6 +5,7 @@ import {
   Volume2, Server, Star
 } from 'lucide-react';
 import { MediaItem, StreamMirror, getSourceDisplayBadge } from '../../types/stream';
+import { getAppleVlcTarget, getAppleVlcLaunchUrl } from '../../lib/appleVlc';
 
 interface MediaDetailModalProps {
   media: MediaItem | null;
@@ -194,10 +195,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   };
   const desktopVlc = (window as Window & { flixleoDesktop?: { playNative: (url: string) => Promise<{ ok: boolean; error?: string }> } }).flixleoDesktop;
   const isFlixLeoNative = /FlixLeoNative\/1\.0/i.test(navigator.userAgent);
-  const canUseVlc = isFlixLeoNative || Boolean(desktopVlc);
+  const appleVlcTarget = getAppleVlcTarget();
+  const canUseVlc = isFlixLeoNative || Boolean(desktopVlc) || Boolean(appleVlcTarget);
   const playInVlc = async (mirror: StreamMirror) => {
-    // External VLC invocation is supported only on Android. Desktop browsers
-    // cannot securely hand off a private media URL to VLC without exposing it.
+    // Keep the Android native bridge and desktop bridge; Apple web browsers
+    // can request an external VLC handoff through platform URL schemes.
     if (!canUseVlc) return;
     try {
       const source = new URL(mirror.url);
@@ -208,8 +210,12 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
       if (desktopVlc) {
         const result = await desktopVlc.playNative(source.href);
         if (!result?.ok) window.alert(result?.error || 'Unable to open VLC.');
-      } else {
+      } else if (isFlixLeoNative) {
         window.location.href = 'flixleo-player://play?url=' + encodeURIComponent(source.href);
+      } else if (appleVlcTarget) {
+        const vlcUrl = getAppleVlcLaunchUrl(source.href, appleVlcTarget);
+        if (!vlcUrl) { window.alert('This source cannot be opened in VLC.'); return; }
+        window.location.href = vlcUrl;
       }
     } catch {
       window.alert('This stream has no supported VLC playback link.');
@@ -330,7 +336,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-amber-300">Video playing without sound?</p>
                   <p className="mt-1 text-xs leading-relaxed text-slate-200 sm:text-sm">
-                    Some 4K and surround-sound audio formats are not supported by web browsers. For wider playback compatibility, try our <strong className="text-white">FlixLeo Android app</strong> with Native Play (VLC), or our <strong className="text-white">FlixLeo Windows app</strong> with native playback. Stream availability and audio support still depend on the source.
+                    Some 4K and surround-sound audio formats are not supported by web browsers. For wider playback compatibility, try our <strong className="text-white">FlixLeo Android app</strong> , or our <strong className="text-white">FlixLeo Windows app</strong> with native playback. Stream availability and audio support still depend on the source.
                   </p>
                   <div className="mt-3 flex items-center gap-3" aria-label="FlixLeo Android and Windows apps">
                     <span title="FlixLeo for Android" role="img" aria-label="FlixLeo for Android"
@@ -402,10 +408,10 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                             <span className="break-words">{mirror.label}</span>
                             <span className="shrink-0 text-right text-amber-400">{mirror.quality}{mirror.fileSize && <span className="block text-[11px] text-slate-300">{mirror.fileSize}</span>}</span>
                           </button>
-                          {isFlixLeoNative && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                          {canUseVlc && !desktopVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                             onClick={() => playInVlc(mirror)}
                             className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-3 text-xs font-semibold text-orange-200 disabled:opacity-40">
-                            {isFlixLeoNative ? "Native Play" : "Native Play"}
+                            {isFlixLeoNative ? "Native Play" : "VLC Play"}
                           </button>}
                         </div>
                       ))}
@@ -506,10 +512,10 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           <Play className="w-3.5 h-3.5 fill-current" />
                           {waitingForServers ? 'Fetching…' : 'Play'}
                         </button>
-                        {isFlixLeoNative && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
+                        {canUseVlc && !desktopVlc && <button type="button" disabled={waitingForServers || mirror.streamType === 'embed-iframe'}
                           onClick={() => playInVlc(mirror)}
                           className="px-3 py-2 rounded-lg border border-orange-500/40 bg-orange-500/15 text-orange-200 font-semibold text-xs disabled:opacity-40">
-                          {isFlixLeoNative ? "Native Play" : "Native Play"}
+                          {isFlixLeoNative ? "Native Play" : "VLC Play"}
                         </button>}
                       </div>
                     </div>
