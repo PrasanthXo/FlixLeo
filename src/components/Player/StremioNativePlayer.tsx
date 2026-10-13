@@ -13,6 +13,9 @@ const parseSrt = (text: string) => 'WEBVTT\n\n' + text.replace(/\r/g, '').replac
 
 export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved, onEpisodeEnded }) => {
   const sorted = [...mirrors].sort((a, b) => qualitySort(b) - qualitySort(a));
+  const liveChannel = media.id.startsWith('plavio-live-');
+  const failedLiveSources = useRef<Set<string>>(new Set());
+  const [retryToken, setRetryToken] = useState(0);
   const [selected, setSelected] = useState(initialMirrorId || sorted[0]?.id || '');
   const [audioFix, setAudioFix] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -141,9 +144,27 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     subtitleSelection.current = '';
     setSubtitleMode('auto');
     setSelectedSubtitle('');
-    const fail = () => { if (!disposed) { setBuffering(false); setError('Unable to play this stream in your browser.'); } };
+    const fail = () => {
+      if (disposed) return;
+      setBuffering(false);
+      if (!liveChannel) {
+        setError('Unable to play this stream in your browser.');
+        return;
+      }
+      // Try each source once. Do not loop endlessly when all are offline.
+      if (failedLiveSources.current.has(active.id)) return;
+      failedLiveSources.current.add(active.id);
+      const next = sorted.find(mirror => !failedLiveSources.current.has(mirror.id));
+      if (next) {
+        setError('');
+        setSelected(next.id);
+      } else {
+        setError('No playable stream for this channel. The provider may be offline or the source may block browser playback. Try another channel or an external player.');
+      }
+    };
     const url = audioFix && active.audioFixUrl ? active.audioFixUrl : active.url;
-    const isAdaptive = !audioFix && (active.streamType === 'hls' || /\.m3u8(?:\?|$)|\.mpd(?:\?|$)/i.test(url));
+    // Prefer native HLS / hls.js for live channels; retain Shaka for existing VOD.
+    const isAdaptive = !liveChannel && !audioFix && (active.streamType === 'hls' || /\.m3u8(?:\?|$)|\.mpd(?:\?|$)/i.test(url));
     let shakaPlayer: any = null;
     const setupShaka = async () => {
       try {
@@ -288,6 +309,15 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         selectAutomatically('native-sub:' + preferred.index);
       }
     };
+    let startupConfirmed = false;
+    const onLivePlaying = () => {
+      startupConfirmed = true;
+      if (liveChannel) failedLiveSources.current.clear();
+    };
+    video.addEventListener('playing', onLivePlaying);
+    const startupTimer = liveChannel ? window.setTimeout(() => {
+      if (!disposed && !startupConfirmed && video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) fail();
+    }, 24000) : null;
     video.addEventListener('loadedmetadata', detectEmbeddedSubtitles);
     video.textTracks.addEventListener('addtrack', detectEmbeddedSubtitles);
     video.addEventListener('loadedmetadata', loaded);
@@ -297,6 +327,8 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     if (!isAdaptive) video.play().catch(() => setPlaying(false));
     return () => {
       disposed = true;
+      if (startupTimer !== null) window.clearTimeout(startupTimer);
+      video.removeEventListener('playing', onLivePlaying);
       video.removeEventListener('loadedmetadata', detectEmbeddedSubtitles);
       video.textTracks.removeEventListener('addtrack', detectEmbeddedSubtitles);
       nativeAudio?.removeEventListener?.('addtrack', detectNativeAudio);
@@ -309,7 +341,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       shakaRef.current = null;
       video.pause(); video.removeAttribute('src'); video.load();
     };
-  }, [active?.id, active?.url, active?.audioFixUrl, audioFix, media.id]);
+  }, [active?.id, active?.url, active?.audioFixUrl, audioFix, media.id, liveChannel, retryToken]);
   const changeAudio = (id: number) => {
     if (shakaRef.current) {
       const track = shakaRef.current.getVariantTracks().find((t: any) => t.id === id);
@@ -427,7 +459,11 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={uploadedRef.current || selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>}
       {!desktopNative && buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
-      {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 p-3 text-xs text-amber-300">{error}</div>}
+      {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/85 p-3 text-xs text-amber-300">
+        <p>{error}</p>
+        {liveChannel && <button type="button" onClick={() => { failedLiveSources.current.clear(); setError(''); setSelected(sorted[0]?.id || ''); setRetryToken(n => n + 1); }}
+          className="mt-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-black">Retry channel</button>}
+      </div>}
     </div>
     {desktopNative ? <div className="space-y-3 p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -444,7 +480,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <span className="text-xs text-slate-400">Use the controls on the video for seeking and track selection.</span>
       </div>
       <label className="block text-xs text-slate-300">Video quality / stream
-        <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => setSelected(e.target.value)}>
+        <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => { failedLiveSources.current.clear(); setSelected(e.target.value); setRetryToken(n => n + 1); }}>
           {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}</option>)}
         </select>
       </label>
@@ -472,14 +508,14 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       </div>
       {settingsOpen && <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-900 p-3">
         <label className="block text-xs text-slate-300">Video quality / stream
-          <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => { setAudioFix(false); setSelected(e.target.value); }}>
+          <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => { failedLiveSources.current.clear(); setAudioFix(false); setSelected(e.target.value); setRetryToken(n => n + 1); }}>
             {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}</option>)}
           </select>
         </label>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={openInVlc}
             className="rounded-lg border border-orange-400/50 bg-orange-500/15 px-3 py-2 text-xs font-semibold text-orange-200">
-            Open in VLC (4K audio)
+            {liveChannel ? 'Open channel in VLC' : 'Open in VLC (4K audio)'}
           </button>
         </div>
         {vlcNotice && <p role="status" className="text-xs text-slate-300">{vlcNotice}</p>}
