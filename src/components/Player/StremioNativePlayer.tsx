@@ -411,10 +411,29 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         onEnded={() => { setPlaying(false); save(); onEpisodeEnded?.(); }}>
         {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>}
-      {buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
+      {!desktopNative && buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
       {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 p-3 text-xs text-amber-300">{error}</div>}
     </div>
-    <div className="space-y-3 p-4">
+    {desktopNative ? <div className="space-y-3 p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-black" onClick={() => void desktopBridge()?.commandNative('togglePause')}>Play / Pause</button>
+        <button type="button" className="rounded-lg bg-slate-800 p-2" aria-label="Rewind 10 seconds" onClick={() => void desktopBridge()?.commandNative('seekBackward')}><RotateCcw size={18}/></button>
+        <button type="button" className="rounded-lg bg-slate-800 p-2" aria-label="Forward 10 seconds" onClick={() => void desktopBridge()?.commandNative('seekForward')}><RotateCw size={18}/></button>
+        <button type="button" className="rounded-lg bg-slate-800 p-2" onClick={() => void desktopBridge()?.commandNative('toggleMute')} aria-label="Mute or unmute"><Volume2 size={18}/></button>
+        <button type="button" className="rounded-lg bg-slate-800 px-3 py-2 text-xs" onClick={() => void desktopBridge()?.commandNative('toggleSubtitles')}>Subtitles on / off</button>
+        <button type="button" className="ml-auto rounded-lg bg-slate-800 px-3 py-2 text-xs" onClick={() => void toggleDesktopFullscreen()}>{desktopFullscreen ? 'Exit fullscreen' : '⛶ Fullscreen'}</button>
+      </div>
+      <div className="flex items-center gap-3">
+        <label htmlFor="flixleo-native-volume" className="text-xs text-slate-300">Volume</label>
+        <input id="flixleo-native-volume" type="range" min="0" max="100" value={Math.round(volume * 100)} className="w-40 accent-amber-500" onChange={e => { const next = Number(e.target.value); setVolume(next / 100); void desktopBridge()?.commandNative('setVolume', next); }} />
+        <span className="text-xs text-slate-400">Use the controls on the video for seeking and track selection.</span>
+      </div>
+      <label className="block text-xs text-slate-300">Video quality / stream
+        <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => setSelected(e.target.value)}>
+          {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}</option>)}
+        </select>
+      </label>
+    </div> : <div className="space-y-3 p-4">
       <input type="range" min="0" max={Math.max(1, duration)} step="0.5" value={Math.min(position, Math.max(1, duration))} aria-label="Playback progress" className="w-full accent-amber-500" onChange={e => { if (videoRef.current) videoRef.current.currentTime = Number(e.target.value); setPosition(Number(e.target.value)); }} />
       <div className="flex items-center gap-4">
         <button type="button" className="grid h-12 w-12 place-items-center rounded-full bg-amber-500 text-black" onClick={() => { const video = videoRef.current; if (!video) return; if (video.paused) void video.play(); else video.pause(); }} aria-label={playing ? 'Pause' : 'Play'}>{playing ? <Pause /> : <Play />}</button>
@@ -485,6 +504,6 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         {subtitleError && <p role="alert" className="text-xs text-amber-300">{subtitleError}</p>}
         {!subtitles.length && !subtitleLoading && <p className="text-xs text-slate-400">No automatic subtitle tracks found. Install a local subtitle file.</p>}
       </div>}
-    </div>
+    </div>}
   </section>;
 };
