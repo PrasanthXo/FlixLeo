@@ -58,3 +58,151 @@
   .flixleo-native-desktop-collections .flixleo-mobile-collection-poster:focus-visible,
   .flixleo-native-desktop-collections .flixleo-mobile-collection-card-foot button:focus-visible { outline:3px solid #bba7ff; outline-offset:3px; }
 }
+
+
+/* Windows EXE ONLY: replace Chromium's thick horizontal scrollbar with a
+   small animated position pill and premium glass navigation arrows.
+   The browser website, mobile and Android catalog UI is not modified. */
+.flixleo-exe-carousel {
+  position: relative;
+  min-width: 0;
+  isolation: isolate;
+  padding-bottom: 10px;
+}
+.flixleo-exe-carousel-frame {
+  position: relative;
+  min-width: 0;
+}
+.flixleo-exe-carousel-track {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+  scroll-behavior: smooth;
+  scroll-padding-inline: 8px;
+  padding-top: 8px !important;
+  padding-bottom: 15px !important;
+  overscroll-behavior-x: contain;
+}
+.flixleo-exe-carousel-track::-webkit-scrollbar,
+.flixleo-exe-carousel-track::-webkit-scrollbar-track,
+.flixleo-exe-carousel-track::-webkit-scrollbar-thumb {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+.flixleo-exe-carousel-track:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+  border-radius: 14px;
+}
+.flixleo-exe-carousel-frame::before,
+.flixleo-exe-carousel-frame::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  bottom: 12px;
+  width: clamp(28px, 6%, 76px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .28s ease;
+}
+.flixleo-exe-carousel-frame::before {
+  left: 0;
+  background: linear-gradient(90deg,#080d1d 3%,rgba(8,13,29,0));
+}
+.flixleo-exe-carousel-frame::after {
+  right: 0;
+  background: linear-gradient(270deg,#080d1d 3%,rgba(8,13,29,0));
+}
+.flixleo-exe-carousel[data-left="true"] .flixleo-exe-carousel-frame::before,
+.flixleo-exe-carousel[data-right="true"] .flixleo-exe-carousel-frame::after {
+  opacity: .92;
+}
+.flixleo-exe-carousel-arrow {
+  position: absolute;
+  z-index: 6;
+  top: 42%;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #f6f0ff;
+  background: linear-gradient(145deg,rgba(69,48,118,.95),rgba(15,19,37,.94));
+  border: 1px solid rgba(184,155,255,.52);
+  box-shadow: 0 7px 28px #000b, inset 0 1px #ffffff40, 0 0 17px #8955ff26;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  opacity: .73;
+  cursor: pointer;
+  transition: transform .3s cubic-bezier(.2,.8,.2,1),
+    opacity .2s ease, border-color .2s ease, box-shadow .25s ease, background .25s ease;
+}
+.flixleo-exe-carousel-prev { left: 7px; transform: translateY(-50%) translateX(-5px); }
+.flixleo-exe-carousel-next { right: 7px; transform: translateY(-50%) translateX(5px); }
+.flixleo-exe-carousel:hover .flixleo-exe-carousel-arrow:not(:disabled),
+.flixleo-exe-carousel:focus-within .flixleo-exe-carousel-arrow:not(:disabled) {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+.flixleo-exe-carousel-arrow:not(:disabled):hover {
+  border-color: #d5b9ff;
+  background: linear-gradient(145deg,#8256d3,#33245d);
+  box-shadow: 0 11px 32px #000b, 0 0 25px #9c6aff87;
+}
+.flixleo-exe-carousel-arrow:focus-visible {
+  outline: 3px solid #e3c9ff;
+  outline-offset: 3px;
+  opacity: 1;
+}
+.flixleo-exe-carousel-arrow:disabled {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+.flixleo-exe-carousel-indicator {
+  position: relative;
+  width: clamp(95px, 16%, 180px);
+  height: 3px;
+  margin: 3px auto 0;
+  border-radius: 999px;
+  background: rgba(156,135,206,.23);
+  opacity: .73;
+  transition: opacity .22s ease, background .22s ease;
+}
+.flixleo-exe-carousel-thumb {
+  position: absolute;
+  display: block;
+  top: -1px;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,#7972ff,#b687ff,#e0b9ff);
+  box-shadow: 0 0 12px #9473ffe0;
+  transition: left .13s ease-out, width .2s ease, box-shadow .22s ease;
+}
+.flixleo-exe-carousel:hover .flixleo-exe-carousel-indicator,
+.flixleo-exe-carousel:focus-within .flixleo-exe-carousel-indicator {
+  opacity: 1;
+  background: rgba(183,163,235,.32);
+}
+.flixleo-exe-carousel:hover .flixleo-exe-carousel-thumb {
+  box-shadow: 0 0 19px #a88aff;
+}
+.flixleo-exe-carousel .flixleo-mobile-collection-poster {
+  transition: transform .32s cubic-bezier(.18,.8,.25,1),
+    box-shadow .28s ease, border-color .28s ease;
+}
+.flixleo-exe-carousel .flixleo-mobile-collection-card:hover .flixleo-mobile-collection-poster {
+  transform: translateY(-3px) scale(1.018);
+  border-color: #c09dffad;
+  box-shadow: 0 16px 34px #000c, 0 0 18px #7f55e437;
+}
+@media (prefers-reduced-motion: reduce) {
+  .flixleo-exe-carousel *,
+  .flixleo-exe-carousel-frame::before,
+  .flixleo-exe-carousel-frame::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    animation: none !important;
+  }
+}
