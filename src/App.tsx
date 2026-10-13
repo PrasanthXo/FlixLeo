@@ -1110,7 +1110,7 @@ export default function App() {
             media={showMixedMobileWheel ? mobileWheelFeatured : featuredMedia}
             items={showMixedMobileWheel ? mobileWheelItems : currentTab === 'series' ? tvShows : tmdbMovies}
             bookmarkedIds={watchlistIds}
-            mobileHome={currentTab === "browse"}
+            mobileHome={false}
             onPlay={(m) => handlePlayMedia(m)}
             onOpenDetails={(m) => setDetailMedia(m)}
             isBookmarked={watchlistIds.includes((showMixedMobileWheel ? mobileWheelFeatured : featuredMedia).id)}
