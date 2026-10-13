@@ -22,6 +22,20 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   media, initialMirrorId, minimizeSignal = 0, onClose, onProgressSaved, onMirrorChange, onEpisodeEnded
 }) => {
   const playerAnchorRef = useRef<HTMLDivElement>(null);
+  const playerFrameRef = useRef<HTMLDivElement>(null);
+  const [frameFullscreen, setFrameFullscreen] = useState(false);
+  const desktopApp = Boolean(desktopBridge());
+  useEffect(() => {
+    const update = () => setFrameFullscreen(document.fullscreenElement === playerFrameRef.current);
+    document.addEventListener('fullscreenchange', update);
+    return () => document.removeEventListener('fullscreenchange', update);
+  }, []);
+  const toggleFrameFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await playerFrameRef.current?.requestFullscreen();
+    } catch { window.alert('Fullscreen is unavailable for this player.'); }
+  };
   const [docked, setDocked] = useState(false);
   // Older saved catalogue entries can still contain the defunct embed.su mirror.
   const mirrors = (media.mirrors || []).filter(m => !/^https?:\/\/embed\.su(?:\/|$)/i.test(m.url));
@@ -188,7 +202,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         </div>
         <div className="flex items-center gap-2 shrink-0"><button type="button" onClick={() => setDocked(true)} className="rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Minimize player">Mini player</button><button type="button" onClick={() => void shareMovie()} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Share movie"><Share2 className="h-4 w-4" /> Share</button><button type="button" onClick={() => { saveProgress(); onClose(); }} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white"><ArrowLeft className="h-4 w-4" /> Close</button></div>
       </div>
-      <div className={docked ? "fixed z-[65] right-3 bottom-28 md:bottom-8 w-[min(60vw,240px)] md:w-80 aspect-video rounded-xl overflow-hidden border border-amber-500/60 shadow-2xl bg-black" : "tv6-cinema-frame aspect-video w-full bg-black relative"}>
+      <div ref={playerFrameRef} className={docked ? "fixed z-[65] right-3 bottom-28 md:bottom-8 w-[min(60vw,240px)] md:w-80 aspect-video rounded-xl overflow-hidden border border-amber-500/60 shadow-2xl bg-black" : "tv6-cinema-frame aspect-video w-full bg-black relative"} style={frameFullscreen ? { width: "100vw", height: "100vh", maxWidth: "none", maxHeight: "none", aspectRatio: "auto" } : undefined}>
+        {desktopApp && <button type="button" onClick={() => void toggleFrameFullscreen()} className="absolute z-[60] right-3 top-3 rounded-lg bg-black/85 px-3 py-2 text-xs font-semibold text-white hover:bg-black border border-white/20" aria-label={frameFullscreen ? "Exit fullscreen player" : "Fullscreen player"}>{frameFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
         {docked && <div className="absolute z-20 right-1 top-1 flex gap-1"><button type="button" onClick={() => { setDocked(false); playerAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
           : desktopNative ? <DesktopNativeSurface key={active.id} url={active.url} />
