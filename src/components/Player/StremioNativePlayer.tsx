@@ -492,8 +492,8 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       <p className="text-xs text-slate-300">{media.year} · {media.duration}</p>
     </div>
     <div ref={fullscreenFrame} className={docked ? "fixed z-[80] right-3 bottom-24 md:bottom-8 w-[min(72vw,300px)] h-[220px] overflow-hidden rounded-xl border border-amber-500/60 bg-black shadow-2xl" : "relative aspect-video bg-black"} style={desktopFullscreen ? { position: "fixed", inset: 0, top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh", maxWidth: "none", aspectRatio: "auto" } : undefined}>
-      {!desktopNative && <button type="button" className="absolute right-3 top-3 z-[60] rounded-lg bg-black/85 px-3 py-2 text-xs text-white border border-white/20" onClick={() => void toggleDesktopFullscreen()}>{desktopFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
-      {docked && !desktopNative && <div className="absolute right-1 top-1 z-20 flex gap-1">
+      {!desktopNative && !docked && <button type="button" className="absolute right-3 top-3 z-[60] rounded-lg bg-black/85 px-3 py-2 text-xs text-white border border-white/20" onClick={() => void toggleDesktopFullscreen()}>{desktopFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
+      {docked && !desktopNative && <div className="absolute left-2 top-2 z-[70] flex gap-1">
         <button type="button" aria-label="Expand mini player" onClick={() => { playerAnchor.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); setDocked(false); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
