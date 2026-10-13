@@ -331,17 +331,15 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                   <p className="mt-1 text-xs leading-relaxed text-slate-200 sm:text-sm">
                     Some 4K and surround-sound audio formats are not supported by web browsers. For wider playback compatibility, try our <strong className="text-white">FlixLeo Android app</strong> with Native Play (VLC), or our <strong className="text-white">FlixLeo Windows app</strong> with native playback. Stream availability and audio support still depend on the source.
                   </p>
-                  <div className="mt-3 flex items-center gap-3" aria-label="FlixLeo app downloads">
-                    <a href="https://github.com/PrasanthXo/FlixLeo/actions/workflows/build-flixleo-android.yml"
-                      target="_blank" rel="noopener noreferrer" aria-label="Get FlixLeo Android app" title="FlixLeo for Android"
-                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-300 transition-colors hover:bg-emerald-500/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">
+                  <div className="mt-3 flex items-center gap-3" aria-label="FlixLeo Android and Windows apps">
+                    <span title="FlixLeo for Android" role="img" aria-label="FlixLeo for Android"
+                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-300">
                       <Smartphone className="h-6 w-6" aria-hidden="true" />
-                    </a>
-                    <a href="https://github.com/PrasanthXo/FlixLeo/actions/workflows/build-flixleo-windows.yml"
-                      target="_blank" rel="noopener noreferrer" aria-label="Get FlixLeo Windows app" title="FlixLeo for Windows"
-                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-sky-400/40 bg-sky-500/15 text-sky-300 transition-colors hover:bg-sky-500/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300">
+                    </span>
+                    <span title="FlixLeo for Windows" role="img" aria-label="FlixLeo for Windows"
+                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-sky-400/40 bg-sky-500/15 text-sky-300">
                       <Monitor className="h-6 w-6" aria-hidden="true" />
-                    </a>
+                    </span>
                   </div>
                 </div>
               </div>
