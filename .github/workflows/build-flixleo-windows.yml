@@ -12,8 +12,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
       - name: Install dependencies
@@ -60,7 +60,7 @@ jobs:
         run: |
           node --check desktop/main.cjs
           node --check desktop/preload.cjs
-      - name: Package installer and portable Windows app
+      - name: Package Windows installer
         run: npm run desktop:dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -70,7 +70,7 @@ jobs:
           Get-ChildItem desktop-release -Recurse -File | Select-Object FullName, Length
           $exes = @(Get-ChildItem desktop-release -Filter '*.exe' -File)
           if ($exes.Count -ne 1 -or $exes[0].Name -notlike 'FlixLeo-Setup-*.exe') { throw "Expected one FlixLeo installer EXE but found $($exes.Count)" }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: FlixLeo-Windows
           path: desktop-release/*.exe
