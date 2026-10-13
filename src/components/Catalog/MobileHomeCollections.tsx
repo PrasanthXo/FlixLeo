@@ -72,8 +72,8 @@ export function MobileHomeCollections({ items, southIndianMovies = [], additiona
       let col = focusedPoster ? current.indexOf(focusedPoster) : -1;
       if (col < 0) {
         const rail = sections[row].querySelector<HTMLElement>('.flixleo-exe-carousel-track');
-        const viewportStart = rail?.scrollLeft || 0;
-        const first = current.findIndex(button => button.parentElement && button.parentElement.offsetLeft >= viewportStart - 6);
+        const leftEdge = rail?.getBoundingClientRect().left ?? 0;
+        const first = current.findIndex(button => button.getBoundingClientRect().right > leftEdge + 24);
         col = Math.max(0, first);
       }
 
