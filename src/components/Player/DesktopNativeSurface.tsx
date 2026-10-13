@@ -7,8 +7,11 @@ type DesktopBridge = {
   positionNative: (bounds: number[]) => Promise<boolean>;
   stopNative: () => Promise<boolean>;
   playbackStatus?: () => Promise<{ready:boolean;position?:number}>;
+  durationNative?: () => Promise<number>;
+  isFullscreen?: () => Promise<boolean>;
+  onFullscreenChanged?: (listener: (fullscreen: boolean) => void) => () => void;
   tracksNative?: () => Promise<{ audio:NativeTrack[]; subtitles:NativeTrack[] }>;
-  commandNative: (action: 'togglePause' | 'seekBackward' | 'seekForward' | 'toggleMute' | 'toggleSubtitles' | 'setVolume' | 'toggleFullscreen' | 'nextAudio' | 'nextSubtitle' | 'setAudioTrack' | 'setSubtitleTrack', value?: number) => Promise<boolean>;
+  commandNative: (action: 'togglePause' | 'seekBackward' | 'seekForward' | 'toggleMute' | 'toggleSubtitles' | 'setVolume' | 'toggleFullscreen' | 'nextAudio' | 'nextSubtitle' | 'setAudioTrack' | 'setSubtitleTrack' | 'disableSubtitles' | 'seekTo', value?: number) => Promise<boolean>;
 };
 export const fullLanguage = (code: string, title?: string): string => {
   const lang = (code || '').trim().replace(/_/g, '-').toLowerCase();
@@ -20,6 +23,19 @@ export const fullLanguage = (code: string, title?: string): string => {
 };
 export const desktopBridge = (): DesktopBridge | undefined =>
   (window as Window & { flixleoDesktop?: DesktopBridge }).flixleoDesktop;
+
+export function useDesktopWindowFullscreen(): boolean {
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    const bridge = desktopBridge();
+    if (!bridge) return;
+    let mounted = true;
+    const unsubscribe = bridge.onFullscreenChanged?.(value => { if (mounted) setFullscreen(value); });
+    void bridge.isFullscreen?.().then(value => { if (mounted) setFullscreen(Boolean(value)); }).catch(() => {});
+    return () => { mounted = false; unsubscribe?.(); };
+  }, []);
+  return fullscreen;
+}
 
 /** Video remains inside the existing React big/mini player; the same mpv
  * process follows this element on dock/undock rather than restarting. */
