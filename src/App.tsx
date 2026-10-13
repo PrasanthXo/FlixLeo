@@ -1113,12 +1113,12 @@ export default function App() {
           />
         )}
 
-        {/* Dedicated PlavioHD live catalog; movie/series providers above remain unchanged. */}
-        {currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all' && !activeMedia && (
+        {/* Live TV lives only in its own navigation destination. */}
+        {currentTab === 'live' && (
           <PlavioLiveSection onPlay={handlePlayMedia} />
         )}
 
-        <div className={(!isTvDisplay && currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all') ? 'flixleo-mobile-home-hide-legacy' : ''}>
+        {currentTab !== 'live' && <div className={(!isTvDisplay && currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all') ? 'flixleo-mobile-home-hide-legacy' : ''}>
         {/* TMDB Movie Catalogs Selector */}
         {(currentTab === 'browse' || currentTab === 'movies') && !searchQuery && (
           <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-slate-900/90 via-[#0a101d] to-slate-950 border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -1295,7 +1295,7 @@ export default function App() {
               </div>
             )}
 
-        </div>
+        </div>}
       </main>
 
       {/* Footer (Anti-Slop compliant, quiet links & copyright) */}
