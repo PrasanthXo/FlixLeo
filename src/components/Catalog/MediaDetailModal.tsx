@@ -365,7 +365,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                           <Play className="h-6 w-6" aria-hidden="true" />
                         </span>
                       )}
-                      <span className="text-sm font-semibold text-white">Download</span>
+                      {audioHelpPlatform !== 'apple' && <span className="text-sm font-semibold text-white">Download</span>}
                     </div>
                   </div>
                 </div>
