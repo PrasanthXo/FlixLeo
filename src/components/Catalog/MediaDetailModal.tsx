@@ -1,7 +1,7 @@
 import React from 'react';
 import { TmdbArtwork } from './TmdbArtwork';
 import {
-  X, Play, Bookmark, BookmarkCheck, Download,
+  X, Play, Bookmark, BookmarkCheck, Smartphone, Monitor,
   Volume2, Server, Star
 } from 'lucide-react';
 import { MediaItem, StreamMirror, getSourceDisplayBadge } from '../../types/stream';
@@ -331,21 +331,18 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                   <p className="mt-1 text-xs leading-relaxed text-slate-200 sm:text-sm">
                     Some 4K and surround-sound audio formats are not supported by web browsers. For wider playback compatibility, try our <strong className="text-white">FlixLeo Android app</strong> with Native Play (VLC), or our <strong className="text-white">FlixLeo Windows app</strong> with native playback. Stream availability and audio support still depend on the source.
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex items-center gap-3" aria-label="FlixLeo app downloads">
                     <a href="https://github.com/PrasanthXo/FlixLeo/actions/workflows/build-flixleo-android.yml"
-                      target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-amber-400">
-                      <Download className="h-4 w-4" aria-hidden="true" /> Android APK builds
+                      target="_blank" rel="noopener noreferrer" aria-label="Get FlixLeo Android app" title="FlixLeo for Android"
+                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-300 transition-colors hover:bg-emerald-500/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">
+                      <Smartphone className="h-6 w-6" aria-hidden="true" />
                     </a>
                     <a href="https://github.com/PrasanthXo/FlixLeo/actions/workflows/build-flixleo-windows.yml"
-                      target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-100 transition-colors hover:bg-slate-700">
-                      <Download className="h-4 w-4" aria-hidden="true" /> Windows app builds
+                      target="_blank" rel="noopener noreferrer" aria-label="Get FlixLeo Windows app" title="FlixLeo for Windows"
+                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-sky-400/40 bg-sky-500/15 text-sky-300 transition-colors hover:bg-sky-500/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300">
+                      <Monitor className="h-6 w-6" aria-hidden="true" />
                     </a>
                   </div>
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    Open a successful GitHub Actions build to download its app artifact. Android Native Play requires VLC for Android.
-                  </p>
                 </div>
               </div>
             </div>
