@@ -359,8 +359,9 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       if (uploadedRef.current) URL.revokeObjectURL(uploadedRef.current);
       const objectUrl = URL.createObjectURL(new Blob([converted], { type: 'text/vtt' }));
       uploadedRef.current = objectUrl;
-      subtitleSelection.current = objectUrl;
-      setSelectedSubtitle(objectUrl);
+      // Keep the chosen online language visible in the selector while the video uses the downloaded blob.
+      subtitleSelection.current = url;
+      setSelectedSubtitle(url);
     } catch {
       if (!controller.signal.aborted) setSubtitleError('Could not install online subtitles. Try another track or upload a file.');
     } finally { if (!controller.signal.aborted) setSubtitleLoading(false); }
@@ -423,7 +424,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         onCanPlay={() => setBuffering(false)}
         onTimeUpdate={event => { setPosition(event.currentTarget.currentTime); setDuration(event.currentTarget.duration || 0); save(); }}
         onEnded={() => { setPlaying(false); save(); onEpisodeEnded?.(); }}>
-        {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
+        {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={uploadedRef.current || selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>}
       {!desktopNative && buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
       {error && <div role="alert" className="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 p-3 text-xs text-amber-300">{error}</div>}
