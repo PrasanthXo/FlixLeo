@@ -356,6 +356,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1380, height: 850, minWidth: 850, minHeight: 560,
     title:'FlixLeo', backgroundColor:'#080a0f',
+    icon:path.join(__dirname, 'brand-icon.ico'),
     webPreferences: {
       preload:path.join(__dirname,'preload.cjs'),
       contextIsolation:true, sandbox:true, nodeIntegration:false, webSecurity:true
@@ -400,6 +401,7 @@ function createWindow() {
   win.loadURL(WEBSITE);
 }
 app.whenReady().then(()=>{
+  if (process.platform === 'win32') app.setAppUserModelId('cyou.flixleo.desktop');
   createWindow();
   // The first check runs after the browser has opened; repeat every six hours.
   setTimeout(() => { void checkDesktopUpdate(); }, 5000);
