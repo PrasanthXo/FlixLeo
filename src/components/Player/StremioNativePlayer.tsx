@@ -23,6 +23,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const [audioFix, setAudioFix] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerAnchor = useRef<HTMLDivElement>(null);
+  const videoEndSentinel = useRef<HTMLDivElement>(null);
   const fullscreenFrame = useRef<HTMLDivElement>(null);
   const [desktopFullscreen, setDesktopFullscreen] = useState(false);
   const nativeWindowFullscreen = useDesktopWindowFullscreen();
@@ -46,6 +47,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
     lastMinimizeSignal.current = minimizeSignal;
   }, [minimizeSignal]);
   useEffect(() => {
+    if (desktopBridge()) return; // Native docking is based on video viewport, not section.
     let lastScroll = window.scrollY;
     const onScroll = () => {
       const anchor = playerAnchor.current;
@@ -108,6 +110,31 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   };
   useEffect(() => { setAspectRatio('no'); }, [active?.url]);
   useEffect(() => { if (nativeFullscreen) setDocked(false); }, [nativeFullscreen]);
+  // Keep the video in one React tree and the mpv process alive while its
+  // fixed mini-frame follows scrolling. The marker stays at the original
+  // bottom edge because docking inserts a same-size flow placeholder.
+  useEffect(() => {
+    if (!desktopNative || nativeFullscreen) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const marker = videoEndSentinel.current;
+      if (!marker || document.fullscreenElement) return;
+      const below = marker.getBoundingClientRect().top < 12;
+      setDocked(prev => prev === below ? prev : below);
+    };
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+    schedule();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [desktopNative, nativeFullscreen]);
   const [nativeTracks, setNativeTracks] = useState<{audio:NativeTrack[]; subtitles:NativeTrack[]}>({audio:[], subtitles:[]});
   useEffect(() => {
     if (!desktopNative) return;
@@ -508,6 +535,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       <h2 className="text-lg font-bold">{media.title}</h2>
       <p className="text-xs text-slate-300">{media.year} · {media.duration}</p>
     </div>
+    {docked && desktopNative && !nativeFullscreen && <div className="aspect-video w-full" aria-hidden="true" />}
     <div ref={fullscreenFrame} className={nativeFullscreen ? "fixed inset-0 z-[200] h-screen w-screen overflow-hidden bg-black" : docked ? "fixed z-[80] right-3 bottom-24 md:bottom-8 w-[min(72vw,300px)] h-[220px] overflow-hidden rounded-xl border border-amber-500/60 bg-black shadow-2xl" : "relative aspect-video bg-black"} style={desktopFullscreen && !desktopNative ? { position: "fixed", inset: 0, top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh", maxWidth: "none", aspectRatio: "auto" } : undefined}>
       {!desktopNative && !docked && <button type="button" className="absolute right-3 top-3 z-[60] rounded-lg bg-black/85 px-3 py-2 text-xs text-white border border-white/20" onClick={() => void toggleDesktopFullscreen()}>{desktopFullscreen ? "Exit fullscreen" : "⛶ Fullscreen"}</button>}
       {docked && !desktopNative && <div className="absolute left-2 top-2 z-[70] flex gap-1">
@@ -547,6 +575,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
           className="mt-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-black">Retry channel</button>}
       </div>}
     </div>
+    <div ref={videoEndSentinel} className="h-px pointer-events-none" aria-hidden="true" />
     {desktopNative ? <div className="space-y-3 p-4">
       <div className="flex items-center gap-2 flex-wrap">
         <button type="button" className="inline-flex items-center justify-center rounded-xl bg-slate-800 p-3 hover:bg-slate-700" aria-label={desktopFullscreen ? 'Exit fullscreen' : 'Fullscreen'} title="Fullscreen · Esc to exit" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')}><Maximize2 size={21}/></button>
