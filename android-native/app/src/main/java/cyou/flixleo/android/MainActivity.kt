@@ -158,6 +158,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var accountBusy by mutableStateOf(false)
     var showAuth by mutableStateOf(false)
     var showSignup by mutableStateOf(false)
+    var authError by mutableStateOf("")
     var showOnboarding by mutableStateOf(false)
     var streamsChecked by mutableStateOf(false)
     private var lastCatalogRefreshAt = 0L
@@ -495,6 +496,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         } finally { refreshing.set(false) }
     }
     fun signIn(email: String, password: String) = scope.launch {
+        authError = ""
         accountBusy = true
         try {
             account = Session.from(api.call("/api/native/auth/login", "POST",
@@ -511,6 +513,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                 localRevision++
             }
             showAuth = false
+            authError = ""
             message = "Signed in"
             showOnboarding = store.needsSignupOnboarding(
                 account?.user?.optString("email").orEmpty()
@@ -520,10 +523,16 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                 pendingWatchlistTitle = null
                 if (!store.watched.contains(title.id)) toggleWatch(title)
             }
-        } catch (e: Exception) { message = e.localizedMessage ?: "Sign-in failed" }
+        } catch (e: Exception) {
+            val detail = e.localizedMessage.orEmpty()
+            authError = if ("HTTP 404" in detail)
+                "Android sign-in service is not deployed yet. Please retry after the backend update."
+                else detail.ifBlank { "Sign-in failed" }
+        }
         finally { accountBusy = false }
     }
     fun signUp(email: String, password: String) = scope.launch {
+        authError = ""
         accountBusy = true
         try {
             val result = api.call("/api/native/auth/signup", "POST",
@@ -532,16 +541,27 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             message = result.optString("message", "Verify your email before signing in")
             showSignup = false
             showAuth = false
-        } catch (e: Exception) { message = e.localizedMessage ?: "Could not sign up" }
+        } catch (e: Exception) {
+            val detail = e.localizedMessage.orEmpty()
+            authError = if ("HTTP 404" in detail)
+                "Android sign-in service is not deployed yet. Please retry after the backend update."
+                else detail.ifBlank { "Could not sign up" }
+        }
         finally { accountBusy = false }
     }
     fun emailAction(email: String, action: String) = scope.launch {
+        authError = ""
         accountBusy = true
         try {
             val path = if (action == "recover") "recover" else "resend"
             val result = api.call("/api/native/auth/$path", "POST", JSONObject().put("email", email.trim()))
             message = result.optString("message", "Check your email")
-        } catch (e: Exception) { message = e.localizedMessage ?: "Could not send email" }
+        } catch (e: Exception) {
+            val detail = e.localizedMessage.orEmpty()
+            authError = if ("HTTP 404" in detail)
+                "Android sign-in service is not deployed yet. Please retry after the backend update."
+                else detail.ifBlank { "Could not send email" }
+        }
         finally { accountBusy = false }
     }
     fun signOut() = scope.launch {
