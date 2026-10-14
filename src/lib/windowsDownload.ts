@@ -12,7 +12,7 @@ export async function downloadFlixLeoWindows(): Promise<void> {
     if (!response.ok) throw new Error('download status unavailable');
     const status = await response.json() as { ready?: boolean };
     if (!status.ready) {
-      window.alert('The signed FlixLeo Windows installer is being prepared. Please try again later.');
+      window.alert('The FlixLeo Windows installer is being prepared. Please try again later.');
       return;
     }
     window.location.assign('/api/download/windows');
