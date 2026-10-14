@@ -6,17 +6,18 @@ android {
         applicationId = "cyou.flixleo.android"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
+    packaging { jniLibs { useLegacyPackaging = true } }
 }
 
 dependencies {
-    implementation("androidx.media3:media3-exoplayer:1.5.1")
-    implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
-    implementation("androidx.media3:media3-exoplayer-dash:1.5.1")
-    implementation("androidx.media3:media3-ui:1.5.1")
+    // Native VLC decodes formats Android WebView commonly cannot (AC-3,
+    // E-AC-3, DTS, MKV audio) and exposes embedded audio/subtitle tracks.
+    implementation("org.videolan.android:libvlc-all:3.6.5")
 }

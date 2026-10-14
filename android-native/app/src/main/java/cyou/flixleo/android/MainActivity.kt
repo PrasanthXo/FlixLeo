@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var fileCallback: android.webkit.ValueCallback<Array<Uri>>? = null
     private val fileRequestCode = 450
+    private val nativePlayerRequestCode = 451
     private val home = "https://flixleo.cyou/"
     private var lastPolicyCheck = 0L
     private var blockingDialog: AlertDialog? = null
@@ -196,11 +197,21 @@ class MainActivity : Activity() {
         if (url.startsWith("flixleo-player://")) {
             val page = runCatching { Uri.parse(browser.url) }.getOrNull()
             if (page?.scheme == "https" && page.host == "flixleo.cyou") {
-                val stream = Uri.parse(url).getQueryParameter("url")
+                val launch = Uri.parse(url)
+                val stream = launch.getQueryParameter("url")
                 val source = stream?.let { runCatching { Uri.parse(it) }.getOrNull() }
-                if (source?.scheme == "https" && !source.host.isNullOrBlank()) {
-                    startActivity(Intent(this, NativePlayerActivity::class.java).putExtra("stream_url", stream))
-                } else Toast.makeText(this, "Invalid stream", Toast.LENGTH_SHORT).show()
+                if (source?.scheme == "https" && !source.host.isNullOrBlank() &&
+                    !source.host.equals("localhost", true)) {
+                    val title = launch.getQueryParameter("title").orEmpty().take(120)
+                    val mirror = launch.getQueryParameter("mirror").orEmpty().take(160)
+                    val resumeMs = (launch.getQueryParameter("resume")?.toDoubleOrNull() ?: 0.0)
+                        .coerceIn(0.0, 86_400.0).times(1000.0).toLong()
+                    startActivityForResult(Intent(this, NativePlayerActivity::class.java)
+                        .putExtra("stream_url", stream)
+                        .putExtra("title", title)
+                        .putExtra("mirror_id", mirror)
+                        .putExtra("resume_ms", resumeMs), nativePlayerRequestCode)
+                } else Toast.makeText(this, "Invalid HTTPS stream", Toast.LENGTH_SHORT).show()
             }
             return true
         }
@@ -219,6 +230,15 @@ class MainActivity : Activity() {
         if (requestCode == fileRequestCode) {
             fileCallback?.onReceiveValue(if (resultCode == RESULT_OK) WebChromeClient.FileChooserParams.parseResult(resultCode, data) else null)
             fileCallback = null
+        } else if (requestCode == nativePlayerRequestCode && resultCode == RESULT_OK && data != null) {
+            val payload = JSONObject().apply {
+                put("position", data.getLongExtra("position_ms", 0L) / 1000.0)
+                put("duration", data.getLongExtra("duration_ms", 0L) / 1000.0)
+                put("ended", data.getBooleanExtra("ended", false))
+                put("mirrorId", data.getStringExtra("mirror_id").orEmpty())
+            }
+            // Json serialization escapes user strings; never interpolate raw URLs into JS.
+            browser.evaluateJavascript("window.dispatchEvent(new CustomEvent('flixleo:android-player-result',{detail:${payload}}));", null)
         }
     }
     @Deprecated("Deprecated in Java")
