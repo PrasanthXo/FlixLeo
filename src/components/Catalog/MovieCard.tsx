@@ -31,6 +31,14 @@ export const MovieCard: React.FC<MovieCardProps> = ({
         {/* Gradient Scrim for readable contrast */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
+        {/* Always-visible type and genre identification on mobile and desktop */}
+        <div className="pointer-events-none absolute z-20 top-2 left-2 right-12 flex flex-wrap gap-1">
+          <span className="rounded-md bg-black/85 border border-white/20 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
+            {media.type === 'tv' || media.id.startsWith('tv-') ? 'SERIES' : 'MOVIE'}
+          </span>
+          {media.genres?.[0] && <span className="max-w-full truncate rounded-md bg-black/85 border border-white/20 px-2 py-1 text-[10px] font-medium text-amber-200 backdrop-blur-sm">{media.genres[0]}</span>}
+        </div>
+
         {/* Always-visible mobile friendly watchlist menu */}
         <div className="absolute z-30 top-2 right-2">
           <button type="button" aria-label={`More options for ${media.title}`} aria-expanded={menuOpen}
@@ -111,7 +119,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
 
         {/* Available source dots */}
         <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-500">
-          <span className="truncate max-w-[130px]">{media.genres[0]}</span>
+          <span className="truncate max-w-[130px]">{(media.genres || []).filter(Boolean).slice(0, 2).join(' · ') || (media.type === 'tv' || media.id.startsWith('tv-') ? 'TV Series' : 'Movie')}</span>
           <span className="font-mono text-slate-400">{media.mirrors.length} mirrors</span>
         </div>
       </div>
