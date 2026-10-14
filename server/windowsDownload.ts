@@ -1,14 +1,14 @@
 import { Router, type Request, type Response } from 'express';
 
 /**
- * A stable, same-origin download action for the Windows portable app.
- * The actual portable release asset is resolved only on the server and is never
+ * A stable, same-origin download action for Windows installer downloads.
+ * The actual installation EXE asset is resolved only on the server and is never
  * embedded in a client-side link, HTML attribute or bundle.
- * A checksum-validated, explicitly unsigned portable EXE is released by CI.
+ * Latest releases are CI-built and unsigned; SHA256 checksums are published.
  */
 const router = Router();
 const RELEASE_ENDPOINT = 'https://api.github.com/repos/PrasanthXo/FlixLeo/releases/latest';
-const INSTALLER_NAME = /^FlixLeo-Portable-\d+\.\d+\.\d+-x64\.exe$/;
+const INSTALLER_NAME = /^FlixLeo-Setup-\d+\.\d+\.\d+-x64\.exe$/;
 type Installer = { url: string; filename: string; bytes: number };
 let cached: { expiry: number; installer: Installer | null } | null = null;
 let pending: Promise<Installer | null> | null = null;
@@ -56,17 +56,32 @@ function noCache(res: Response) {
   res.setHeader('Referrer-Policy', 'no-referrer');
 }
 
+
+/** Publish release details to the Windows gate without touching other apps. */
+export async function getLatestWindowsInstaller(): Promise<{url:string;version:string;versionCode:number} | null> {
+  const asset = await findVerifiedRelease();
+  if (!asset) return null;
+  const match = /^FlixLeo-Setup-(\d+)\.(\d+)\.(\d+)-x64\.exe$/.exec(asset.filename);
+  if (!match) return null;
+  const major = Number(match[1]), minor = Number(match[2]), patch = Number(match[3]);
+  return {
+    url: asset.url,
+    version: [major, minor, patch].join('.'),
+    versionCode: Math.max(1, (major - 1) * 1000000 + minor * 1000 + patch + 1)
+  };
+}
+
 router.get('/api/download/windows/status', async (_req: Request, res: Response) => {
   noCache(res);
   const installer = await findVerifiedRelease();
-  res.json({ ready: Boolean(installer), platform: 'windows', format: 'portable-exe' });
+  res.json({ ready: Boolean(installer), platform: 'windows', format: 'installable-exe' });
 });
 
 router.get('/api/download/windows', async (_req: Request, res: Response) => {
   noCache(res);
   const installer = await findVerifiedRelease();
   if (!installer) {
-    return res.status(503).type('text/plain').send('The FlixLeo Windows portable app is not available yet. Please try again later.');
+    return res.status(503).type('text/plain').send('The FlixLeo Windows installer is not available yet. Please try again later.');
   }
   // The visible website exposes only the stable internal download action,
   // never the versioned public asset URL.
