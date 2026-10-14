@@ -267,10 +267,18 @@ private fun HomeScreen(state: FlixState) {
             }
         }
         item {
-            val selected = state.favorites
+            val langs = state.favorites
+            val genres = state.favoriteGenres
+            val artists = state.favoriteArtists
             val all = sections.flatMap { it.second }.distinctBy { it.id }
-            val matched = all.filter { t -> selected.any { t.language.contains(it, ignoreCase = true) } }.take(24)
-            if (selected.isNotEmpty() && matched.isNotEmpty()) PosterRow("For You", matched, state)
+            val matched = all.filter { t ->
+                langs.any { t.language.contains(it, ignoreCase = true) } ||
+                genres.any { g -> t.genres.any { it.equals(g, ignoreCase = true) } } ||
+                artists.any { a -> t.cast.any { it.contains(a, ignoreCase = true) } }
+            }.take(24)
+            if ((langs.isNotEmpty() || genres.isNotEmpty() || artists.isNotEmpty()) && matched.isNotEmpty()) {
+                PosterRow("For You", matched, state)
+            }
         }
         items(sections.filter { it.first != "Spotlight" }) { (heading, data) ->
             PosterRow(heading, data, state)
@@ -471,6 +479,7 @@ private fun DetailSheet(state: FlixState) {
 @Composable
 private fun ProfileScreen(state: FlixState) {
     var pairId by remember { mutableStateOf("") }
+    var newArtist by remember { mutableStateOf("") }
     val session = state.account
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
@@ -497,6 +506,33 @@ private fun ProfileScreen(state: FlixState) {
                     group.forEach { label ->
                         FilterChip(selected = label in state.favorites, onClick = { state.toggleLanguage(label) },
                             label = { Text(label, fontSize = 10.sp) })
+                    }
+                }
+            }
+            Heading("Favorite genres", "Used to build your personal For You section")
+            listOf("Action", "Comedy", "Drama", "Thriller", "Romance", "Sci-Fi",
+                "Animation", "Horror", "Fantasy", "Adventure", "Crime", "Documentary")
+                .chunked(3).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        row.forEach { genre ->
+                            FilterChip(selected = genre in state.favoriteGenres,
+                                onClick = { state.toggleGenre(genre) },
+                                label = { Text(genre, fontSize = 10.sp) })
+                        }
+                    }
+                }
+            Heading("Favorite artists", "Match movies by actor or actress")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(value = newArtist, onValueChange = { newArtist = it.take(80) },
+                    modifier = Modifier.weight(1f), singleLine = true, label = { Text("Artist name") })
+                TextButton(onClick = { state.addArtist(newArtist); newArtist = "" },
+                    enabled = newArtist.isNotBlank()) { Text("Add") }
+            }
+            state.favoriteArtists.forEach { artist ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(artist, Modifier.weight(1f), fontSize = 12.sp)
+                    IconButton(onClick = { state.removeArtist(artist) }) {
+                        Icon(Icons.Default.Close, "Remove artist", tint = Muted, modifier = Modifier.size(17.dp))
                     }
                 }
             }
