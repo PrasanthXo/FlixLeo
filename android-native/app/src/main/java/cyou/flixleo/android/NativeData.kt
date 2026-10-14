@@ -46,7 +46,7 @@ data class FlixStream(
     val id: String
 ) {
     companion object {
-        fun parse(json: JSONObject, index: Int): FlixStream? {
+        fun parse(index: Int, json: JSONObject): FlixStream? {
             val url = json.optString("url")
             val uri = runCatching { Uri.parse(url) }.getOrNull()
             if (uri?.scheme != "https" || uri.host.isNullOrBlank()) return null
@@ -121,7 +121,7 @@ class FlixStore(private val context: Context) {
         return gen.generateKey()
     }
     fun readSession(): Session? = runCatching {
-        val raw = prefs.getString("session", null) ?: return null
+        val raw = prefs.getString("session", null) ?: return@runCatching null
         val bytes = Base64.decode(raw, Base64.NO_WRAP)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
