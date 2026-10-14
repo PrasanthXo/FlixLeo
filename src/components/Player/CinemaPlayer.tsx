@@ -71,7 +71,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     if (!androidNative) return;
     const finished = (event: Event) => {
       const result = (event as CustomEvent<AndroidPlaybackResult>).detail;
-      if (!result || result.mirrorId !== active?.id) return;
+      if (!result || !active || result.mirrorId !== active.id) return;
       saveFlixLeoAndroidProgress(media, active.id, result);
       onProgressSaved?.();
       if (result.ended) onEpisodeEnded?.();
