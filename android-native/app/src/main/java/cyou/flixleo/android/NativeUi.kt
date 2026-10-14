@@ -588,42 +588,87 @@ private fun DetailSheet(state: FlixState) {
                     }
                 }
             }
-            Spacer(Modifier.height(11.dp))
-            Button(onClick = { state.resolveStreams() }, enabled = !state.detailsLoading,
-                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                Icon(Icons.Default.PlayArrow, null)
-                Spacer(Modifier.width(7.dp))
-                Text(if (state.detailsLoading) "Finding streams…" else if (state.streams.isEmpty()) "Find Servers" else "Refresh Servers")
-            }
-        } else if (channel != null) {
+            // Stream discovery happens automatically after opening details or choosing an episode.
+            Spacer(Modifier.height(10.dp))
+                } else if (channel != null) {
             Text(channel.name, fontSize = 23.sp, fontWeight = FontWeight.Black)
             Text("Live TV", color = Gold)
         }
-        if (state.detailsLoading) {
-            Spacer(Modifier.height(10.dp))
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-        }
-        if (state.streams.isNotEmpty()) {
-            Heading("Available Servers", "Select quality to play in built-in VLC")
-            state.streams.forEach { source ->
-                Surface(onClick = { state.play(source) }, color = Card,
-                    shape = RoundedCornerShape(11.dp),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.PlayCircle, null, tint = Gold)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(source.quality + if (source.size.isNotBlank()) " · " + source.size else "",
-                                fontWeight = FontWeight.Bold)
-                            Text(source.name, fontSize = 11.sp, color = Muted, maxLines = 2)
-                        }
-                        Icon(Icons.Default.ChevronRight, null, tint = Gold)
+        Spacer(Modifier.height(13.dp))
+        if (state.detailsLoading && state.streams.isEmpty()) {
+            Surface(color = Card, shape = RoundedCornerShape(15.dp)) {
+                Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(color = Gold, strokeWidth = 2.dp,
+                        modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Checking available playback options", color = Color.White,
+                            fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Fetching quality and server choices…", color = Muted, fontSize = 12.sp)
                     }
                 }
             }
-        } else if (!state.detailsLoading && channel != null) {
-            Text("No streams available", color = Color(0xFFFF6B78),
-                fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
+        if (state.streams.isNotEmpty()) {
+            Text("READY TO WATCH", color = Gold, fontSize = 11.sp,
+                fontWeight = FontWeight.Black, letterSpacing = 1.3.sp)
+            Spacer(Modifier.height(6.dp))
+            Text("Select video quality", color = Color.White, fontWeight = FontWeight.Bold,
+                fontSize = 18.sp)
+            Text("Sources are automatically discovered. Tap to play.",
+                color = Muted, fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = { state.play(state.streams.first()) },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(14.dp)) {
+                Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(23.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Play best available · ${state.streams.first().quality}",
+                    fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(11.dp))
+            state.streams.forEachIndexed { index, source ->
+                Surface(onClick = { state.play(source) },
+                    color = if (index == 0) Color(0xFF242D40) else Card,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp))
+                            .background(Gold.copy(alpha = .12f)),
+                            contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.PlayCircle, null, tint = Gold, modifier = Modifier.size(25.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(source.quality + if (source.size.isNotBlank()) " · " + source.size else "",
+                                fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                                maxLines = 1)
+                            Text("Option ${index+1}" + if (index == 0) " · Recommended" else "",
+                                color = Muted, fontSize = 12.sp)
+                        }
+                        Icon(Icons.Default.ChevronRight, contentDescription = "Play source",
+                            tint = Gold, modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
+        } else if (!state.detailsLoading && state.streamsChecked) {
+            Column(Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(15.dp)).background(Card).padding(17.dp),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.WifiOff, null, tint = Color(0xFFFDA4AF),
+                    modifier = Modifier.size(26.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("No streams available", color = Color(0xFFFDA4AF),
+                    fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("This title has no compatible playback option right now.",
+                    color = Muted, fontSize = 12.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(7.dp))
+                TextButton(onClick = {
+                    if (channel != null) state.channel(channel)
+                    else state.resolveStreams()
+                }) { Text("Try again", color = Gold) }
+            }
         }
     }
 }
