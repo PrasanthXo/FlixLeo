@@ -240,3 +240,12 @@ html.flixleo-native-cursor-hidden,
 html.flixleo-native-cursor-hidden * {
   cursor: none !important;
 }
+
+/* Windows native fullscreen uses a Win32 video HWND with a reserved HTML
+   control bar. Keep catalogue poster menus (the repeating ellipsis circles)
+   out of the fullscreen video and seek timeline. Web/mobile unaffected. */
+body.flixleo-native-fullscreen div:has(> button[aria-label^="More options for"]),
+body.flixleo-native-fullscreen button[aria-label^="More options for"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
