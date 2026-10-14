@@ -501,7 +501,7 @@ private fun HomeScreen(state: FlixState) {
             }
         }
         item {
-            val history = state.history
+            val history = state.history.filter { !state.store.isWatched(it.title) && (it.duration <= 0 || it.progress < it.duration * 0.95) }
             if (history.isNotEmpty()) {
                 Heading("Continue Watching")
                 LazyRow(contentPadding = PaddingValues(horizontal = 17.dp),
@@ -586,9 +586,18 @@ private fun BrowseScreen(state: FlixState, tv: Boolean) {
                 group.forEach { title ->
                     Box(Modifier.weight(1f)) {
                         Column(Modifier.fillMaxWidth().clickable { state.open(title) }) {
-                            AsyncImage(title.poster, title.title, contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxWidth().height(161.dp)
-                                    .clip(RoundedCornerShape(12.dp)).background(Card))
+                            Box(Modifier.fillMaxWidth().height(161.dp)
+                                .clip(RoundedCornerShape(12.dp)).background(Card)) {
+                                AsyncImage(title.poster, title.title, contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize())
+                                if (state.store.isWatched(title)) {
+                                    Text("✓ WATCHED", fontSize = 10.sp, color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.align(Alignment.BottomStart).padding(5.dp)
+                                            .background(Color(0xFF16593A), RoundedCornerShape(5.dp))
+                                            .padding(horizontal = 6.dp, vertical = 4.dp))
+                                }
+                            }
                             Text(title.title, fontSize = 11.sp, color = Color.White,
                                 maxLines = 2, overflow = TextOverflow.Ellipsis,
                                 fontWeight = FontWeight.SemiBold)
