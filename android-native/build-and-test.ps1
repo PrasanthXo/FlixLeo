@@ -41,10 +41,9 @@ Write-Host "Android SDK: $sdk"
 
 $gradleCandidates = @(
   $GradleCommand,
+  (Join-Path $project "gradlew.bat"),
   "gradle.bat",
-  "gradle",
-  (Join-Path $repoRoot "gradlew.bat"),
-  "D:\APP pro1\morning-music (1)\android\MorningMusic\gradlew.bat"
+  "gradle"
 )
 $gradle = Resolve-Executable "Gradle 8.10+ / Gradle Wrapper" $gradleCandidates
 Write-Host "Gradle: $gradle"
