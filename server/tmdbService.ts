@@ -25,6 +25,14 @@ export const TMDB_GENRES: Record<number, string> = {
   53: 'Thriller',
   10752: 'War',
   37: 'Western',
+  10759: 'Action & Adventure',
+  10762: 'Kids',
+  10763: 'News',
+  10764: 'Reality',
+  10765: 'Sci-Fi & Fantasy',
+  10766: 'Soap',
+  10767: 'Talk',
+  10768: 'War & Politics',
 };
 
 // Language code to display name
@@ -81,11 +89,11 @@ export function transformTmdbMovie(raw: any): MediaItem {
 
   const backdropUrl = raw.backdrop_path
     ? `${TMDB_IMAGE_BASE}/w1280${raw.backdrop_path}`
-    : '/src/assets/images/hero_cinema_stream_1791647936700.jpg';
+    : '';
 
   const posterUrl = raw.poster_path
     ? `${TMDB_IMAGE_BASE}/w500${raw.poster_path}`
-    : '/src/assets/images/poster_action_blockbuster_1791647951763.jpg';
+    : '';
 
   const voteAvg = typeof raw.vote_average === 'number' ? raw.vote_average.toFixed(1) : '8.1';
   const primarySource = 'streamhub';
@@ -169,7 +177,8 @@ export function transformTmdbMovie(raw: any): MediaItem {
     duration: raw.runtime ? `${Math.floor(raw.runtime / 60)}h ${raw.runtime % 60}m` : '2h 15m',
     rating: raw.adult ? 'R' : 'PG-13',
     imdbRating: voteAvg,
-    genres: genres.length > 0 ? genres : ['Action', 'Thriller'],
+    genres: genres.length > 0 ? genres : ['Cinema'],
+    type: 'movie',
     language: `${langDisplay} · Dual Audio`,
     overview: raw.overview || 'Experience unified high-definition cinema streaming with multi-server failover and high-speed cloud mirrors.',
     backdropUrl,
@@ -395,11 +404,11 @@ export function transformTmdbTvShow(raw: any): MediaItem {
 
   const backdropUrl = raw.backdrop_path
     ? `${TMDB_IMAGE_BASE}/w1280${raw.backdrop_path}`
-    : '/src/assets/images/hero_cinema_stream_1791647936700.jpg';
+    : '';
 
   const posterUrl = raw.poster_path
     ? `${TMDB_IMAGE_BASE}/w500${raw.poster_path}`
-    : '/src/assets/images/poster_action_blockbuster_1791647951763.jpg';
+    : '';
 
   const voteAvg = typeof raw.vote_average === 'number' ? raw.vote_average.toFixed(1) : '8.5';
   const tmdbId = raw.id;
@@ -441,7 +450,8 @@ export function transformTmdbTvShow(raw: any): MediaItem {
     duration: '45m / Ep',
     rating: 'TV-MA',
     imdbRating: voteAvg,
-    genres: genres.length > 0 ? genres : ['Drama', 'Series'],
+    genres: genres.length > 0 ? genres : ['TV Series'],
+    type: 'tv',
     language: `${langDisplay} · Series`,
     overview: raw.overview || 'Binge-watch hit television series, seasons, and episodes with high-speed multi-server embeds and zero buffering.',
     backdropUrl,
