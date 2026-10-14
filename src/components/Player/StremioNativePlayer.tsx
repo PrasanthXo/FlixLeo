@@ -2,7 +2,7 @@ import { DesktopNativeSurface, desktopBridge, fullLanguage, useDesktopWindowFull
 import { DesktopFullscreenControls, DesktopAspectRatioPicker, type NativeAspectRatio } from './DesktopFullscreenControls';
 import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
-import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2 } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2, X } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 import { getAppleVlcTarget, getAppleVlcLaunchUrl } from '../../lib/appleVlc';
 
@@ -532,7 +532,10 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       <div className="mb-5 flex items-center justify-between gap-2">
         {!desktopNative && <button type="button" onClick={() => { save(); onClose(); }} className="rounded-full bg-slate-900/90 p-2" aria-label="Back"><ArrowLeft /></button>}
         {!desktopNative && <button type="button" onClick={() => setDocked(true)} className="flex items-center gap-2 rounded-lg bg-slate-900/90 px-3 py-2 text-xs text-white" aria-label="Minimize player"><Minimize2 size={16} /> Mini player</button>}
-        {desktopNative && !nativeFullscreen && !docked && <button type="button" onClick={() => { manualMinimize.current = true; setDocked(true); }} className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-slate-900/90 px-3 py-2 text-xs text-white hover:bg-slate-800" aria-label="Minimize native video to mini player"><Minimize2 size={16} /> Mini player</button>}
+        {desktopNative && !nativeFullscreen && !docked && <div className="ml-auto flex items-center gap-2">
+          <button type="button" onClick={() => { manualMinimize.current = true; setDocked(true); }} className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-slate-900/90 px-3 py-2 text-xs text-white hover:bg-slate-800" aria-label="Minimize native video to mini player"><Minimize2 size={16} /> Mini player</button>
+          <button type="button" onClick={() => { save(); onClose(); }} className="inline-flex items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/30" title="Stop playback and close player" aria-label="Close Windows video player"><X size={16}/>Close player</button>
+        </div>}
       </div>
       <h2 className="text-lg font-bold">{media.title}</h2>
       <p className="text-xs text-slate-300">{media.year} · {media.duration}</p>
@@ -582,6 +585,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       <div className="flex items-center gap-2 flex-wrap">
         <button type="button" className="inline-flex items-center justify-center rounded-xl bg-slate-800 p-3 hover:bg-slate-700" aria-label={desktopFullscreen ? 'Exit fullscreen' : 'Fullscreen'} title="Fullscreen · Esc to exit" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')}><Maximize2 size={21}/></button>
         <DesktopAspectRatioPicker value={aspectRatio} onChange={changeAspectRatio} />
+        <button type="button" onClick={() => { save(); onClose(); }} className="inline-flex items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/30" title="Stop playback and close player" aria-label="Close Windows video player"><X size={16}/>Close player</button>
         <label className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2" title="Audio language">
           <Volume2 size={21}/>
           <select aria-label="Audio language" className="max-w-56 bg-transparent text-sm text-white outline-none" value={nativeTracks.audio.find(t => t.selected)?.id ?? ''} onChange={e => void desktopBridge()?.commandNative('setAudioTrack', Number(e.target.value))}>
