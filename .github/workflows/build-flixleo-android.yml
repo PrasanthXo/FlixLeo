@@ -35,6 +35,10 @@ jobs:
       - name: Build Android debug APK
         working-directory: android-native
         run: gradle --no-daemon :app:assembleDebug
+      - name: Show APK size and SHA-256
+        run: |
+          ls -lh android-native/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum android-native/app/build/outputs/apk/debug/app-debug.apk
       - name: Verify APK
         run: test -s android-native/app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
@@ -42,3 +46,4 @@ jobs:
           name: FlixLeo-Android-debug-APK
           path: android-native/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 30
