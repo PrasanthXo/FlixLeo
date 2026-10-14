@@ -68,76 +68,61 @@ jobs:
         run: |
           node --check desktop/main.cjs
           node --check desktop/preload.cjs
-      - name: Prepare Windows Authenticode signing certificate
-        shell: pwsh
-        env:
-          FLIXLEO_PFX_BASE64: ${{ secrets.FLIXLEO_WINDOWS_PFX_BASE64 }}
-          FLIXLEO_PFX_PASSWORD: ${{ secrets.FLIXLEO_WINDOWS_PFX_PASSWORD }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if ([string]::IsNullOrWhiteSpace($env:FLIXLEO_PFX_BASE64) -or
-              [string]::IsNullOrWhiteSpace($env:FLIXLEO_PFX_PASSWORD)) {
-            throw 'SIGNING_NOT_CONFIGURED: Add FLIXLEO_WINDOWS_PFX_BASE64 and FLIXLEO_WINDOWS_PFX_PASSWORD as GitHub Actions secrets. A real trusted code-signing certificate is required.'
-          }
-          $certPath = Join-Path $env:RUNNER_TEMP 'flixleo-windows-signing.pfx'
-          [System.IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:FLIXLEO_PFX_BASE64))
-          $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
-            $certPath, $env:FLIXLEO_PFX_PASSWORD,
-            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
-          if (-not $certificate.HasPrivateKey -or $certificate.NotAfter -lt (Get-Date) -or
-              $certificate.NotBefore -gt (Get-Date)) {
-            throw 'Signing PFX must contain a currently valid code-signing certificate and private key.'
-          }
-          Write-Host 'Windows signing certificate loaded securely (private key not displayed).'
-      - name: Package and Authenticode-sign Windows installer
+      - name: Build FlixLeo portable Windows EXE (unsigned)
         run: npm run desktop:dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          CSC_LINK: ${{ runner.temp }}/flixleo-windows-signing.pfx
-          CSC_KEY_PASSWORD: ${{ secrets.FLIXLEO_WINDOWS_PFX_PASSWORD }}
-      - name: Check generated Windows executables
-        shell: pwsh
-        run: |
-          Get-ChildItem desktop-release -Recurse -File | Select-Object FullName, Length
-          $exes = @(Get-ChildItem desktop-release -Filter '*.exe' -File)
-          if ($exes.Count -ne 1 -or $exes[0].Name -notlike 'FlixLeo-Setup-*.exe') { throw "Expected one FlixLeo installer EXE but found $($exes.Count)" }
-      - name: Verify trusted Windows Authenticode signatures
+
+      - name: Verify portable EXE and calculate SHA256
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $installer = @(Get-ChildItem desktop-release -File -Filter 'FlixLeo-Setup-*.exe')
-          if ($installer.Count -ne 1) { throw 'Signed installer missing or ambiguous' }
-          $application = Join-Path (Resolve-Path desktop-release/win-unpacked).Path 'FlixLeo.exe'
-          if (-not (Test-Path $application)) { throw 'Packaged FlixLeo application EXE is missing.' }
-          foreach ($file in @($application, $installer[0].FullName)) {
-            $signature = Get-AuthenticodeSignature -FilePath $file
-            if ($signature.Status -ne 'Valid') {
-              throw "AUTHENTICODE_VERIFICATION_FAILED: $([System.IO.Path]::GetFileName($file)) signature is $($signature.Status). Refusing to publish an unsigned or untrusted Windows EXE."
-            }
-            Write-Host "$([System.IO.Path]::GetFileName($file)) Authenticode verified: Valid"
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $expected = "FlixLeo-Portable-$version-x64.exe"
+          $executables = @(Get-ChildItem desktop-release -File -Filter '*.exe')
+          if ($executables.Count -ne 1 -or $executables[0].Name -ne $expected) {
+            throw "Expected exactly one portable EXE named $expected"
           }
-          (Get-FileHash $installer[0].FullName -Algorithm SHA256) | Format-List Hash
-      - uses: actions/upload-artifact@v5
+          $portable = $executables[0]
+          if ($portable.Length -lt 40000000) { throw 'Portable app is unexpectedly small' }
+          $appExe = 'desktop-release/win-unpacked/FlixLeo.exe'
+          if (-not (Test-Path $appExe)) { throw 'Embedded FlixLeo application binary is missing' }
+          $signature = Get-AuthenticodeSignature -FilePath $portable.FullName
+          Write-Host "Code-signing status: $($signature.Status); portable binary intentionally unsigned."
+          if ($signature.Status -notin @('NotSigned', 'Valid')) {
+            throw "Unexpected portable executable signature status: $($signature.Status)"
+          }
+          $hash = (Get-FileHash -Path $portable.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $expected" | Set-Content -Path desktop-release/SHA256SUMS.txt -Encoding ascii
+          Write-Host "SHA256: $hash"
+          Get-ChildItem desktop-release -File | Select-Object Name, Length
+
+      - name: Save portable EXE artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: FlixLeo-Windows-Signed
-          path: desktop-release/FlixLeo-Setup-*.exe
+          name: FlixLeo-Windows-Portable
+          path: |
+            desktop-release/FlixLeo-Portable-*.exe
+            desktop-release/SHA256SUMS.txt
           if-no-files-found: error
-      - name: Publish verified Windows installer to latest release
+
+      - name: Publish portable Windows release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ($version -notmatch '^[0-9]+[.][0-9]+[.][0-9]+$') { throw 'Invalid Windows release version' }
+          if ($version -notmatch '^[0-9]+[.][0-9]+[.][0-9]+$') { throw 'Invalid version' }
           $tag = "windows-v$version"
-          $installer = @(Get-ChildItem desktop-release -File -Filter "FlixLeo-Setup-$version-x64.exe")
-          if ($installer.Count -ne 1) { throw 'Expected exact signed Windows installer not found' }
-          gh release view $tag *> $null
+          $exe = "desktop-release/FlixLeo-Portable-$version-x64.exe"
+          if (-not (Test-Path $exe)) { throw 'Portable EXE missing before publishing' }
+          $assets = @($exe, 'desktop-release/SHA256SUMS.txt')
+          gh release view $tag --json tagName 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $installer[0].FullName --clobber
+            gh release upload $tag @assets --clobber
           } else {
-            gh release create $tag $installer[0].FullName --target $env:GITHUB_SHA --title "FlixLeo Windows $version" --notes "FlixLeo for Windows x64. The installer and application executable are Authenticode-signed and verified by Windows during release. Includes desktop and Start Menu shortcuts." --latest
+            gh release create $tag @assets --target $env:GITHUB_SHA --title "FlixLeo Windows Portable $version" --notes "FlixLeo Windows x64 portable executable: double-click to run without installation. The app is unsigned because no code-signing certificate is available. Windows may warn Unknown Publisher. See SHA256SUMS.txt to verify your download." --latest
           }
-          if ($LASTEXITCODE -ne 0) { throw 'Unable to publish the verified Windows installer' }
-          Write-Host "Signed Windows $version installer published to GitHub Releases."
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish portable release to GitHub' }
+          Write-Host "Published FlixLeo Portable $version and checksum."
