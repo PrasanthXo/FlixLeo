@@ -4,6 +4,14 @@ on:
   push:
     paths:
       - 'android-native/**'
+      - 'src/lib/androidNative.ts'
+      - 'src/components/Player/**'
+      - '.github/workflows/build-flixleo-android.yml'
+  pull_request:
+    paths:
+      - 'android-native/**'
+      - 'src/lib/androidNative.ts'
+      - 'src/components/Player/**'
       - '.github/workflows/build-flixleo-android.yml'
 jobs:
   android:
@@ -31,10 +39,32 @@ jobs:
       - name: Build Android debug APK
         working-directory: android-native
         run: gradle --no-daemon :app:assembleDebug
-      - name: Verify APK
-        run: test -s android-native/app/build/outputs/apk/debug/app-debug.apk
+      - name: Verify installable Android APK
+        run: |
+          set -eu
+          APK=android-native/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          echo "APK size: $(du -h "$APK" | cut -f1)"
+          unzip -l "$APK" | grep -E 'lib/(arm64-v8a|armeabi-v7a)/libvlc.so' || {
+            echo 'Native LibVLC libraries not packaged in APK'; exit 1;
+          }
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt" dump badging "$APK" | head -n 8
       - uses: actions/upload-artifact@v4
         with:
           name: FlixLeo-Android-debug-APK
           path: android-native/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Validate Android Studio Gradle wrapper and package project
+        run: |
+          set -eu
+          test -s android-native/gradle/wrapper/gradle-wrapper.jar
+          bash android-native/gradlew --version | grep 'Gradle 8.10.2'
+          zip -qr FlixLeo-AndroidStudio-Source.zip android-native \
+            -x 'android-native/.gradle/*' 'android-native/app/build/*' 'android-native/build/*'
+          unzip -l FlixLeo-AndroidStudio-Source.zip | grep 'android-native/app/src/main/java/cyou/flixleo/android/NativeUi.kt'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FlixLeo-AndroidStudio-Source
+          path: FlixLeo-AndroidStudio-Source.zip
           if-no-files-found: error
