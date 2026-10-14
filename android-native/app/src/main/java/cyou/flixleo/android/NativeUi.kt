@@ -794,8 +794,7 @@ private fun DetailSheet(state: FlixState) {
                             Text(source.quality + if (source.size.isNotBlank()) " · " + source.size else "",
                                 fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White,
                                 maxLines = 1)
-                            Text("Option ${index+1}" + if (index == 0) " · Recommended" else "",
-                                color = Muted, fontSize = 12.sp)
+                            // Provider/option labels stay hidden: show only quality and size.
                         }
                         Icon(Icons.Default.ChevronRight, contentDescription = "Play source",
                             tint = Gold, modifier = Modifier.size(22.dp))
