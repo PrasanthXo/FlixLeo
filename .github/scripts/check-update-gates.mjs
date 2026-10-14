@@ -27,6 +27,37 @@ for (const [app, version] of [['flixleo-android',1],['flixleo-windows',1],['sabd
     }
   } catch (error) { console.error('::error::' + app + ': ' + error.message); errors++; }
 }
+// Windows-only: require that the latest published installable EXE is offered
+// by both the desktop download route and the Windows application update gate.
+try {
+  const status = await request(origin + '/api/download/windows/status');
+  if (status.status !== 200 || status.json.ready !== true ||
+      status.json.format !== 'installable-exe') {
+    throw Error('Windows installer download is not ready');
+  }
+  const gate = await request(origin + '/api/gateway/v1/check/flixleo-windows?versionCode=3');
+  const policy = gate.json.policy;
+  if (gate.status !== 200 || gate.json.ready !== true ||
+      !policy || policy.appId !== 'flixleo-windows' ||
+      policy.latestVersionCode < 4 || policy.updateAvailable !== true ||
+      !/^https:\/\//.test(policy.updateUrl || '') ||
+      !/FlixLeo-Setup-\d+\.\d+\.\d+-x64\.exe$/.test(policy.updateUrl || '')) {
+    throw Error('Windows update gate does not point to the current installable EXE');
+  }
+  const response = await fetch(origin + '/api/download/windows', {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(14000)
+  });
+  if (response.status !== 302 ||
+      !/FlixLeo-Setup-\d+\.\d+\.\d+-x64\.exe$/.test(response.headers.get('location') || '')) {
+    throw Error('Windows button route did not redirect to the published installer');
+  }
+  console.log('FlixLeo Windows installer and update gate: READY; version=' + policy.latestVersionName +
+    '; code=' + policy.latestVersionCode + '; download route verified');
+} catch (error) {
+  console.error('::error::FlixLeo Windows installer distribution: ' + error.message);
+  errors++;
+}
 try {
   const { status } = await request(origin + '/api/gateway/v1/check/unknown?versionCode=1');
   if (status !== 400) throw Error('Invalid apps should return HTTP 400, received ' + status);
