@@ -57,11 +57,12 @@ class MainActivity : ComponentActivity() {
         }
         video.onCompleted = {
             val finished = currentPlayback
+            val completedDuration = video.duration
             video.stop(notifyProgress = false)
             currentPlayback = null
             if (finished != null) {
                 state.store.remember(finished.first, 0.0,
-                    video.duration / 1000.0, finished.second.id, ended = true)
+                    completedDuration / 1000.0, finished.second.id, ended = true)
                 state.localRevision++
                 state.uploadCloud()
                 if (finished.first.type == "tv" && finished.first.episode > 0) {
@@ -109,7 +110,7 @@ class MainActivity : ComponentActivity() {
         video.inPictureInPicture = active
         enteringPip = false
         if (!active && video.mode == PlayerMode.FULLSCREEN) {
-            video.setMode(if (restoreAfterPip == PlayerMode.FULLSCREEN) PlayerMode.BIG else restoreAfterPip)
+            video.setMode(restoreAfterPip)
         }
     }
     override fun onPause() {
