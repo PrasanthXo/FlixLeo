@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
             currentPlayback = title to stream
             val resume = state.store.history.find { it.key == state.entryKey(title) }?.progress ?: 0.0
             state.playingTitle = title
-            state.playbackStreams = state.streams.ifEmpty { listOf(stream) }
+            state.playbackStreams = state.streams.ifEmpty { state.playbackStreams.ifEmpty { listOf(stream) } }
             state.selected = null
             state.selectedChannel = null
             video.start(stream, title.title + (if (title.episode > 0) " · S${title.season} E${title.episode}" else ""), resume)
