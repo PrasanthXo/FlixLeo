@@ -1,6 +1,7 @@
 package cyou.flixleo.android
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
@@ -27,6 +28,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.delay
 import coil.compose.AsyncImage
 import kotlin.math.absoluteValue
 import org.json.JSONObject
@@ -49,41 +54,70 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
         Scaffold(
             containerColor = Ink,
             topBar = {
-                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) Row(Modifier.fillMaxWidth().background(Ink).statusBarsPadding()
-                    .padding(start = 17.dp, end = 14.dp, top = 7.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Text("F", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.Black,
-                        modifier = Modifier.clip(RoundedCornerShape(9.dp)).background(Gold).padding(horizontal = 8.dp))
-                    Spacer(Modifier.width(9.dp))
-                    Text("FlixLeo", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { state.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh catalogue", tint = Muted)
-                    }
-                    IconButton(onClick = { state.changeTab("Profile") }) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = Gold)
+                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) {
+                    Row(Modifier.fillMaxWidth().background(Ink).statusBarsPadding()
+                        .padding(horizontal = 17.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Image(painterResource(R.drawable.flixleo_brand), "FlixLeo brand",
+                            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)))
+                        Spacer(Modifier.width(11.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("FlixLeo", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black,
+                                letterSpacing = (-.6).sp)
+                            Text("YOUR CINEMA, REIMAGINED", color = Muted, fontSize = 9.sp,
+                                letterSpacing = 1.3.sp, maxLines = 1)
+                        }
+                        IconButton(onClick = { state.changeTab("Search") },
+                            modifier = Modifier.size(42.dp)) {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White,
+                                modifier = Modifier.size(22.dp))
+                        }
+                        IconButton(onClick = { state.changeTab("Profile") },
+                            modifier = Modifier.size(42.dp)) {
+                            Icon(Icons.Default.AccountCircle, contentDescription = "Your profile", tint = Gold,
+                                modifier = Modifier.size(26.dp))
+                        }
                     }
                 }
             },
             bottomBar = {
-                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) Row(Modifier.fillMaxWidth().background(Color(0xFF121722))
-                    .navigationBarsPadding().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    val icons = listOf(Icons.Default.Home, Icons.Default.Movie, Icons.Default.Tv,
-                        Icons.Default.LiveTv, Icons.Default.Search, Icons.Default.Person)
-                    Nav.forEachIndexed { i, label ->
-                        val active = state.tab == label
-                        Column(
-                            Modifier.width(72.dp).clip(RoundedCornerShape(13.dp))
-                                .background(if (active) Gold.copy(alpha = 0.17f) else Color.Transparent)
-                                .clickable { state.changeTab(label) }.padding(vertical = 6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(icons[i], contentDescription = label,
-                                tint = if (active) Gold else Muted, modifier = Modifier.size(23.dp))
-                            Text(label, fontSize = 10.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                                color = if (active) Gold else Muted, maxLines = 1)
+                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) {
+                    Row(
+                        Modifier.fillMaxWidth().background(Color(0xFF10141F))
+                            .navigationBarsPadding().padding(horizontal = 3.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val icons = listOf(Icons.Default.Home, Icons.Default.Movie, Icons.Default.Tv,
+                            Icons.Default.LiveTv, Icons.Default.Search, Icons.Default.Person)
+                        Nav.forEachIndexed { index, label ->
+                            val active = state.tab == label
+                            val tint by animateColorAsState(
+                                targetValue = if (active) Gold else Muted, label = "nav-tint"
+                            )
+                            val activeBg by animateColorAsState(
+                                targetValue = if (active) Gold.copy(alpha = .13f) else Color.Transparent,
+                                label = "nav-background"
+                            )
+                            Column(
+                                Modifier.weight(1f).heightIn(min = 56.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(activeBg)
+                                    .clickable { state.changeTab(label) }
+                                    .padding(horizontal = 1.dp, vertical = 5.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(icons[index], contentDescription = label, tint = tint,
+                                    modifier = Modifier.size(23.dp))
+                                Spacer(Modifier.height(4.dp))
+                                Text(label, fontSize = 10.sp,
+                                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                                    color = tint, maxLines = 1,
+                                    textAlign = TextAlign.Center,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Clip)
+                            }
                         }
                     }
                 }
