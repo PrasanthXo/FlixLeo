@@ -5,13 +5,13 @@ This is a **fully native Android application**. The main activity uses **Jetpack
 ## Open in Android Studio (Windows)
 1. Clone the GitHub repository, checking out `feature/flixleo-fully-native-android-20261014`.
 2. Android Studio → **Open** → select the repository's `android-native` folder (not the repository root).
-3. Let Gradle sync with **JDK 17** and **Android SDK Platform 35**.
+3. Let Gradle sync with **JDK 17** and **Android SDK Platform 35**. The Gradle 8.10.2 wrapper is included (`gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar`).
 4. Run the `app` configuration on an Android ARM64 / ARM32 phone (Android 7.0 or later), or **Build → Build APK(s)**.
 
 From PowerShell inside `android-native` with JDK 17 / Gradle 8.10.2 installed:
 
 ```powershell
-gradle --no-daemon :app:assembleDebug
+.\\gradlew.bat --no-daemon :app:assembleDebug
 ```
 
 APK output: `android-native/app/build/outputs/apk/debug/app-debug.apk`.
@@ -21,7 +21,7 @@ CI workflow: `.github/workflows/build-flixleo-android.yml`.
 
 - Native Home with mixed perspective carousel, Continue Watching, For You language choices, genres, language catalogues and provider rows.
 - Native Movies / Series, title details, seasons/episodes, debounced movie + series search.
-- Native PlavioHD Live TV categories, stream-quality/server selection.
+- Native PlavioHD Live TV categories, stream-quality/server selection. Native video includes Android 8+ Picture-in-Picture mini player.
 - Native watchlist and resume progress kept locally even without a cloud account.
 - Embedded **LibVLC** with audio language and embedded subtitle selection, aspect ratio, seek, fullscreen and end-of-episode progression. External VLC is not needed.
 - Native accounts with email verification and password reset, cloud watchlist/history sync, native profile preferences, list/revoke approved TV devices and enter a pairing ID, and update gateway checks.
