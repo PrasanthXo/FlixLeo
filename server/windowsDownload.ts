@@ -10,6 +10,14 @@ const router = Router();
 const RELEASE_ENDPOINT = 'https://api.github.com/repos/PrasanthXo/FlixLeo/releases/latest';
 const INSTALLER_NAME = /^FlixLeo-Setup-\d+\.\d+\.\d+-x64\.exe$/;
 type Installer = { url: string; filename: string; bytes: number };
+// Published and checksum-recorded release, verified against GitHub Releases on
+// 2026-10-14. Fallback keeps downloads and the Windows gate working when
+// GitHub's unauthenticated Releases API is rate-limited from Render.
+const PUBLISHED_WINDOWS_INSTALLER: Installer = {
+  filename: 'FlixLeo-Setup-1.0.3-x64.exe',
+  url: 'https://github.com/PrasanthXo/FlixLeo/releases/download/windows-v1.0.3/FlixLeo-Setup-1.0.3-x64.exe',
+  bytes: 228823683
+};
 let cached: { expiry: number; installer: Installer | null } | null = null;
 let pending: Promise<Installer | null> | null = null;
 
@@ -17,7 +25,7 @@ async function findVerifiedRelease(): Promise<Installer | null> {
   if (cached && Date.now() < cached.expiry) return cached.installer;
   if (pending) return pending;
   pending = (async () => {
-    let installer: Installer | null = null;
+    let installer: Installer | null = PUBLISHED_WINDOWS_INSTALLER;
     try {
       const result = await fetch(RELEASE_ENDPOINT, {
         headers: {
@@ -25,7 +33,7 @@ async function findVerifiedRelease(): Promise<Installer | null> {
           'User-Agent': 'FlixLeo-Windows-Download',
           'X-GitHub-Api-Version': '2022-11-28'
         },
-        signal: AbortSignal.timeout(6500)
+        signal: AbortSignal.timeout(3500)
       });
       if (result.ok) {
         const release: any = await result.json();
