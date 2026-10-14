@@ -238,6 +238,8 @@ class InlineVlcController(context: Context) {
         runCatching { libVlc?.release() }
         libVlc = null
         mode = PlayerMode.CLOSED
+        position = 0L
+        duration = 0L
         playing = false
         buffering = false
     }
