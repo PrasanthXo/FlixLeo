@@ -133,6 +133,21 @@ data class Session(val accessToken: String, val refreshToken: String, val expire
 class FlixStore(private val context: Context) {
     private val prefs = context.getSharedPreferences("flixleo_native_state", Context.MODE_PRIVATE)
     val watched: MutableSet<String> get() = prefs.getStringSet("watchlist", emptySet())?.toMutableSet() ?: mutableSetOf()
+    // Watchlist and completed playback are deliberately separate.
+    val completed: Set<String> get() = prefs.getStringSet("completed_playback", emptySet()) ?: emptySet()
+    fun isWatched(title: FlixTitle): Boolean {
+        val prefix = title.id + ":s"
+        return if (title.type == "tv" && title.episode < 1)
+            completed.any { it.startsWith(prefix) }
+        else completed.contains(title.id + if (title.season >= 0 && title.episode >= 0)
+            ":s${title.season}e${title.episode}" else "")
+    }
+    fun markWatched(title: FlixTitle) {
+        val key = title.id + if (title.season >= 0 && title.episode >= 0)
+            ":s${title.season}e${title.episode}" else ""
+        prefs.edit().putStringSet("completed_playback", completed + key).apply()
+    }
+
     val history: List<ResumeEntry> get() = runCatching {
         JSONArray(prefs.getString("history", "[]")).objects().mapNotNull(ResumeEntry::from)
     }.getOrDefault(emptyList())
