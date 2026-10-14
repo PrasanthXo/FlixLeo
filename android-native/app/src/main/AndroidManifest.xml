@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
         android:label="FlixLeo"
-        android:icon="@drawable/flixleo_icon"
+        android:icon="@drawable/flixleo_brand"
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true"

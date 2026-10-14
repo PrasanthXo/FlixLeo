@@ -1,6 +1,9 @@
 package cyou.flixleo.android
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
@@ -27,8 +30,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.delay
 import coil.compose.AsyncImage
 import kotlin.math.absoluteValue
+import kotlin.math.abs
 import org.json.JSONObject
 
 private val Ink = Color(0xFF090B11)
@@ -49,41 +57,70 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
         Scaffold(
             containerColor = Ink,
             topBar = {
-                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) Row(Modifier.fillMaxWidth().background(Ink).statusBarsPadding()
-                    .padding(start = 17.dp, end = 14.dp, top = 7.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Text("F", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.Black,
-                        modifier = Modifier.clip(RoundedCornerShape(9.dp)).background(Gold).padding(horizontal = 8.dp))
-                    Spacer(Modifier.width(9.dp))
-                    Text("FlixLeo", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { state.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh catalogue", tint = Muted)
-                    }
-                    IconButton(onClick = { state.changeTab("Profile") }) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = Gold)
+                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) {
+                    Row(Modifier.fillMaxWidth().background(Ink).statusBarsPadding()
+                        .padding(horizontal = 17.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Image(painterResource(R.drawable.flixleo_brand), "FlixLeo brand",
+                            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)))
+                        Spacer(Modifier.width(11.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("FlixLeo", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black,
+                                letterSpacing = (-.6).sp)
+                            Text("YOUR CINEMA, REIMAGINED", color = Muted, fontSize = 9.sp,
+                                letterSpacing = 1.3.sp, maxLines = 1)
+                        }
+                        IconButton(onClick = { state.changeTab("Search") },
+                            modifier = Modifier.size(42.dp)) {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White,
+                                modifier = Modifier.size(22.dp))
+                        }
+                        IconButton(onClick = { state.changeTab("Profile") },
+                            modifier = Modifier.size(42.dp)) {
+                            Icon(Icons.Default.AccountCircle, contentDescription = "Your profile", tint = Gold,
+                                modifier = Modifier.size(26.dp))
+                        }
                     }
                 }
             },
             bottomBar = {
-                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) Row(Modifier.fillMaxWidth().background(Color(0xFF121722))
-                    .navigationBarsPadding().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    val icons = listOf(Icons.Default.Home, Icons.Default.Movie, Icons.Default.Tv,
-                        Icons.Default.LiveTv, Icons.Default.Search, Icons.Default.Person)
-                    Nav.forEachIndexed { i, label ->
-                        val active = state.tab == label
-                        Column(
-                            Modifier.width(72.dp).clip(RoundedCornerShape(13.dp))
-                                .background(if (active) Gold.copy(alpha = 0.17f) else Color.Transparent)
-                                .clickable { state.changeTab(label) }.padding(vertical = 6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(icons[i], contentDescription = label,
-                                tint = if (active) Gold else Muted, modifier = Modifier.size(23.dp))
-                            Text(label, fontSize = 10.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                                color = if (active) Gold else Muted, maxLines = 1)
+                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) {
+                    Row(
+                        Modifier.fillMaxWidth().background(Color(0xFF10141F))
+                            .navigationBarsPadding().padding(horizontal = 3.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val icons = listOf(Icons.Default.Home, Icons.Default.Movie, Icons.Default.Tv,
+                            Icons.Default.LiveTv, Icons.Default.Search, Icons.Default.Person)
+                        Nav.forEachIndexed { index, label ->
+                            val active = state.tab == label
+                            val tint by animateColorAsState(
+                                targetValue = if (active) Gold else Muted, label = "nav-tint"
+                            )
+                            val activeBg by animateColorAsState(
+                                targetValue = if (active) Gold.copy(alpha = .13f) else Color.Transparent,
+                                label = "nav-background"
+                            )
+                            Column(
+                                Modifier.weight(1f).heightIn(min = 56.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(activeBg)
+                                    .clickable { state.changeTab(label) }
+                                    .padding(horizontal = 1.dp, vertical = 5.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(icons[index], contentDescription = label, tint = tint,
+                                    modifier = Modifier.size(23.dp))
+                                Spacer(Modifier.height(4.dp))
+                                Text(label, fontSize = 10.sp,
+                                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                                    color = tint, maxLines = 1,
+                                    textAlign = TextAlign.Center,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Clip)
+                            }
                         }
                     }
                 }
@@ -127,6 +164,7 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
             }
         }
         if (state.showAuth) AccountDialog(state)
+        if (state.showOnboarding && state.account != null) PostSignupInterestsDialog(state)
         val update = state.updateNotice
         if (update != null) AlertDialog(
             onDismissRequest = { if (!state.updateForced) state.updateNotice = null },
@@ -154,71 +192,231 @@ private fun Heading(title: String, subtitle: String? = null, action: (() -> Unit
     }
 }
 @Composable
-private fun Poster(item: FlixTitle, selected: Boolean, compact: Boolean = false, onClick: () -> Unit) {
-    val width = if (compact) 112.dp else 133.dp
-    Column(Modifier.width(width).clip(RoundedCornerShape(13.dp))
-        .clickable(onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().height(if (compact) 150.dp else 187.dp)
-            .clip(RoundedCornerShape(12.dp)).background(Card)) {
+private fun Poster(item: FlixTitle, selected: Boolean, compact: Boolean = false,
+                   onBookmark: (() -> Unit)? = null, onClick: () -> Unit) {
+    val width = if (compact) 112.dp else 139.dp
+    var expanded by remember { mutableStateOf(false) }
+    Column(Modifier.width(width).clickable(onClick = onClick)) {
+        Box(Modifier.fillMaxWidth()
+            .height(if (compact) 151.dp else 197.dp)
+            .shadow(8.dp, RoundedCornerShape(15.dp))
+            .clip(RoundedCornerShape(15.dp))
+            .border(1.dp, Color.White.copy(alpha = .12f), RoundedCornerShape(15.dp))
+            .background(Card)) {
             AsyncImage(model = item.poster, contentDescription = item.title,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            if (selected) Icon(Icons.Default.Bookmark, contentDescription = "In watchlist",
-                tint = Gold, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(18.dp))
-            if (item.type == "tv") Text("SERIES", fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                color = Gold, modifier = Modifier.align(Alignment.BottomStart)
-                    .background(Ink.copy(alpha = .87f), RoundedCornerShape(topEnd = 7.dp)).padding(5.dp))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                listOf(Color(0x16000000), Color.Transparent, Color(0xD9070A10)),
+                startY = 0f)))
+            if (item.rating.isNotBlank()) {
+                Text("★ ${item.rating}", fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold, color = Gold,
+                    modifier = Modifier.align(Alignment.TopStart)
+                        .padding(7.dp).clip(RoundedCornerShape(7.dp))
+                        .background(Color(0xCC111827)).padding(horizontal = 7.dp, vertical = 4.dp))
+            }
+            if (onBookmark != null) {
+                Box(Modifier.align(Alignment.TopEnd)) {
+                    IconButton(onClick = { expanded = true },
+                        modifier = Modifier.padding(4.dp).size(33.dp)
+                            .background(Color(0xB31C2030), CircleShape)) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More options for ${item.title}",
+                            tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false },
+                        modifier = Modifier.background(Color(0xFF222638))) {
+                        DropdownMenuItem(
+                            text = { Text("View details", color = Color.White) },
+                            leadingIcon = { Icon(Icons.Default.Info, null, tint = Gold) },
+                            onClick = { expanded = false; onClick() })
+                        DropdownMenuItem(
+                            text = {
+                                Text(if (selected) "Remove from Watchlist" else "Add to Watchlist",
+                                    color = Color.White)
+                            },
+                            leadingIcon = {
+                                Icon(if (selected) Icons.Default.BookmarkRemove else Icons.Default.BookmarkAdd,
+                                    null, tint = Gold)
+                            }, onClick = { expanded = false; onBookmark() })
+                    }
+                }
+            } else if (selected) {
+                Icon(Icons.Default.Bookmark, "Saved", tint = Gold,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(7.dp).size(18.dp))
+            }
+            Text(if (item.type == "tv") "SERIES" else "MOVIE",
+                color = Gold, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                letterSpacing = 1.sp,
+                modifier = Modifier.align(Alignment.BottomStart)
+                    .padding(9.dp).background(Ink.copy(alpha = .75f), RoundedCornerShape(7.dp))
+                    .padding(horizontal = 6.dp, vertical = 3.dp))
         }
-        Spacer(Modifier.height(6.dp))
-        Text(item.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-            maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(item.year + if (item.rating.isNotBlank()) "  ★${item.rating}" else "",
-            color = Muted, fontSize = 10.sp, maxLines = 1)
+        Spacer(Modifier.height(9.dp))
+        Text(item.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            maxLines = 2, minLines = 2, lineHeight = 17.sp, overflow = TextOverflow.Ellipsis)
+        Text(listOf(item.year, item.genres.firstOrNull().orEmpty())
+            .filter { it.isNotBlank() }.joinToString("  ·  "),
+            color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 @Composable
 private fun PosterRow(label: String, data: List<FlixTitle>, state: FlixState) {
     if (data.isEmpty()) return
-    Heading(label)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(11.dp),
+    Heading(label, "${data.size} titles available")
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(13.dp),
         contentPadding = PaddingValues(horizontal = 17.dp)) {
         items(data, key = { label + it.id }) { item ->
-            Poster(item, state.watchlist.contains(item.id)) { state.open(item) }
+            Poster(item, state.watchlist.contains(item.id),
+                onBookmark = { state.toggleWatch(item) },
+                onClick = { state.open(item) })
         }
     }
 }
 @Composable
 private fun HeroWheel(items: List<FlixTitle>, state: FlixState) {
     if (items.isEmpty()) return
-    val pager = rememberPagerState(pageCount = { items.size.coerceAtMost(18) })
-    Box(Modifier.fillMaxWidth().height(270.dp)) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 43.dp), pageSpacing = 10.dp) { page ->
-            val item = items[page]
-            val offset = ((pager.currentPage - page) + pager.currentPageOffsetFraction).absoluteValue
-            Box(Modifier.fillMaxSize().padding(vertical = 7.dp)
-                .graphicsLayer {
-                    scaleX = 1f - (offset * .1f).coerceAtMost(.18f)
-                    scaleY = 1f - (offset * .1f).coerceAtMost(.18f)
-                    rotationY = ((pager.currentPage - page) + pager.currentPageOffsetFraction) * 15f
-                    cameraDistance = 13f * density
-                }
-                .clip(RoundedCornerShape(23.dp))
-                .background(Card).clickable { state.open(item) }) {
-                AsyncImage(item.backdrop.takeIf { it.isNotBlank() } ?: item.poster,
-                    contentDescription = item.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
-                    Color.Transparent, Ink.copy(alpha = .23f), Ink.copy(alpha = .98f)))))
-                Column(Modifier.align(Alignment.BottomStart).padding(18.dp)) {
-                    Text("FLIXLEO FEATURED", color = Gold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text(item.title, color = Color.White, fontWeight = FontWeight.Black,
-                        fontSize = 23.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(item.year + "  ·  " + item.language + if (item.type == "tv") "  ·  Series" else "",
-                        color = Color.LightGray, fontSize = 12.sp)
-                    Spacer(Modifier.height(7.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.PlayCircleFilled, contentDescription = null, tint = Gold)
-                        Text("  View details", color = Color.White, fontSize = 13.sp)
+    val slides = remember(items) { items.distinctBy { it.id }.take(15) }
+    var currentIndex by remember(slides) { mutableIntStateOf(0) }
+    val current = slides[currentIndex.coerceIn(slides.indices)]
+    var lastTouched by remember { mutableLongStateOf(0L) }
+
+    // This is a real five-poster 3D wheel, not a one-poster banner/pager.
+    LaunchedEffect(slides) {
+        while (true) {
+            delay(4600L)
+            if (slides.size > 1 && System.currentTimeMillis() - lastTouched > 5000L) {
+                currentIndex = (currentIndex + 1) % slides.size
+            }
+        }
+    }
+    Column(
+        Modifier.fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(25.dp))
+            .border(1.dp, Color(0xFF726DA3).copy(alpha = .5f), RoundedCornerShape(25.dp))
+            .background(Color(0xFF10132A))
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth().height(298.dp).clip(RoundedCornerShape(25.dp))) {
+            val centerSlide = current
+            AsyncImage(
+                model = centerSlide.backdrop.ifBlank { centerSlide.poster },
+                contentDescription = null, contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().blur(24.dp)
+            )
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                listOf(Color(0xCB090A1A), Color(0xD80F1031), Color(0xFF0D1028)))))
+            val posterWidth = minOf(maxWidth * .36f, 154.dp)
+            val stride = minOf(maxWidth * .235f, 94.dp)
+            // Perspective halo matches FlixLeo's cinematic violet/blue glass wheel.
+            Box(Modifier.align(Alignment.BottomCenter)
+                .padding(bottom = 17.dp)
+                .fillMaxWidth(.70f).height(38.dp)
+                .border(2.dp, Color(0xFF9C83FF).copy(alpha = .75f), CircleShape)
+                .background(Brush.radialGradient(listOf(Color(0x664E3BAB), Color.Transparent)), CircleShape))
+            if (slides.size > 1) {
+                (-2..2).sortedByDescending { abs(it) }.forEach { offset ->
+                    val position = (currentIndex + offset + slides.size * 4) % slides.size
+                    val item = slides[position]
+                    val isCenter = offset == 0
+                    val slideX by animateDpAsState(stride * offset,
+                        animationSpec = tween(460, easing = FastOutSlowInEasing), label = "wheel-x")
+                    val rotate by animateFloatAsState(
+                        when (offset) { -2 -> 42f; -1 -> 24f; 1 -> -24f; 2 -> -42f; else -> 0f },
+                        animationSpec = tween(460), label = "wheel-rotation"
+                    )
+                    val scale by animateFloatAsState(
+                        when (abs(offset)) { 0 -> 1f; 1 -> .86f; else -> .71f },
+                        animationSpec = tween(460), label = "wheel-scale"
+                    )
+                    Box(
+                        Modifier.align(Alignment.Center)
+                            .offset(x = slideX, y = if (isCenter) (-4).dp else 5.dp)
+                            .width(posterWidth).height(211.dp)
+                            .zIndex((4 - abs(offset)).toFloat())
+                            .graphicsLayer {
+                                rotationY = rotate
+                                scaleX = scale
+                                scaleY = scale
+                                cameraDistance = 13f * density
+                                alpha = if (abs(offset) == 2) .75f else 1f
+                            }
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(if (isCenter) 2.dp else 1.dp,
+                                if (isCenter) Color(0xFFC4A8FF) else Color.White.copy(alpha = .27f),
+                                RoundedCornerShape(14.dp))
+                            .background(Card)
+                            .clickable {
+                                lastTouched = System.currentTimeMillis()
+                                if (isCenter) state.open(item)
+                                else currentIndex = position
+                            }
+                    ) {
+                        AsyncImage(model = item.poster, contentDescription = item.title,
+                            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        if (isCenter) Box(Modifier.fillMaxSize()
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0x4D121526)))))
                     }
+                }
+            } else {
+                AsyncImage(model = current.poster, contentDescription = current.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.align(Alignment.Center).width(posterWidth).height(208.dp)
+                        .clip(RoundedCornerShape(14.dp)).clickable { state.open(current) })
+            }
+            if (slides.size > 1) {
+                IconButton(onClick = {
+                    lastTouched = System.currentTimeMillis()
+                    currentIndex = (currentIndex - 1 + slides.size) % slides.size
+                }, modifier = Modifier.align(Alignment.CenterStart)
+                    .padding(start = 6.dp).size(34.dp)
+                    .background(Color(0xB910162A), CircleShape)) {
+                    Icon(Icons.Default.ChevronLeft, "Previous featured title", tint = Color.White)
+                }
+                IconButton(onClick = {
+                    lastTouched = System.currentTimeMillis()
+                    currentIndex = (currentIndex + 1) % slides.size
+                }, modifier = Modifier.align(Alignment.CenterEnd)
+                    .padding(end = 6.dp).size(34.dp)
+                    .background(Color(0xB910162A), CircleShape)) {
+                    Icon(Icons.Default.ChevronRight, "Next featured title", tint = Color.White)
+                }
+            }
+        }
+        Column(Modifier.fillMaxWidth().padding(start = 17.dp, end = 17.dp, bottom = 17.dp)) {
+            Text("✦  CINEMATIC SPOTLIGHT", color = Color(0xFFC5B3FF), fontSize = 10.sp,
+                fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
+            Spacer(Modifier.height(5.dp))
+            Text(current.title, fontWeight = FontWeight.Black, fontSize = 22.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, color = Color.White)
+            Text(listOf(current.year, current.language, if (current.type == "tv") "Series" else "Movie")
+                .filter { it.isNotBlank() }.joinToString("  ·  "), color = Muted, fontSize = 12.sp)
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Button(onClick = { state.open(current) },
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).height(42.dp)) {
+                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Watch", fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(onClick = { state.toggleWatch(current) },
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.height(42.dp)) {
+                    Icon(if (state.watchlist.contains(current.id)) Icons.Default.BookmarkAdded
+                        else Icons.Default.BookmarkBorder,
+                        contentDescription = "Save featured title", modifier = Modifier.size(19.dp))
+                }
+                OutlinedButton(onClick = { state.open(current) },
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.height(42.dp)) {
+                    Text("Details", fontSize = 12.sp)
+                }
+            }
+            if (slides.size > 1) Row(Modifier.fillMaxWidth().padding(top = 13.dp),
+                horizontalArrangement = Arrangement.Center) {
+                repeat(slides.size.coerceAtMost(11)) { i ->
+                    Box(Modifier.padding(horizontal = 3.dp)
+                        .width(if (i == currentIndex) 16.dp else 5.dp).height(5.dp)
+                        .clip(CircleShape)
+                        .background(if (i == currentIndex) Color(0xFFBFA6FF) else Color(0xFF4A4C68)))
                 }
             }
         }
@@ -440,139 +638,396 @@ private fun DetailSheet(state: FlixState) {
                     }
                 }
             }
-            Spacer(Modifier.height(11.dp))
-            Button(onClick = { state.resolveStreams() }, enabled = !state.detailsLoading,
-                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                Icon(Icons.Default.PlayArrow, null)
-                Spacer(Modifier.width(7.dp))
-                Text(if (state.detailsLoading) "Finding streams…" else if (state.streams.isEmpty()) "Find Servers" else "Refresh Servers")
-            }
-        } else if (channel != null) {
+            // Stream discovery happens automatically after opening details or choosing an episode.
+            Spacer(Modifier.height(10.dp))
+                } else if (channel != null) {
             Text(channel.name, fontSize = 23.sp, fontWeight = FontWeight.Black)
             Text("Live TV", color = Gold)
         }
-        if (state.detailsLoading) {
-            Spacer(Modifier.height(10.dp))
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-        }
-        if (state.streams.isNotEmpty()) {
-            Heading("Available Servers", "Select quality to play in built-in VLC")
-            state.streams.forEach { source ->
-                Surface(onClick = { state.play(source) }, color = Card,
-                    shape = RoundedCornerShape(11.dp),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.PlayCircle, null, tint = Gold)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(source.quality + if (source.size.isNotBlank()) " · " + source.size else "",
-                                fontWeight = FontWeight.Bold)
-                            Text(source.name, fontSize = 11.sp, color = Muted, maxLines = 2)
-                        }
-                        Icon(Icons.Default.ChevronRight, null, tint = Gold)
+        Spacer(Modifier.height(13.dp))
+        if (state.detailsLoading && state.streams.isEmpty()) {
+            Surface(color = Card, shape = RoundedCornerShape(15.dp)) {
+                Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(color = Gold, strokeWidth = 2.dp,
+                        modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Checking available playback options", color = Color.White,
+                            fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Fetching quality and server choices…", color = Muted, fontSize = 12.sp)
                     }
                 }
             }
-        } else if (!state.detailsLoading && channel != null) {
-            Text("No streams available", color = Color(0xFFFF6B78),
-                fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
+        if (state.streams.isNotEmpty()) {
+            Text("READY TO WATCH", color = Gold, fontSize = 11.sp,
+                fontWeight = FontWeight.Black, letterSpacing = 1.3.sp)
+            Spacer(Modifier.height(6.dp))
+            Text("Select video quality", color = Color.White, fontWeight = FontWeight.Bold,
+                fontSize = 18.sp)
+            Text("Sources are automatically discovered. Tap to play.",
+                color = Muted, fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = { state.play(state.streams.first()) },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(14.dp)) {
+                Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(23.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Play best available · ${state.streams.first().quality}",
+                    fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(11.dp))
+            state.streams.forEachIndexed { index, source ->
+                Surface(onClick = { state.play(source) },
+                    color = if (index == 0) Color(0xFF242D40) else Card,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp))
+                            .background(Gold.copy(alpha = .12f)),
+                            contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.PlayCircle, null, tint = Gold, modifier = Modifier.size(25.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(source.quality + if (source.size.isNotBlank()) " · " + source.size else "",
+                                fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                                maxLines = 1)
+                            Text("Option ${index+1}" + if (index == 0) " · Recommended" else "",
+                                color = Muted, fontSize = 12.sp)
+                        }
+                        Icon(Icons.Default.ChevronRight, contentDescription = "Play source",
+                            tint = Gold, modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
+        } else if (!state.detailsLoading && state.streamsChecked) {
+            Column(Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(15.dp)).background(Card).padding(17.dp),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.WifiOff, null, tint = Color(0xFFFDA4AF),
+                    modifier = Modifier.size(26.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("No streams available", color = Color(0xFFFDA4AF),
+                    fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("This title has no compatible playback option right now.",
+                    color = Muted, fontSize = 12.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(7.dp))
+                TextButton(onClick = {
+                    if (channel != null) state.channel(channel)
+                    else state.resolveStreams()
+                }) { Text("Try again", color = Gold) }
+            }
         }
     }
 }
 @Composable
 private fun ProfileScreen(state: FlixState) {
+    var interestsOpen by remember { mutableStateOf(false) }
+    var tvOpen by remember { mutableStateOf(false) }
     var pairId by remember { mutableStateOf("") }
     var newArtist by remember { mutableStateOf("") }
     val session = state.account
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+
+    LazyColumn(Modifier.fillMaxSize().background(Ink),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 30.dp),
+        verticalArrangement = Arrangement.spacedBy(13.dp)) {
         item {
-            Text("Your FlixLeo", fontSize = 27.sp, fontWeight = FontWeight.Black)
             Spacer(Modifier.height(8.dp))
-            Surface(color = Card, shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(session?.user?.optString("email") ?: "Guest account",
-                        fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                    Text(if (session == null) "Sign in to sync across devices"
-                        else "Email verified · Cloud account",
-                        color = Muted, fontSize = 12.sp)
-                    Spacer(Modifier.height(10.dp))
-                    if (session == null) Button(onClick = { state.showAuth = true }) { Text("Sign in / Create account") }
-                    else TextButton(onClick = { state.signOut() }) { Text("Sign out") }
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Heading("Your movie languages", "Choose for native For You recommendations")
-            val choices = listOf("English", "Tamil", "Hindi", "Telugu", "Malayalam", "Kannada", "Sinhala", "Korean", "Japanese")
-            choices.chunked(3).forEach { group ->
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    group.forEach { label ->
-                        FilterChip(selected = label in state.favorites, onClick = { state.toggleLanguage(label) },
-                            label = { Text(label, fontSize = 10.sp) })
+            Text("My FlixLeo", fontSize = 27.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text("Your entertainment, your way", fontSize = 13.sp, color = Muted)
+        }
+        item {
+            Column(Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF222440), Color(0xFF151D2D), Color(0xFF141722))))
+                .border(1.dp, Color.White.copy(alpha = .10f), RoundedCornerShape(24.dp))
+                .padding(19.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(64.dp).clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(Gold, Color(0xFFF97316)))),
+                        contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = Ink,
+                            modifier = Modifier.size(33.dp))
+                    }
+                    Spacer(Modifier.width(13.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(session?.user?.optJSONObject("user_metadata")
+                            ?.optString("display_name")?.takeIf { it.isNotBlank() }
+                            ?: if (session == null) "Welcome to FlixLeo" else "Your account",
+                            color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(session?.user?.optString("email") ?: "Enjoy movies without signing in",
+                            color = Muted, fontSize = 12.sp, maxLines = 2)
+                        Spacer(Modifier.height(6.dp))
+                        Text(if (session == null) "GUEST MODE" else "✓ VERIFIED ACCOUNT",
+                            color = if (session == null) Color(0xFFFCD34D) else Color(0xFF86EFAC),
+                            fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp)
                     }
                 }
-            }
-            Heading("Favorite genres", "Used to build your personal For You section")
-            listOf("Action", "Comedy", "Drama", "Thriller", "Romance", "Sci-Fi",
-                "Animation", "Horror", "Fantasy", "Adventure", "Crime", "Documentary")
-                .chunked(3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        row.forEach { genre ->
-                            FilterChip(selected = genre in state.favoriteGenres,
-                                onClick = { state.toggleGenre(genre) },
-                                label = { Text(genre, fontSize = 10.sp) })
+                Spacer(Modifier.height(16.dp))
+                if (session == null) {
+                    Button(onClick = { state.showAuth = true },
+                        modifier = Modifier.fillMaxWidth().height(49.dp),
+                        shape = RoundedCornerShape(14.dp)) {
+                        Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(19.dp))
+                        Spacer(Modifier.width(9.dp))
+                        Text("Sign in or create account", fontWeight = FontWeight.Bold)
+                    }
+                    Text("Sign in to share your watchlist and playback progress across platforms.",
+                        color = Muted, fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 10.dp))
+                } else {
+                    Surface(color = Color.White.copy(alpha = .07f),
+                        shape = RoundedCornerShape(14.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(13.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CloudDone, contentDescription = null, tint = Color(0xFF86EFAC))
+                            Spacer(Modifier.width(10.dp))
+                            Text("Syncs with your FlixLeo account",
+                                fontSize = 12.sp, color = Color.White,
+                                modifier = Modifier.weight(1f))
                         }
                     }
                 }
-            Heading("Favorite artists", "Match movies by actor or actress")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = newArtist, onValueChange = { newArtist = it.take(80) },
-                    modifier = Modifier.weight(1f), singleLine = true, label = { Text("Artist name") })
-                TextButton(onClick = { state.addArtist(newArtist); newArtist = "" },
-                    enabled = newArtist.isNotBlank()) { Text("Add") }
             }
-            state.favoriteArtists.forEach { artist ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(artist, Modifier.weight(1f), fontSize = 12.sp)
-                    IconButton(onClick = { state.removeArtist(artist) }) {
-                        Icon(Icons.Default.Close, "Remove artist", tint = Muted, modifier = Modifier.size(17.dp))
-                    }
-                }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ProfileStat("Watchlist", state.watchlist.size.toString(), Icons.Default.Bookmark,
+                    Modifier.weight(1f))
+                ProfileStat("Continue", state.history.size.toString(), Icons.Default.PlayCircle,
+                    Modifier.weight(1f))
+                ProfileStat("Languages", state.favorites.size.toString(), Icons.Default.Language,
+                    Modifier.weight(1f))
             }
-            Heading("Watchlist", "${state.watchlist.size} titles saved")
-            val all = (state.home.flatMap { it.second } + state.movies + state.series +
+        }
+        item {
+            ProfileHeading("My Watchlist", "Saved movies and series", Icons.Default.Bookmarks)
+            val items = (state.home.flatMap { it.second } + state.movies + state.series +
                 state.history.map { it.title }).distinctBy { it.id }
-            val saved = all.filter { it.id in state.watchlist }
-            if (saved.isEmpty()) Text("Tap the bookmark on any title to save it.",
-                color = Muted, fontSize = 13.sp, modifier = Modifier.padding(10.dp))
-            if (saved.isNotEmpty()) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(saved) { title -> Poster(title, true, compact = true) { state.open(title) } }
-                }
-            }
-            if (session != null) {
-                Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = Muted.copy(alpha = .15f))
-                Heading("Approved TVs", "Revoke TV access or approve pairing code")
-                OutlinedButton(onClick = { state.loadApprovedTvs() }) { Text("Load paired TVs") }
-                state.approvedTvs.forEach { tv ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(tv.optString("label", "TV"), Modifier.weight(1f), color = Color.White)
-                        TextButton(onClick = { state.revokeTv(tv.optString("id")) }) { Text("Revoke") }
+                .filter { it.id in state.watchlist }
+            if (items.isEmpty()) {
+                Surface(color = Card, shape = RoundedCornerShape(17.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.BookmarkBorder, null, tint = Gold)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Save titles from Home or Search to see them here.",
+                            color = Muted, fontSize = 12.sp)
                     }
                 }
-                OutlinedTextField(value = pairId, onValueChange = { pairId = it.take(90) },
-                    label = { Text("TV pairing code / ID") }, singleLine = true)
-                TextButton(onClick = { state.approveTv(pairId); pairId = "" }, enabled = pairId.isNotBlank()) {
-                    Text("Approve TV")
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(11.dp),
+                    contentPadding = PaddingValues(vertical = 7.dp)) {
+                    items(items, key = { it.id }) { item ->
+                        Poster(item, true, compact = true) { state.open(item) }
+                    }
                 }
             }
-            Spacer(Modifier.height(28.dp))
-            Text("FLIXLEO · Native Android · v1.2.0", color = Gold, fontWeight = FontWeight.Bold)
-            Text("Discover using TMDB metadata. Availability and source compatibility vary.",
-                color = Muted, fontSize = 11.sp)
+        }
+        if (session != null) {
+            item {
+                Spacer(Modifier.height(3.dp))
+                Surface(color = Card, shape = RoundedCornerShape(17.dp),
+                    modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().animateContentSize()) {
+                        Row(Modifier.fillMaxWidth().clickable { interestsOpen = !interestsOpen }
+                            .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Tune, null, tint = Gold)
+                            Spacer(Modifier.width(11.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Personalize For You", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("Languages, genres & artists", color = Muted, fontSize = 12.sp)
+                            }
+                            Icon(if (interestsOpen) Icons.Default.ExpandLess else Icons.Default.ChevronRight,
+                                "Edit preferences", tint = Muted)
+                        }
+                        AnimatedVisibility(interestsOpen) {
+                            Column(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 15.dp)) {
+                                InterestOptions(state,
+                                    newArtist = newArtist,
+                                    onArtistChange = { newArtist = it },
+                                    onArtistAdd = {
+                                        state.addArtist(newArtist)
+                                        newArtist = ""
+                                    })
+                                OutlinedButton(onClick = { state.saveProfile(); interestsOpen = false },
+                                    modifier = Modifier.fillMaxWidth()) {
+                                    Icon(Icons.Default.Check, null)
+                                    Spacer(Modifier.width(7.dp))
+                                    Text("Save preferences")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                Surface(color = Card, shape = RoundedCornerShape(17.dp),
+                    modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().animateContentSize()) {
+                        Row(Modifier.fillMaxWidth().clickable {
+                            tvOpen = !tvOpen
+                            if (tvOpen) state.loadApprovedTvs()
+                        }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Tv, null, tint = Gold)
+                            Spacer(Modifier.width(11.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Connected TVs", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("Manage access and pairing", color = Muted, fontSize = 12.sp)
+                            }
+                            Icon(if (tvOpen) Icons.Default.ExpandLess else Icons.Default.ChevronRight,
+                                "Manage TVs", tint = Muted)
+                        }
+                        AnimatedVisibility(tvOpen) {
+                            Column(Modifier.padding(horizontal = 15.dp, vertical = 10.dp)) {
+                                state.approvedTvs.forEach { tv ->
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically) {
+                                        Text(tv.optString("label", "TV"),
+                                            color = Color.White, modifier = Modifier.weight(1f))
+                                        TextButton(onClick = { state.revokeTv(tv.optString("id")) }) {
+                                            Text("Revoke")
+                                        }
+                                    }
+                                }
+                                OutlinedTextField(pairId, onValueChange = { pairId = it.take(90) },
+                                    label = { Text("TV pairing ID") }, singleLine = true,
+                                    modifier = Modifier.fillMaxWidth())
+                                Button(onClick = {
+                                    state.approveTv(pairId); pairId = ""
+                                }, enabled = pairId.isNotBlank(),
+                                    modifier = Modifier.fillMaxWidth().padding(top = 7.dp)) {
+                                    Text("Approve TV")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                OutlinedButton(onClick = { state.signOut() },
+                    modifier = Modifier.fillMaxWidth().height(47.dp),
+                    shape = RoundedCornerShape(15.dp)) {
+                    Icon(Icons.Default.Logout, null, tint = Color(0xFFFDA4AF))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Sign out", color = Color(0xFFFDA4AF), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        item {
+            Column(Modifier.fillMaxWidth().padding(top = 9.dp),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(painterResource(R.drawable.flixleo_brand), contentDescription = null,
+                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)))
+                Spacer(Modifier.height(5.dp))
+                Text("FlixLeo · Native Android", fontSize = 12.sp, color = Muted)
+                Text("Movies & TV series powered by TMDB", fontSize = 10.sp, color = Muted)
+            }
         }
     }
+}
+@Composable
+private fun ProfileStat(label: String, number: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+    Surface(color = Card, shape = RoundedCornerShape(15.dp), modifier = modifier) {
+        Column(Modifier.padding(horizontal = 11.dp, vertical = 13.dp)) {
+            Icon(icon, null, tint = Gold, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.height(7.dp))
+            Text(number, color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp)
+            Text(label, color = Muted, fontSize = 10.sp, maxLines = 1)
+        }
+    }
+}
+@Composable
+private fun ProfileHeading(text: String, subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = Gold, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text(subtitle, color = Muted, fontSize = 11.sp)
+        }
+    }
+}
+@Composable
+private fun InterestOptions(state: FlixState, newArtist: String,
+    onArtistChange: (String) -> Unit, onArtistAdd: () -> Unit) {
+    Text("Preferred languages", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    Spacer(Modifier.height(4.dp))
+    val languages = listOf("English","Tamil","Hindi","Telugu","Malayalam","Kannada",
+        "Sinhala","Korean","Japanese")
+    languages.chunked(3).forEach { group ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            group.forEach { label ->
+                FilterChip(label in state.favorites, onClick = { state.toggleLanguage(label) },
+                    label = { Text(label, fontSize = 10.sp) },
+                    modifier = Modifier.height(39.dp))
+            }
+        }
+    }
+    Spacer(Modifier.height(9.dp))
+    Text("Favorite genres", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    listOf("Action","Comedy","Drama","Thriller","Romance","Sci-Fi","Animation",
+        "Horror","Fantasy","Adventure","Crime","Documentary").chunked(3).forEach { group ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            group.forEach { label ->
+                FilterChip(label in state.favoriteGenres, onClick = { state.toggleGenre(label) },
+                    label = { Text(label, fontSize = 10.sp) },
+                    modifier = Modifier.height(39.dp))
+            }
+        }
+    }
+    Spacer(Modifier.height(9.dp))
+    Text("Favorite artists", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(newArtist, onValueChange = onArtistChange,
+            label = { Text("Artist") }, singleLine = true,
+            modifier = Modifier.weight(1f))
+        TextButton(onClick = onArtistAdd, enabled = newArtist.isNotBlank()) { Text("Add") }
+    }
+    state.favoriteArtists.forEach { artist ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(artist, Modifier.weight(1f), color = Color.White, fontSize = 12.sp)
+            IconButton(onClick = { state.removeArtist(artist) }) {
+                Icon(Icons.Default.Close, "Remove artist", tint = Muted, modifier = Modifier.size(17.dp))
+            }
+        }
+    }
+}
+@Composable
+private fun PostSignupInterestsDialog(state: FlixState) {
+    var artist by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { /* Only explicit save/skip clears the signup prompt. */ },
+        title = {
+            Column {
+                Text("Make FlixLeo yours", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                Text("Choose what you enjoy. We will build your For You collection.",
+                    fontSize = 12.sp, color = Muted)
+            }
+        },
+        text = {
+            Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                InterestOptions(state, artist, { artist = it.take(80) }) {
+                    state.addArtist(artist)
+                    artist = ""
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { state.finishOnboarding(true) },
+                shape = RoundedCornerShape(12.dp)) { Text("Save choices") }
+        },
+        dismissButton = {
+            TextButton(onClick = { state.finishOnboarding(false) }) {
+                Text("Skip for now")
+            }
+        }
+    )
 }
 @Composable
 private fun AccountDialog(state: FlixState) {

@@ -28,7 +28,10 @@ data class FlixTitle(val json: JSONObject) {
     val poster: String get() = json.optString("posterUrl")
     val backdrop: String get() = json.optString("backdropUrl")
     val description: String get() = json.optString("overview")
-    val rating: String get() = json.optString("rating")
+    // TMDB's content rating (PG-13 etc.) is NOT an IMDb score.
+    val rating: String get() = json.optString("imdbRating").takeIf {
+        it.toDoubleOrNull() != null
+    }.orEmpty()
     val language: String get() = json.optString("language")
     val genres: List<String> get() = json.optJSONArray("genres").strings()
     val cast: List<String> get() = json.optJSONArray("cast").strings()
@@ -99,6 +102,12 @@ class FlixStore(private val context: Context) {
     val history: List<ResumeEntry> get() = runCatching {
         JSONArray(prefs.getString("history", "[]")).objects().mapNotNull(ResumeEntry::from)
     }.getOrDefault(emptyList())
+    // A preference survey is only prompted after signup in THIS app, never for guests.
+    fun markSignup(email: String) =
+        prefs.edit().putString("pending_onboarding_email", email.trim().lowercase()).apply()
+    fun needsSignupOnboarding(email: String): Boolean =
+        prefs.getString("pending_onboarding_email", "").equals(email.trim(), ignoreCase = true)
+    fun clearSignupOnboarding() = prefs.edit().remove("pending_onboarding_email").apply()
     val favorites: Set<String> get() = prefs.getStringSet("favorite_languages", emptySet()) ?: emptySet()
     val favoriteGenres: Set<String> get() = prefs.getStringSet("favorite_genres", emptySet()) ?: emptySet()
     val favoriteArtists: Set<String> get() = prefs.getStringSet("favorite_artists", emptySet()) ?: emptySet()
