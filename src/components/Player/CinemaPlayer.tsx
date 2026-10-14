@@ -5,6 +5,7 @@ import Hls from 'hls.js';
 import { StremioNativePlayer } from './StremioNativePlayer';
 import { ArrowLeft, ExternalLink, RefreshCw, Share2, Maximize2, Minimize2, X } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
+import { isFlixLeoAndroid, launchFlixLeoAndroidStream, savedAndroidPosition, saveFlixLeoAndroidProgress, type AndroidPlaybackResult } from '../../lib/androidNative';
 
 const resumeKey = (m: MediaItem) => m.id + (m.playbackSeason !== undefined && m.playbackEpisode !== undefined ? ':s' + m.playbackSeason + 'e' + m.playbackEpisode : '');
 interface CinemaPlayerProps {
@@ -54,6 +55,30 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const lastSaveRef = useRef(0);
   const active = mirrors[index];
   const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
+  const isDelegated = Boolean(initialMirrorId?.startsWith('stremio-') || media.id.startsWith('plavio-live-'));
+  const androidNative = Boolean(!isDelegated && isFlixLeoAndroid() && active && active.streamType !== 'embed-iframe');
+  const lastAndroidLaunch = useRef('');
+  useEffect(() => {
+    if (!androidNative || !active?.url) return;
+    const launchKey = active.id + ':' + active.url;
+    if (lastAndroidLaunch.current === launchKey) return;
+    lastAndroidLaunch.current = launchKey;
+    if (!launchFlixLeoAndroidStream(active.url, media.title, active.id, savedAndroidPosition(media))) {
+      setError('This source cannot be played in the Android app.');
+    }
+  }, [androidNative, active?.id, active?.url, media.id, media.title]);
+  useEffect(() => {
+    if (!androidNative) return;
+    const finished = (event: Event) => {
+      const result = (event as CustomEvent<AndroidPlaybackResult>).detail;
+      if (!result || result.mirrorId !== active?.id) return;
+      saveFlixLeoAndroidProgress(media, active.id, result);
+      onProgressSaved?.();
+      if (result.ended) onEpisodeEnded?.();
+    };
+    window.addEventListener('flixleo:android-player-result', finished);
+    return () => window.removeEventListener('flixleo:android-player-result', finished);
+  }, [androidNative, active?.id, media.id, media.playbackSeason, media.playbackEpisode, onEpisodeEnded, onProgressSaved]);
   const nativeFullscreen = desktopNative && nativeWindowFullscreen;
   const fullscreenControlsVisible = useDesktopControlsVisible(nativeFullscreen);
   const [aspectRatio, setAspectRatio] = useState<NativeAspectRatio>('no');
@@ -154,7 +179,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     setSelectedQuality(-1);
     if (!active) return;
     onMirrorChange?.(active);
-    if (desktopNative) { setReady(true); return; }
+    if (desktopNative || androidNative) { setReady(true); return; }
     if (active.streamType === 'embed-iframe') {
       setReady(true);
       return;
@@ -262,6 +287,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         {docked && !desktopNative && <div className="absolute z-[70] left-2 top-2 flex gap-1"><button type="button" onClick={() => { playerAnchorRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); setDocked(false); }} aria-label="Return to full player" title="Expand player" className="rounded bg-black/80 text-white p-1"><Maximize2 className="h-4 w-4" /></button><button type="button" onClick={() => { saveProgress(); onClose(); }} aria-label="Close mini player" className="rounded bg-black/80 text-white p-1">×</button></div>}
         {!active ? <div className="h-full grid place-items-center text-slate-300">No stream servers available</div>
           : desktopNative ? <div className={nativeFullscreen ? (fullscreenControlsVisible ? "h-[calc(100%-96px)] w-full" : "h-full w-full") : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div>
+          : androidNative ? <div className="flex h-full flex-col items-center justify-center gap-4 bg-black p-5 text-white"><p className="text-sm text-slate-300">Playing in the FlixLeo Android app</p><button type="button" onClick={() => launchFlixLeoAndroidStream(active.url, media.title, active.id, savedAndroidPosition(media))} className="rounded-xl bg-amber-400 px-5 py-3 font-semibold text-black">▶ Open native player</button></div>
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
             : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onDoubleClick={() => void toggleFrameFullscreen()} onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); onEpisodeEnded?.(); }} className="h-full w-full object-contain" />}
