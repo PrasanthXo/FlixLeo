@@ -590,7 +590,17 @@ private fun BrowseScreen(state: FlixState, tv: Boolean) {
                                 modifier = Modifier.fillMaxWidth().height(161.dp)
                                     .clip(RoundedCornerShape(12.dp)).background(Card))
                             Text(title.title, fontSize = 11.sp, color = Color.White,
-                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                fontWeight = FontWeight.SemiBold)
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(if (tv || title.type == "tv" || title.id.startsWith("tv-")) "SERIES" else "MOVIE",
+                                    fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Gold)
+                                Text(title.genres.filter { it.isNotBlank() }.take(2).joinToString(" · ")
+                                    .ifBlank { if (tv) "TV Series" else "Movie" },
+                                    fontSize = 10.sp, color = Muted,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(title.year, fontSize = 10.sp, color = Muted)
                                 if (title.rating.isNotBlank()) {
