@@ -77,6 +77,10 @@ class MainActivity : ComponentActivity() {
         setContent { FlixLeoNativeApp(state, video) }
         state.initialize()
     }
+    override fun onResume() {
+        super.onResume()
+        if (::state.isInitialized) state.refreshOnForeground()
+    }
 
     private fun closePlayback() {
         video.stop()
@@ -148,6 +152,10 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var accountBusy by mutableStateOf(false)
     var showAuth by mutableStateOf(false)
     var showSignup by mutableStateOf(false)
+    var showOnboarding by mutableStateOf(false)
+    var streamsChecked by mutableStateOf(false)
+    private var lastCatalogRefreshAt = 0L
+    private var lastCloudPullAt = 0L
     var updateNotice by mutableStateOf<JSONObject?>(null)
     var updateForced by mutableStateOf(false)
     var approvedTvs by mutableStateOf<List<JSONObject>>(emptyList())
@@ -192,7 +200,20 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             refreshSession()
         }
     }
+    fun refreshOnForeground() {
+        val now = System.currentTimeMillis()
+        // Refresh catalogue automatically after a short background interval.
+        if (now - lastCatalogRefreshAt > 2 * 60_000L) refresh()
+        if (account != null && now - lastCloudPullAt > 2 * 60_000L) {
+            lastCloudPullAt = now
+            scope.launch {
+                refreshSession().join()
+                if (account != null) syncOnLogin(showNotice = false)
+            }
+        }
+    }
     fun refresh() {
+        lastCatalogRefreshAt = System.currentTimeMillis()
         scope.launch {
             loading = true
             try {
@@ -273,6 +294,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         chosenEpisode = if (title.episode > 0) title.episode else -1
         selectedChannel = null
         streams = emptyList()
+        streamsChecked = false
         episodes = emptyList()
         scope.launch {
             detailsLoading = true
@@ -298,10 +320,20 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                     }
                 }
             } catch (_: Exception) { /* catalogue card still usable */ }
-            finally { detailsLoading = false }
+            finally {
+                detailsLoading = false
+                // The app fetches supported direct-video sources automatically.
+                // No manual "Find servers" step, and no premature playback.
+                resolveStreams()
+            }
         }
     }
-    fun chooseEpisode(ep: FlixEpisode) { chosenSeason = ep.season; chosenEpisode = ep.number; streams = emptyList() }
+    fun chooseEpisode(ep: FlixEpisode) {
+        chosenSeason = ep.season; chosenEpisode = ep.number
+        streams = emptyList()
+        streamsChecked = false
+        resolveStreams()
+    }
     fun resolveStreams() = scope.launch {
         val chosen = selected ?: return@launch
         val target = if (chosen.type == "tv") {
@@ -313,19 +345,27 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         selected = target
         detailsLoading = true
         streams = emptyList()
+        streamsChecked = false
         try {
             streams = api.streamOptions(target)
-            if (streams.isEmpty()) message = "No streams available"
-        } catch (_: Exception) { message = "No streams available" }
-        finally { detailsLoading = false }
+            // All candidate sources are fetched before offering Play.
+        } catch (_: Exception) { streams = emptyList() }
+        finally {
+            streamsChecked = true
+            detailsLoading = false
+        }
     }
     fun channel(channel: LiveChannel) = scope.launch {
-        selectedChannel = channel; streams = emptyList(); detailsLoading = true
+        selected = null
+        selectedChannel = channel
+        streams = emptyList()
+        streamsChecked = false
+        detailsLoading = true
         try {
             streams = api.liveStreams(channel)
             if (streams.isEmpty()) message = "No streams available"
         } catch (_: Exception) { message = "No streams available" }
-        finally { detailsLoading = false }
+        finally { detailsLoading = false; streamsChecked = true }
     }
     fun play(stream: FlixStream) {
         val title = selected ?: selectedChannel?.let {
@@ -412,7 +452,10 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             }
             showAuth = false
             message = "Signed in"
-            syncOnLogin()
+            showOnboarding = store.needsSignupOnboarding(
+                account?.user?.optString("email").orEmpty()
+            )
+            syncOnLogin(showNotice = false)
         } catch (e: Exception) { message = e.localizedMessage ?: "Sign-in failed" }
         finally { accountBusy = false }
     }
@@ -421,8 +464,10 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         try {
             val result = api.call("/api/native/auth/signup", "POST",
                 JSONObject().put("email", email.trim()).put("password", password))
+            store.markSignup(email)
             message = result.optString("message", "Verify your email before signing in")
             showSignup = false
+            showAuth = false
         } catch (e: Exception) { message = e.localizedMessage ?: "Could not sign up" }
         finally { accountBusy = false }
     }
@@ -444,7 +489,12 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         } catch (_: Exception) { }
         message = "Signed out"
     }
-    private suspend fun syncOnLogin() {
+    fun finishOnboarding(save: Boolean) {
+        showOnboarding = false
+        store.clearSignupOnboarding()
+        if (save) saveProfile()
+    }
+    private suspend fun syncOnLogin(showNotice: Boolean = false) {
         val current = account ?: return
         try {
             val cloud = api.remoteHistory(current.accessToken).optJSONObject("payload")
@@ -459,7 +509,9 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             store.setHistory(histories)
             localRevision++
             api.sync(current.accessToken, mergedIds, histories)
-        } catch (_: Exception) { message = "Signed in. Cloud sync will retry when available." }
+        } catch (_: Exception) {
+            if (showNotice) message = "Your account is signed in. Sync will retry automatically."
+        }
     }
     fun uploadCloud() {
         cloudJob?.cancel()
