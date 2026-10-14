@@ -322,8 +322,8 @@ private fun HeroWheel(items: List<FlixTitle>, state: FlixState) {
     // This is a real five-poster 3D wheel, not a one-poster banner/pager.
     LaunchedEffect(slides) {
         while (true) {
-            delay(4600L)
-            if (slides.size > 1 && System.currentTimeMillis() - lastTouched > 5000L) {
+            delay(3600L)
+            if (slides.size > 1 && System.currentTimeMillis() - lastTouched > 3300L) {
                 currentIndex = (currentIndex + 1) % slides.size
             }
         }
@@ -335,7 +335,30 @@ private fun HeroWheel(items: List<FlixTitle>, state: FlixState) {
             .border(1.dp, Color(0xFF726DA3).copy(alpha = .5f), RoundedCornerShape(25.dp))
             .background(Color(0xFF10132A))
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth().height(298.dp).clip(RoundedCornerShape(25.dp))) {
+        BoxWithConstraints(
+            Modifier.fillMaxWidth().height(298.dp)
+                .clip(RoundedCornerShape(25.dp))
+                .pointerInput(slides.size) {
+                    var dragPixels = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            dragPixels = 0f
+                            lastTouched = System.currentTimeMillis()
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            dragPixels += dragAmount
+                        },
+                        onDragEnd = {
+                            if (slides.size > 1 && kotlin.math.abs(dragPixels) > 38.dp.toPx()) {
+                                currentIndex = (currentIndex +
+                                    (if (dragPixels < 0f) 1 else -1) + slides.size) % slides.size
+                            }
+                            lastTouched = System.currentTimeMillis()
+                        }
+                    )
+                }
+        ) {
             val centerSlide = current
             AsyncImage(
                 model = centerSlide.backdrop.ifBlank { centerSlide.poster },
@@ -554,7 +577,14 @@ private fun BrowseScreen(state: FlixState, tv: Boolean) {
                                     .clip(RoundedCornerShape(12.dp)).background(Card))
                             Text(title.title, fontSize = 11.sp, color = Color.White,
                                 maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text(title.year, fontSize = 10.sp, color = Muted)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(title.year, fontSize = 10.sp, color = Muted)
+                                if (title.rating.isNotBlank()) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("★ ${title.rating}", fontSize = 10.sp,
+                                        color = Gold, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
                 }
@@ -601,7 +631,8 @@ private fun SearchScreen(state: FlixState) {
                     Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Gold)
                 }
             }
-            if (state.searchResults.isEmpty() && !state.searchLoading && state.search.isNotEmpty()) item {
+            if (state.searchResults.isEmpty() && !state.searchLoading &&
+                state.search.isNotEmpty() && state.searchError.isEmpty()) item {
                 Text("No matching titles found.", color = Muted)
             }
         }
