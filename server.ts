@@ -1117,8 +1117,15 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
         const extensionless = !lastSegment.includes('.') && !/\/((embed|watch|view|page|player|login|redirect))(\/|$)/i.test(pathname);
         if (!hls && !video && !extensionless) return [];
         const label = String(stream.title || '').slice(0, 160);
-        const qualityText = [stream.name, stream.title, stream.description, stream.filename].filter(x => typeof x === 'string').join(' ');
-        const quality = /(?:2160p|4k|uhd)/i.test(qualityText) ? '4K' : /1080p/i.test(qualityText) ? '1080p' : /720p/i.test(qualityText) ? '720p' : /480p/i.test(qualityText) ? '480p' : /360p/i.test(qualityText) ? '360p' : 'Auto';
+        const qualityText = [stream.name, stream.title, stream.description, stream.filename]
+          .filter(x => typeof x === 'string').join(' ')
+          // "4khdhub" is a provider name, not evidence of 4K resolution.
+          .replace(/4khdhub/gi, '');
+        const quality = /(?:^|[^a-z0-9])(?:2160p|4k|uhd)(?![a-z0-9])/i.test(qualityText) ? '4K'
+          : /(?:^|[^a-z0-9])1080p(?![a-z0-9])/i.test(qualityText) ? '1080p'
+          : /(?:^|[^a-z0-9])720p(?![a-z0-9])/i.test(qualityText) ? '720p'
+          : /(?:^|[^a-z0-9])480p(?![a-z0-9])/i.test(qualityText) ? '480p'
+          : /(?:^|[^a-z0-9])360p(?![a-z0-9])/i.test(qualityText) ? '360p' : 'Auto';
         const sizeFromBytes = Number(stream.size || stream.fileSizeBytes || 0);
         const sizeText = [stream.title, stream.name, stream.description, stream.filename, stream.fileSize]
           .filter((s: unknown): s is string => typeof s === 'string')
