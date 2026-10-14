@@ -233,19 +233,33 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                     if (series.isNotEmpty()) sections.add("Series Trending" to series.take(24))
                     val southList = south.await()
                     if (southList.isNotEmpty()) sections.add("South Indian Cinema" to southList.take(35))
-                    val priority = listOf(
-                        "genre:Animation" to "Animation Movies", "seriesGenre:Animation" to "Animation Series",
-                        "anime:movies" to "Anime Movies", "anime:series" to "Anime Series",
-                        "genre:Action" to "Action", "genre:Sci-Fi" to "Sci-Fi",
-                        "language:Tamil" to "Tamil", "language:Hindi" to "Hindi",
-                        "language:Sinhala" to "Sinhala", "language:English" to "English",
-                        "providerMovie:Netflix" to "Netflix Movies",
-                        "providerSeries:Netflix" to "Netflix Series",
-                        "allProviderMovie:STARZ" to "STARZ Movies",
-                        "allProviderSeries:STARZ" to "STARZ Series",
-                        "allProviderMovie:ZEE5" to "ZEE5 Movies",
-                        "allProviderSeries:ZEE5" to "ZEE5 Series"
-                    )
+                    // Keep native Home catalogue rows aligned to the SAME keys used
+                    // by FlixLeo web / Windows. The backend owns catalogue freshness.
+                    val genres = listOf("Action", "Sci-Fi", "Thriller", "Comedy", "Drama",
+                        "Romance", "Horror", "Adventure", "Fantasy", "Mystery",
+                        "Crime", "Animation", "Family", "Documentary", "War", "History", "Music")
+                    val seriesGenres = listOf("Animation", "Action", "Sci-Fi", "Comedy",
+                        "Drama", "Mystery", "Crime", "Fantasy", "Family", "Documentary")
+                    val languages = listOf("Tamil", "English", "Hindi", "Sinhala",
+                        "Telugu", "Malayalam", "Kannada", "Korean", "Japanese")
+                    val providers = listOf("Netflix", "Amazon Prime Video", "Disney Plus", "Apple TV")
+                    val priority = buildList {
+                        add("genre:Animation" to "Animation Movies")
+                        add("seriesGenre:Animation" to "Animation Series")
+                        add("anime:movies" to "Anime Movies")
+                        add("anime:series" to "Anime Series")
+                        genres.filter { it != "Animation" }.forEach { add("genre:$it" to "$it Movies") }
+                        seriesGenres.filter { it != "Animation" }.forEach { add("seriesGenre:$it" to "$it Series") }
+                        languages.forEach { add("language:$it" to "$it Movies") }
+                        providers.forEach { provider ->
+                            add("providerMovie:$provider" to "$provider Movies")
+                            add("providerSeries:$provider" to "$provider Series")
+                        }
+                        listOf("STARZ", "ZEE5").forEach { provider ->
+                            add("allProviderMovie:$provider" to "$provider Movies")
+                            add("allProviderSeries:$provider" to "$provider Series")
+                        }
+                    }
                     priority.forEach { (key, label) ->
                         val row = curated?.optJSONArray(key).let { data ->
                             if (data == null) emptyList() else (0 until data.length())
