@@ -182,7 +182,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         refresh()
         scope.launch {
             try {
-                val code = 3
+                val code = 5
                 val result = api.call("/api/gateway/v1/check/flixleo-android?versionCode=$code")
                 if (result.optBoolean("ready")) {
                     val policy = result.optJSONObject("policy")
