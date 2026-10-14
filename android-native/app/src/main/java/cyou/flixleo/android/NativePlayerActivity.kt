@@ -2,6 +2,10 @@ package cyou.flixleo.android
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
+import android.os.Build
+import android.util.Rational
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Color
@@ -139,6 +143,7 @@ class NativePlayerActivity : Activity() {
         row.addView(button("Audio") { selectAudio() })
         row.addView(button("CC") { selectSubtitles() })
         row.addView(button("Aspect") { changeAspect() })
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) row.addView(button("Mini") { enterMini() })
         toolbar.addView(row)
         root.addView(toolbar, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
         root.setOnClickListener { if (controlsShown) { controls.visibility = View.GONE; controlsShown = false } else showControls() }
@@ -258,9 +263,28 @@ class NativePlayerActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() { closePlayer() }
 
+    private fun enterMini() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && player?.isPlaying == true) {
+            val params = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
+            try { enterPictureInPictureMode(params) } catch (_: Exception) { }
+        }
+    }
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        enterMini()
+    }
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (::controls.isInitialized) {
+            controls.visibility = if (isInPictureInPictureMode) View.GONE else View.VISIBLE
+            if (!isInPictureInPictureMode) showControls()
+        }
+    }
     override fun onPause() {
         super.onPause()
-        if (!isFinishing) player?.let { if (it.isPlaying) it.pause() }
+        if (!isFinishing && !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode)) {
+            player?.let { if (it.isPlaying) it.pause() }
+        }
     }
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
