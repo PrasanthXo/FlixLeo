@@ -78,7 +78,7 @@ data class FlixStream(
                 sourceName.replace(Regex("(?i)4khdhub"), ""))
                 .firstNotNullOfOrNull { resolution.find(it)?.value?.uppercase(java.util.Locale.ROOT) }
             val safeHint = resolution.find(hint)?.value?.uppercase(java.util.Locale.ROOT)
-            val matched = independent ?: if (providerIs4khdhub) null else safeHint
+            val matched = independent ?: if (providerIs4khdhub && safeHint == "4K") null else safeHint
             val cleanQuality = when (matched) {
                 "4K", "UHD", "2160P" -> "2160p"
                 "FHD", "1080P" -> "1080p"
