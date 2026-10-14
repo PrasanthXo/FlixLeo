@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
             currentPlayback?.let { (title, stream) ->
                 if (pos > 0) {
                     state.store.remember(title, pos / 1000.0, length / 1000.0, stream.id)
+                    if (length > 0 && pos.toDouble() / length >= 0.95) state.store.markWatched(title)
                     state.localRevision++
                     if (System.currentTimeMillis() - lastCloudSync > 65000) {
                         lastCloudSync = System.currentTimeMillis()
@@ -61,6 +62,7 @@ class MainActivity : ComponentActivity() {
             video.stop(notifyProgress = false)
             currentPlayback = null
             if (finished != null) {
+                state.store.markWatched(finished.first)
                 state.store.remember(finished.first, 0.0,
                     completedDuration / 1000.0, finished.second.id, ended = true)
                 state.localRevision++
