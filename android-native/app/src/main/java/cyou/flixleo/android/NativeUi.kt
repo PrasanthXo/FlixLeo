@@ -700,7 +700,7 @@ private fun DetailSheet(state: FlixState) {
             }
             Spacer(Modifier.height(11.dp))
             OutlinedButton(onClick = { state.toggleWatch(title) }) {
-                Icon(if (state.account == null) Icons.Default.LockOutline
+                Icon(if (state.account == null) Icons.Default.Lock
                     else if (state.watchlist.contains(title.id)) Icons.Default.BookmarkAdded
                     else Icons.Default.BookmarkAdd, null)
                 Spacer(Modifier.width(7.dp))
