@@ -1,8 +1,12 @@
 package cyou.flixleo.android
 
+import android.app.PictureInPictureParams
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
@@ -11,48 +15,111 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Pure native Activity. No WebView, HTML, React, JavaScript or embedded website. */
+/** Pure native Android / Compose catalogue with ONE continuous in-app LibVLC player. */
 class MainActivity : ComponentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var state: FlixState
+    private lateinit var video: InlineVlcController
     private var currentPlayback: Pair<FlixTitle, FlixStream>? = null
-    private val playerRequest = 721
+    private var lastCloudSync = 0L
+    private var restoreAfterPip = PlayerMode.MINI
+    private var enteringPip = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        video = InlineVlcController(this)
         state = FlixState(FlixStore(applicationContext), FlixApi(), scope)
         state.onPlay = { title, stream ->
+            if (video.mode != PlayerMode.CLOSED) video.stop()
             currentPlayback = title to stream
-            state.store.remember(title, state.store.history.find {
-                it.key == state.entryKey(title)
-            }?.progress ?: 0.0, 0.0, stream.id)
             val resume = state.store.history.find { it.key == state.entryKey(title) }?.progress ?: 0.0
-            @Suppress("DEPRECATION")
-            startActivityForResult(Intent(this, NativePlayerActivity::class.java)
-                .putExtra("stream_url", stream.url)
-                .putExtra("title", title.title + if (title.episode > 0) " · S${title.season} E${title.episode}" else "")
-                .putExtra("mirror_id", stream.id)
-                .putExtra("resume_ms", (resume * 1000).toLong()), playerRequest)
+            state.playingTitle = title
+            state.playbackStreams = state.streams.ifEmpty { listOf(stream) }
+            state.selected = null
+            state.selectedChannel = null
+            video.start(stream, title.title + (if (title.episode > 0) " · S${title.season} E${title.episode}" else ""), resume)
         }
+        state.onStopPlayback = { closePlayback() }
+        state.onNavigation = {
+            if (video.mode == PlayerMode.BIG) video.setMode(PlayerMode.MINI)
+        }
+        video.onProgress = { pos, length ->
+            currentPlayback?.let { (title, stream) ->
+                if (pos > 0) {
+                    state.store.remember(title, pos / 1000.0, length / 1000.0, stream.id)
+                    state.localRevision++
+                    if (System.currentTimeMillis() - lastCloudSync > 65000) {
+                        lastCloudSync = System.currentTimeMillis()
+                        state.uploadCloud()
+                    }
+                }
+            }
+        }
+        video.onCompleted = {
+            val finished = currentPlayback
+            video.stop(notifyProgress = false)
+            currentPlayback = null
+            if (finished != null) {
+                state.store.remember(finished.first, 0.0,
+                    video.duration / 1000.0, finished.second.id, ended = true)
+                state.localRevision++
+                state.uploadCloud()
+                if (finished.first.type == "tv" && finished.first.episode > 0) {
+                    state.playNextEpisode(finished.first)
+                }
+            }
+        }
+        video.onError = { message -> state.notify(message) }
         state.onOpenUrl = { address ->
             if (address.startsWith("https://")) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(address)))
         }
-        setContent { FlixLeoNativeApp(state) }
+        setContent { FlixLeoNativeApp(state, video) }
         state.initialize()
     }
-    @Deprecated("Activity Result API replacement pending migration")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != playerRequest || resultCode != RESULT_OK) return
-        val pair = currentPlayback ?: return
-        val ended = data?.getBooleanExtra("ended", false) == true
-        val progress = (data?.getLongExtra("position_ms", 0L) ?: 0L) / 1000.0
-        val duration = (data?.getLongExtra("duration_ms", 0L) ?: 0L) / 1000.0
-        state.store.remember(pair.first, progress, duration, pair.second.id, ended)
-        state.localRevision++
+
+    private fun closePlayback() {
+        video.stop()
+        currentPlayback = null
+        state.playbackStreams = emptyList()
+        state.playingTitle = null
         state.uploadCloud()
-        if (ended && pair.first.type == "tv" && pair.first.episode > 0) state.playNextEpisode(pair.first)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            video.mode != PlayerMode.CLOSED && video.playing) {
+            restoreAfterPip = video.mode
+            enteringPip = true
+            video.inPictureInPicture = true
+            video.setMode(PlayerMode.FULLSCREEN)
+            try {
+                enterPictureInPictureMode(PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(16, 9)).build())
+            } catch (_: Exception) {
+                video.inPictureInPicture = false
+                video.setMode(restoreAfterPip)
+                enteringPip = false
+            }
+        }
+    }
+    override fun onPictureInPictureModeChanged(active: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(active, newConfig)
+        if (!::video.isInitialized) return
+        video.inPictureInPicture = active
+        enteringPip = false
+        if (!active && video.mode == PlayerMode.FULLSCREEN) {
+            video.setMode(if (restoreAfterPip == PlayerMode.FULLSCREEN) PlayerMode.BIG else restoreAfterPip)
+        }
+    }
+    override fun onPause() {
+        super.onPause()
+        if (::video.isInitialized && !enteringPip &&
+            !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) &&
+            video.playing) video.toggle()
     }
     override fun onDestroy() {
+        if (::video.isInitialized) video.release()
         scope.cancel()
         super.onDestroy()
     }
@@ -84,6 +151,11 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var updateForced by mutableStateOf(false)
     var approvedTvs by mutableStateOf<List<JSONObject>>(emptyList())
     var onPlay: (FlixTitle, FlixStream) -> Unit = { _, _ -> }
+    var onStopPlayback: () -> Unit = {}
+    var onNavigation: () -> Unit = {}
+    var playingTitle by mutableStateOf<FlixTitle?>(null)
+    var playbackStreams by mutableStateOf<List<FlixStream>>(emptyList())
+    fun closePlayback() = onStopPlayback()
     var onOpenUrl: (String) -> Unit = {}
     private var searchJob: Job? = null
     private var cloudJob: Job? = null
@@ -167,6 +239,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         }
     }
     fun changeTab(section: String) {
+        onNavigation()
         tab = section
         selected = null
         streams = emptyList()
@@ -256,7 +329,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     fun play(stream: FlixStream) {
         val title = selected ?: selectedChannel?.let {
             FlixTitle(JSONObject().put("id", "plavio-live-" + it.id).put("title", it.name).put("posterUrl", it.poster))
-        } ?: return
+        } ?: playingTitle ?: return
         onPlay(title, stream)
     }
     fun playNextEpisode(title: FlixTitle) = scope.launch {
