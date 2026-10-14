@@ -146,6 +146,12 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var search by mutableStateOf("")
     var searchResults by mutableStateOf<List<FlixTitle>>(emptyList())
     var searchLoading by mutableStateOf(false)
+    var searchError by mutableStateOf("")
+    var showSplash by mutableStateOf(true)
+        private set
+    private var splashStartedAt = System.currentTimeMillis()
+    private var firstRefreshCompleted = false
+    private var pendingWatchlistTitle: FlixTitle? = null
     var home by mutableStateOf<List<Pair<String, List<FlixTitle>>>>(emptyList())
     var localRevision by mutableIntStateOf(0)
     var account by mutableStateOf<Session?>(store.readSession())
@@ -179,6 +185,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         (if (title.season >= 0 && title.episode >= 0) ":s${title.season}e${title.episode}" else "")
     fun notify(text: String) { message = text }
     fun initialize() {
+        splashStartedAt = System.currentTimeMillis()
         refresh()
         scope.launch {
             try {
@@ -271,7 +278,15 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                     if (home.isEmpty()) message = "Catalogue temporarily unavailable. Retry when connected."
                 }
             } catch (e: Exception) { message = e.localizedMessage ?: "Could not load catalogue" }
-            finally { loading = false }
+            finally {
+                loading = false
+                if (!firstRefreshCompleted) {
+                    firstRefreshCompleted = true
+                    val elapsed = System.currentTimeMillis() - splashStartedAt
+                    delay((1550L - elapsed).coerceAtLeast(0L))
+                    showSplash = false
+                }
+            }
         }
     }
     fun changeTab(section: String) {
@@ -288,18 +303,42 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     fun performSearch(text: String) {
         search = text
         searchJob?.cancel()
+        searchError = ""
         if (text.isBlank()) { searchResults = emptyList(); searchLoading = false; return }
         searchJob = scope.launch {
-            delay(350)
+            delay(400) // debounce keyboard input; cancellation is expected, NOT a server error.
             searchLoading = true
             try {
-                supervisorScope {
-                    val a = async { runCatching { api.titles("/api/tmdb/search?q=" + Uri.encode(text)) }.getOrDefault(emptyList()) }
-                    val b = async { runCatching { api.titles("/api/tmdb/tv/search?q=" + Uri.encode(text)) }.getOrDefault(emptyList()) }
-                    searchResults = (a.await() + b.await()).distinctBy { it.id }
+                val (movieResult, tvResult) = supervisorScope {
+                    val movie = async { runCatching { api.titles("/api/tmdb/search?q=" + Uri.encode(text)) } }
+                    val tv = async { runCatching { api.titles("/api/tmdb/tv/search?q=" + Uri.encode(text)) } }
+                    movie.await() to tv.await()
                 }
-            } catch (_: Exception) { message = "Search service unavailable" }
-            finally { searchLoading = false }
+                ensureActive()
+                // Still allow useful results from cached Home data if TMDB is offline.
+                val local = (movies + series + home.flatMap { it.second }).distinctBy { it.id }
+                    .filter {
+                        it.title.contains(text, ignoreCase = true) ||
+                        it.cast.any { name -> name.contains(text, ignoreCase = true) }
+                    }.take(40)
+                searchResults = (
+                    movieResult.getOrDefault(emptyList()) +
+                    tvResult.getOrDefault(emptyList()) + local
+                ).distinctBy { it.id }
+                searchError = if (movieResult.isFailure && tvResult.isFailure &&
+                    searchResults.isEmpty()) "Search is temporarily offline. Check your connection and retry."
+                    else ""
+            } catch (_: CancellationException) {
+                // A new keystroke cancels the previous request. Never show a popup.
+                return@launch
+            } catch (_: Exception) {
+                searchResults = (movies + series).distinctBy { it.id }
+                    .filter { it.title.contains(text, ignoreCase = true) }
+                searchError = if (searchResults.isEmpty())
+                    "Search is temporarily offline. Try again shortly." else ""
+            } finally {
+                if (isActive) searchLoading = false
+            }
         }
     }
     fun open(title: FlixTitle) {
@@ -402,6 +441,13 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         } catch (_: Exception) { message = "Could not load the next episode" }
     }
     fun toggleWatch(title: FlixTitle) {
+        if (account == null) {
+            pendingWatchlistTitle = title
+            showSignup = false
+            showAuth = true
+            message = "Sign in or create an account to use your Watchlist."
+            return
+        }
         val ids = store.watched
         if (!ids.add(title.id)) ids.remove(title.id)
         store.setWatchlist(ids)
@@ -470,6 +516,10 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                 account?.user?.optString("email").orEmpty()
             )
             syncOnLogin(showNotice = false)
+            pendingWatchlistTitle?.let { title ->
+                pendingWatchlistTitle = null
+                if (!store.watched.contains(title.id)) toggleWatch(title)
+            }
         } catch (e: Exception) { message = e.localizedMessage ?: "Sign-in failed" }
         finally { accountBusy = false }
     }
