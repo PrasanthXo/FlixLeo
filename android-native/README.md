@@ -1,22 +1,38 @@
-# FlixLeo Android — Native VLC app
+# FlixLeo native Android Studio application (Kotlin)
 
-This Android app keeps the live **flixleo.cyou** catalogue, account, search, watchlist, TV and update gateway, with in-app native LibVLC playback for direct HTTPS streams. No separate VLC installation is needed.
+This is a **fully native Android application**. The main activity uses **Jetpack Compose**. It does **not** load a website in WebView, React, Capacitor or an iframe.
 
-The native fullscreen player provides play/pause, 10-second skipping, a seek bar, audio language selection, embedded subtitles and aspect ratio. Returning to the catalogue saves Continue Watching progress; when an episode ends, the website can advance to the next one.
+## Open in Android Studio (Windows)
+1. Clone the GitHub repository, checking out `feature/flixleo-fully-native-android-20261014`.
+2. Android Studio → **Open** → select the repository's `android-native` folder (not the repository root).
+3. Let Gradle sync with **JDK 17** and **Android SDK Platform 35**.
+4. Run the `app` configuration on an Android ARM64 / ARM32 phone (Android 7.0 or later), or **Build → Build APK(s)**.
 
-## Build
-GitHub Actions > **Build FlixLeo Android APK** > **Run workflow**. Select your branch, wait for success, and download **FlixLeo-Android-debug-APK**. Extract app-debug.apk and install it on Android 7 or later (ARM32/ARM64).
+From PowerShell inside `android-native` with JDK 17 / Gradle 8.10.2 installed:
 
-For a local build, install JDK 17, Android SDK 35 and Gradle 8.10.2, then run:
-
-```sh
-cd android-native
+```powershell
 gradle --no-daemon :app:assembleDebug
 ```
 
-The APK is generated at `android-native/app/build/outputs/apk/debug/app-debug.apk`.
+APK output: `android-native/app/build/outputs/apk/debug/app-debug.apk`.
+CI workflow: `.github/workflows/build-flixleo-android.yml`.
 
-## Release security
-Debug APKs are signed with development keys. Because CI runners can generate different debug keys, these APKs may not update each other in place. Production releases need a persistent, private keystore and release signing configuration. Do not publish an APK to website download spots or turn on forced updates before testing installation and signing. Android versionCode is 2 (1.1.0); the existing update gateway remains in place.
+## Native screens and capabilities
 
-Player handoff is limited to the FlixLeo WebView and HTTPS streams. Chrome, iPhone/iPad/Mac and Windows keep their existing player behavior. DRM, provider blocks and individual codec support still depend on source and device. LibVLC is a VideoLAN project licensed under LGPL-2.1-or-later; include applicable notices and review distribution obligations before store publication.
+- Native Home with mixed perspective carousel, Continue Watching, For You language choices, genres, language catalogues and provider rows.
+- Native Movies / Series, title details, seasons/episodes, debounced movie + series search.
+- Native PlavioHD Live TV categories, stream-quality/server selection.
+- Native watchlist and resume progress kept locally even without a cloud account.
+- Embedded **LibVLC** with audio language and embedded subtitle selection, aspect ratio, seek, fullscreen and end-of-episode progression. External VLC is not needed.
+- Native accounts with email verification and password reset, cloud watchlist/history sync, native profile preferences, list/revoke approved TV devices and enter a pairing ID, and update gateway checks.
+- UI uses Kotlin, Jetpack Compose, AndroidX, Coil and libVLC. No WebView.
+
+Existing production FlixLeo catalogue APIs `/api/tmdb/*` and `/api/stremio/*` are reused. The optional **native sign-in/cloud routes** at `/api/native/*` are added in `server/nativeMobileApi.ts` and require the updated backend to be **deployed** before sign-in works. No production credentials are embedded in the APK; the server uses the **anon** Supabase API key with verified user JWTs and RLS. Sessions are encrypted locally using Android Keystore AES-GCM.
+
+## Current release status
+
+`versionCode=3`, `versionName=1.2.0-native`. CI artifacts use a **debug signing key** and must not be advertised as stable installs or update-gateway download targets. For production, use an existing/reusable signing certificate and configure **release signing** securely. The app may not upgrade over an APK with a different signing certificate without uninstalling and losing local app data.
+
+CI compilation and APK packaging alone are not physical-device video tests. Test all player controls, native catalogue/API availability, episode progression, auth, TV pairing and accessibility on Android devices before distribution. Metadata from TMDB is not a guarantee of source availability. DRM content and provider-restricted links may not play.
+
+Licensing: libVLC is VideoLAN software (LGPL-2.1-or-later); review and ship necessary license/codec notices for redistribution.
