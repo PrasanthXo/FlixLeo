@@ -190,35 +190,83 @@ private fun Heading(title: String, subtitle: String? = null, action: (() -> Unit
     }
 }
 @Composable
-private fun Poster(item: FlixTitle, selected: Boolean, compact: Boolean = false, onClick: () -> Unit) {
-    val width = if (compact) 112.dp else 133.dp
-    Column(Modifier.width(width).clip(RoundedCornerShape(13.dp))
-        .clickable(onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().height(if (compact) 150.dp else 187.dp)
-            .clip(RoundedCornerShape(12.dp)).background(Card)) {
+private fun Poster(item: FlixTitle, selected: Boolean, compact: Boolean = false,
+                   onBookmark: (() -> Unit)? = null, onClick: () -> Unit) {
+    val width = if (compact) 112.dp else 139.dp
+    var expanded by remember { mutableStateOf(false) }
+    Column(Modifier.width(width).clickable(onClick = onClick)) {
+        Box(Modifier.fillMaxWidth()
+            .height(if (compact) 151.dp else 197.dp)
+            .shadow(8.dp, RoundedCornerShape(15.dp))
+            .clip(RoundedCornerShape(15.dp))
+            .border(1.dp, Color.White.copy(alpha = .12f), RoundedCornerShape(15.dp))
+            .background(Card)) {
             AsyncImage(model = item.poster, contentDescription = item.title,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            if (selected) Icon(Icons.Default.Bookmark, contentDescription = "In watchlist",
-                tint = Gold, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(18.dp))
-            if (item.type == "tv") Text("SERIES", fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                color = Gold, modifier = Modifier.align(Alignment.BottomStart)
-                    .background(Ink.copy(alpha = .87f), RoundedCornerShape(topEnd = 7.dp)).padding(5.dp))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                listOf(Color(0x16000000), Color.Transparent, Color(0xD9070A10)),
+                startY = 0f)))
+            if (item.rating.isNotBlank()) {
+                Text("★ ${item.rating}", fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold, color = Gold,
+                    modifier = Modifier.align(Alignment.TopStart)
+                        .padding(7.dp).clip(RoundedCornerShape(7.dp))
+                        .background(Color(0xCC111827)).padding(horizontal = 7.dp, vertical = 4.dp))
+            }
+            if (onBookmark != null) {
+                Box(Modifier.align(Alignment.TopEnd)) {
+                    IconButton(onClick = { expanded = true },
+                        modifier = Modifier.padding(4.dp).size(33.dp)
+                            .background(Color(0xB31C2030), CircleShape)) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More options for ${item.title}",
+                            tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false },
+                        modifier = Modifier.background(Color(0xFF222638))) {
+                        DropdownMenuItem(
+                            text = { Text("View details", color = Color.White) },
+                            leadingIcon = { Icon(Icons.Default.Info, null, tint = Gold) },
+                            onClick = { expanded = false; onClick() })
+                        DropdownMenuItem(
+                            text = {
+                                Text(if (selected) "Remove from Watchlist" else "Add to Watchlist",
+                                    color = Color.White)
+                            },
+                            leadingIcon = {
+                                Icon(if (selected) Icons.Default.BookmarkRemove else Icons.Default.BookmarkAdd,
+                                    null, tint = Gold)
+                            }, onClick = { expanded = false; onBookmark() })
+                    }
+                }
+            } else if (selected) {
+                Icon(Icons.Default.Bookmark, "Saved", tint = Gold,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(7.dp).size(18.dp))
+            }
+            Text(if (item.type == "tv") "SERIES" else "MOVIE",
+                color = Gold, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                letterSpacing = 1.sp,
+                modifier = Modifier.align(Alignment.BottomStart)
+                    .padding(9.dp).background(Ink.copy(alpha = .75f), RoundedCornerShape(7.dp))
+                    .padding(horizontal = 6.dp, vertical = 3.dp))
         }
-        Spacer(Modifier.height(6.dp))
-        Text(item.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-            maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(item.year + if (item.rating.isNotBlank()) "  ★${item.rating}" else "",
-            color = Muted, fontSize = 10.sp, maxLines = 1)
+        Spacer(Modifier.height(9.dp))
+        Text(item.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            maxLines = 2, minLines = 2, lineHeight = 17.sp, overflow = TextOverflow.Ellipsis)
+        Text(listOf(item.year, item.genres.firstOrNull().orEmpty())
+            .filter { it.isNotBlank() }.joinToString("  ·  "),
+            color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 @Composable
 private fun PosterRow(label: String, data: List<FlixTitle>, state: FlixState) {
     if (data.isEmpty()) return
-    Heading(label)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(11.dp),
+    Heading(label, "${data.size} titles available")
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(13.dp),
         contentPadding = PaddingValues(horizontal = 17.dp)) {
         items(data, key = { label + it.id }) { item ->
-            Poster(item, state.watchlist.contains(item.id)) { state.open(item) }
+            Poster(item, state.watchlist.contains(item.id),
+                onBookmark = { state.toggleWatch(item) },
+                onClick = { state.open(item) })
         }
     }
 }
