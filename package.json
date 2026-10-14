@@ -80,7 +80,7 @@
         ]
       }
     ],
-    "forceCodeSigning": true
+    "forceCodeSigning": false
   },
   "main": "desktop/main.cjs",
   "author": "FlixLeo"
