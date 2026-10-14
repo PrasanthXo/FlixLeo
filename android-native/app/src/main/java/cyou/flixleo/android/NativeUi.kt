@@ -37,6 +37,7 @@ private val Gold = Color(0xFFFBBF24)
 private val Muted = Color(0xFFA7AAB7)
 private val Nav = listOf("Home", "Movies", "Series", "Live TV", "Search", "Profile")
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlixLeoNativeApp(state: FlixState) {
     val colors = darkColorScheme(
@@ -429,7 +430,7 @@ private fun DetailSheet(state: FlixState) {
                 }
             }
             Spacer(Modifier.height(11.dp))
-            Button(onClick = state::resolveStreams, enabled = !state.detailsLoading,
+            Button(onClick = { state.resolveStreams() }, enabled = !state.detailsLoading,
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                 Icon(Icons.Default.PlayArrow, null)
                 Spacer(Modifier.width(7.dp))
@@ -485,7 +486,7 @@ private fun ProfileScreen(state: FlixState) {
                         color = Muted, fontSize = 12.sp)
                     Spacer(Modifier.height(10.dp))
                     if (session == null) Button(onClick = { state.showAuth = true }) { Text("Sign in / Create account") }
-                    else TextButton(onClick = state::signOut) { Text("Sign out") }
+                    else TextButton(onClick = { state.signOut() }) { Text("Sign out") }
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -514,7 +515,7 @@ private fun ProfileScreen(state: FlixState) {
                 Spacer(Modifier.height(10.dp))
                 HorizontalDivider(color = Muted.copy(alpha = .15f))
                 Heading("Approved TVs", "Revoke TV access or approve pairing code")
-                OutlinedButton(onClick = state::loadApprovedTvs) { Text("Load paired TVs") }
+                OutlinedButton(onClick = { state.loadApprovedTvs() }) { Text("Load paired TVs") }
                 state.approvedTvs.forEach { tv ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(tv.optString("label", "TV"), Modifier.weight(1f), color = Color.White)
