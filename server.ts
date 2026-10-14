@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import updateGateway from './server/updateGateway';
+import nativeMobileApi from './server/nativeMobileApi';
 import windowsDownload from './server/windowsDownload';
 import { installSubtitleGateway } from './server/subtitleGateway';
 import path from 'path';
@@ -19,6 +20,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(updateGateway);
+app.use(nativeMobileApi);
 app.use(windowsDownload);
 
 // Private FlixLeo admin API. Credentials must only be configured in Render.
