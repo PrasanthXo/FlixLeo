@@ -26,6 +26,7 @@ import java.net.URL
 data class StreamOption(val name:String,val url:String)
 class NativePlayerActivity : ComponentActivity() {
     private var player: ExoPlayer?=null
+    private var activePlaybackKey=""
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState)
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN)
@@ -38,11 +39,13 @@ class NativePlayerActivity : ComponentActivity() {
             var episode by remember { mutableIntStateOf(1) }
             var streams by remember { mutableStateOf<List<StreamOption>>(emptyList()) }
             var selected by remember { mutableStateOf<StreamOption?>(null) }
+            var playingKey by remember { mutableStateOf("") }
             var loading by remember { mutableStateOf(false) }
             var message by remember { mutableStateOf("") }
             val key="$type:$tmdb:$season:$episode"
             LaunchedEffect(key) {
-                player?.pause();selected=null;loading=true;message=""
+                player?.let { old -> if(playingKey.isNotEmpty()) preferences.edit().putLong("$playingKey:position",old.currentPosition.coerceAtLeast(0)).apply(); old.pause() }
+                selected=null;loading=true;message=""
                 try {
                     streams=withContext(Dispatchers.IO) {
                         val query="type="+if(type=="tv")"series" else "movie"
@@ -73,8 +76,11 @@ class NativePlayerActivity : ComponentActivity() {
                 player?.release()
                 val p=ExoPlayer.Builder(this@NativePlayerActivity).build()
                 player=p
+                playingKey=key
+                activePlaybackKey=key
                 val savedUrl=preferences.getString("$key:url",null)
                 val position=if(savedUrl==option.url) preferences.getLong("$key:position",0) else 0
+                preferences.edit().putString("$key:url",option.url).apply()
                 p.setMediaItem(MediaItem.fromUri(Uri.parse(option.url)))
                 p.prepare()
                 if(position>0)p.seekTo(position)
@@ -106,8 +112,8 @@ class NativePlayerActivity : ComponentActivity() {
         player?.let{p->
             val type=intent.getStringExtra("media_type") ?: "movie"
             val tmdb=intent.getStringExtra("media_id")?.replace(Regex("^(tv-|tmdb-)"),"").orEmpty()
-            // Persist playback per exact title/source. Series episode keys are saved in the player screen.
-            if(type=="movie")getSharedPreferences("flixleo_resume",MODE_PRIVATE).edit().putLong("$type:$tmdb:1:1:position",p.currentPosition.coerceAtLeast(0)).apply()
+            val savedKey=activePlaybackKey
+            if(savedKey.isNotEmpty())getSharedPreferences("flixleo_resume",MODE_PRIVATE).edit().putLong("$savedKey:position",p.currentPosition.coerceAtLeast(0)).apply()
             p.release()
         }
         player=null
