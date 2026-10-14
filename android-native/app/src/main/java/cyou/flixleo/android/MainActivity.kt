@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
         }
         state.onStopPlayback = { closePlayback() }
         state.onNavigation = {
-            if (video.mode == PlayerMode.BIG) video.setMode(PlayerMode.MINI)
+            if (video.mode == PlayerMode.BIG) video.transitionTo(PlayerMode.MINI)
         }
         video.onProgress = { pos, length ->
             currentPlayback?.let { (title, stream) ->
@@ -93,13 +93,13 @@ class MainActivity : ComponentActivity() {
             restoreAfterPip = video.mode
             enteringPip = true
             video.inPictureInPicture = true
-            video.setMode(PlayerMode.FULLSCREEN)
+            video.transitionTo(PlayerMode.FULLSCREEN)
             try {
                 enterPictureInPictureMode(PictureInPictureParams.Builder()
                     .setAspectRatio(Rational(16, 9)).build())
             } catch (_: Exception) {
                 video.inPictureInPicture = false
-                video.setMode(restoreAfterPip)
+                video.transitionTo(restoreAfterPip)
                 enteringPip = false
             }
         }
@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
         video.inPictureInPicture = active
         enteringPip = false
         if (!active && video.mode == PlayerMode.FULLSCREEN) {
-            video.setMode(restoreAfterPip)
+            video.transitionTo(restoreAfterPip)
         }
     }
     override fun onPause() {
