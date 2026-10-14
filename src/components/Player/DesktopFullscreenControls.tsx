@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Minimize2, Pause, Play, RotateCcw, RotateCw, Subtitles, Volume2, VolumeX, X } from 'lucide-react';
 import { desktopBridge, fullLanguage, type NativeTrack } from './DesktopNativeSurface';
 
@@ -26,6 +27,8 @@ const clock = (seconds: number): string => {
  * mpv is a real Win32 child HWND, so HTML controls cannot overlap the
  * video. The embedding helper reserves exactly 96 physical pixels along
  * the bottom of the fullscreen window for this clickable HTML toolbar.
+ * Render the toolbar into document.body so poster/card stacking contexts
+ * can never draw their three-dot buttons over the playback seek bar.
  */
 export function DesktopFullscreenControls({ title, onClose, visible, aspectRatio, onAspectRatioChange }: { title: string; onClose: () => void; visible: boolean; aspectRatio: NativeAspectRatio; onAspectRatioChange: (ratio: NativeAspectRatio) => void }) {
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -69,7 +72,7 @@ export function DesktopFullscreenControls({ title, onClose, visible, aspectRatio
     try { await desktopBridge()?.commandNative('toggleFullscreen'); }
     finally { onClose(); }
   };
-  return <div ref={toolbarRef} className={`absolute bottom-0 left-0 right-0 z-[200] flex h-[96px] flex-col border-t border-white/15 bg-[#101521] text-white shadow-[0_-8px_25px_rgba(0,0,0,0.6)] transition-opacity duration-200 ${visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} role="toolbar" aria-label="Windows fullscreen video controls">
+  return createPortal(<div ref={toolbarRef} className={`fixed bottom-0 left-0 right-0 z-[2147483647] flex h-[96px] flex-col border-t border-white/15 bg-[#101521] text-white shadow-[0_-8px_25px_rgba(0,0,0,0.6)] transition-opacity duration-200 ${visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} role="toolbar" aria-label="Windows fullscreen video controls">
     <div className="flex h-[32px] shrink-0 items-center gap-3 px-4">
       <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-100" title={title}>{title}</span>
       <label className="flex max-w-[190px] shrink-0 items-center gap-1 text-xs text-slate-200" title="Audio language">
@@ -104,5 +107,5 @@ export function DesktopFullscreenControls({ title, onClose, visible, aspectRatio
       <button type="button" title="Exit fullscreen (Esc)" aria-label="Exit fullscreen" onClick={() => command('toggleFullscreen')} className="rounded-lg p-2 hover:bg-white/10"><Minimize2 size={20}/></button>
       <button type="button" title="Close player" aria-label="Close player" onClick={() => void close()} className="rounded-lg p-2 hover:bg-red-500/20"><X size={21}/></button>
     </div>
-  </div>;
+  </div>, document.body);
 }
