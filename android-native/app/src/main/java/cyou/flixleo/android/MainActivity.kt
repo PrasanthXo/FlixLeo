@@ -1,116 +1,648 @@
 package cyou.flixleo.android
 
-import android.app.Activity
+import android.app.PictureInPictureParams
 import android.content.Intent
+import android.content.res.Configuration
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.*
-import coil.compose.AsyncImage
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import java.util.concurrent.atomic.AtomicBoolean
 
-private val Dark = Color(0xFF090C15)
-private val Gold = Color(0xFFFFC453)
-data class TitleItem(val id:String,val name:String,val year:String,val poster:String,val genres:String,val rating:String,val type:String)
-private fun parseTitles(json: JSONObject, type:String):List<TitleItem> {
-    val array = json.optJSONArray("items") ?: return emptyList()
-    return (0 until array.length()).mapNotNull { n ->
-        val obj=array.optJSONObject(n) ?: return@mapNotNull null
-        val genreArray=obj.optJSONArray("genres")
-        val genres=if (genreArray==null) "" else (0 until genreArray.length()).map { genreArray.optString(it) }.filter { it.isNotBlank() }.take(2).joinToString(" · ")
-        TitleItem(obj.optString("id"),obj.optString("title"),obj.optString("year"),obj.optString("posterUrl"),genres,obj.optString("imdbRating"),type)
-    }.filter { it.id.isNotBlank() }
-}
-private suspend fun fetchTitles(type:String,page:Int):Pair<List<TitleItem>,Boolean> = withContext(Dispatchers.IO) {
-    val endpoint=if(type=="Movies") "trending" else "tv/trending"
-    val connection=URL("https://flixleo.cyou/api/tmdb/$endpoint?page=$page").openConnection() as HttpURLConnection
-    try {
-        connection.connectTimeout=12000;connection.readTimeout=12000
-        if(connection.responseCode !in 200..299) throw IllegalStateException("Catalogue unavailable")
-        val body=connection.inputStream.bufferedReader().use { it.readText() }
-        val json=JSONObject(body)
-        if(!json.optBoolean("success")) throw IllegalStateException("Catalogue response unavailable")
-        Pair(parseTitles(json,if(type=="Movies") "movie" else "tv"),json.optBoolean("isLive",true) && page<json.optInt("totalPages",500))
-    } finally { connection.disconnect() }
-}
-class MainActivity:ComponentActivity(){
-    override fun onCreate(savedInstanceState:Bundle?){
+/** Pure native Android / Compose catalogue with ONE continuous in-app LibVLC player. */
+class MainActivity : ComponentActivity() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private lateinit var state: FlixState
+    private lateinit var video: InlineVlcController
+    private var currentPlayback: Pair<FlixTitle, FlixStream>? = null
+    private var lastCloudSync = 0L
+    private var restoreAfterPip = PlayerMode.MINI
+    private var enteringPip = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor=android.graphics.Color.rgb(9,12,21)
-        window.navigationBarColor=android.graphics.Color.rgb(9,12,21)
-        setContent { NativeFlixLeo { title -> startActivity(Intent(this,NativePlayerActivity::class.java).apply {
-            putExtra("media_id",title.id);putExtra("media_name",title.name);putExtra("media_type",title.type)
-        }) } }
-    }
-}
-@Composable private fun NativeFlixLeo(onOpen:(TitleItem)->Unit){
-    var tab by remember { mutableStateOf("Movies") }
-    var page by remember(tab) { mutableIntStateOf(1) }
-    var entries by remember(tab) { mutableStateOf<List<TitleItem>>(emptyList()) }
-    var loading by remember(tab) { mutableStateOf(false) }
-    var more by remember(tab) { mutableStateOf(true) }
-    var error by remember(tab) { mutableStateOf("") }
-    val gridState=rememberLazyGridState()
-    LaunchedEffect(tab,page){
-        loading=true;error=""
-        try {
-            val (items,hasMore)=fetchTitles(tab,page)
-            entries=(entries+items).distinctBy { it.id }
-            more=hasMore && items.isNotEmpty()
-        } catch(e:Exception) { error=e.message ?: "Unable to load catalogue" }
-        loading=false
-    }
-    val loadNext by remember(gridState,entries,loading,more) { derivedStateOf {
-        val last=gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-        entries.isNotEmpty() && more && !loading && error.isEmpty() && last>=entries.size-5
-    } }
-    LaunchedEffect(loadNext){if(loadNext)page++}
-    MaterialTheme(colorScheme=darkColorScheme(primary=Gold,background=Dark,surface=Color(0xFF151927))){
-        Scaffold(containerColor=Dark,topBar={Column {
-            Text("FLIXLEO",fontWeight=FontWeight.Black,color=Gold,fontSize=28.sp,modifier=Modifier.padding(start=18.dp,top=18.dp,bottom=10.dp))
-            Text("Discover movies and series",color=Color.LightGray,fontSize=13.sp,modifier=Modifier.padding(start=18.dp,bottom=8.dp))
-        }},bottomBar={
-            NavigationBar(containerColor=Color(0xFF121624)){
-                listOf("Movies","Series").forEach { name ->
-                    NavigationBarItem(selected=tab==name,onClick={tab=name},icon={Text(if(name=="Movies") "🎬" else "📺")},label={Text(name)})
+        video = InlineVlcController(this)
+        state = FlixState(FlixStore(applicationContext), FlixApi(), scope)
+        state.onPlay = { title, stream ->
+            if (video.mode != PlayerMode.CLOSED) video.stop()
+            currentPlayback = title to stream
+            val resume = state.store.history.find { it.key == state.entryKey(title) }?.progress ?: 0.0
+            state.playingTitle = title
+            state.playbackStreams = state.streams.ifEmpty { state.playbackStreams.ifEmpty { listOf(stream) } }
+            state.selected = null
+            state.selectedChannel = null
+            video.start(stream, title.title + (if (title.episode > 0) " · S${title.season} E${title.episode}" else ""), resume)
+        }
+        state.onStopPlayback = { closePlayback() }
+        state.onNavigation = {
+            if (video.mode == PlayerMode.BIG) video.transitionTo(PlayerMode.MINI)
+        }
+        video.onProgress = { pos, length ->
+            currentPlayback?.let { (title, stream) ->
+                if (pos > 0) {
+                    state.store.remember(title, pos / 1000.0, length / 1000.0, stream.id)
+                    state.localRevision++
+                    if (System.currentTimeMillis() - lastCloudSync > 65000) {
+                        lastCloudSync = System.currentTimeMillis()
+                        state.uploadCloud()
+                    }
                 }
             }
-        }) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding)) {
-                LazyVerticalGrid(columns=GridCells.Fixed(2),state=gridState,contentPadding=PaddingValues(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-                    items(entries,key={it.id}) { title ->
-                        Column(Modifier.fillMaxWidth().clickable { onOpen(title) }) {
-                            Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(Color(0xFF22283A),RoundedCornerShape(12.dp))) {
-                                AsyncImage(model=title.poster.takeIf { it.startsWith("https://") },contentDescription=title.name,contentScale=ContentScale.Crop,modifier=Modifier.fillMaxSize())
-                                Text(if(title.type=="tv") "SERIES" else "MOVIE",color=Color.White,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.align(Alignment.TopStart).padding(7.dp).background(Color.Black.copy(alpha=.8f),RoundedCornerShape(4.dp)).padding(5.dp))
-                            }
-                            Text(title.name,maxLines=2,overflow=TextOverflow.Ellipsis,color=Color.White,fontWeight=FontWeight.SemiBold,fontSize=14.sp,modifier=Modifier.padding(top=6.dp))
-                            Text(title.genres.ifBlank { if(title.type=="tv") "TV Series" else "Movie" },color=Color.LightGray,maxLines=1,fontSize=11.sp)
-                            Text(title.year+"   ★ "+title.rating,color=Gold,fontSize=11.sp)
+        }
+        video.onCompleted = {
+            val finished = currentPlayback
+            val completedDuration = video.duration
+            video.stop(notifyProgress = false)
+            currentPlayback = null
+            if (finished != null) {
+                state.store.remember(finished.first, 0.0,
+                    completedDuration / 1000.0, finished.second.id, ended = true)
+                state.localRevision++
+                state.uploadCloud()
+                if (finished.first.type == "tv" && finished.first.episode > 0) {
+                    state.playNextEpisode(finished.first)
+                }
+            }
+        }
+        video.onError = { message -> state.notify(message) }
+        state.onOpenUrl = { address ->
+            if (address.startsWith("https://")) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(address)))
+        }
+        setContent { FlixLeoNativeApp(state, video) }
+        state.initialize()
+    }
+    override fun onResume() {
+        super.onResume()
+        if (::state.isInitialized) state.refreshOnForeground()
+    }
+
+    private fun closePlayback() {
+        video.stop()
+        currentPlayback = null
+        state.playbackStreams = emptyList()
+        state.playingTitle = null
+        state.uploadCloud()
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            video.mode != PlayerMode.CLOSED && video.playing) {
+            restoreAfterPip = video.mode
+            enteringPip = true
+            video.inPictureInPicture = true
+            video.transitionTo(PlayerMode.FULLSCREEN)
+            try {
+                enterPictureInPictureMode(PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(16, 9)).build())
+            } catch (_: Exception) {
+                video.inPictureInPicture = false
+                video.transitionTo(restoreAfterPip)
+                enteringPip = false
+            }
+        }
+    }
+    override fun onPictureInPictureModeChanged(active: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(active, newConfig)
+        if (!::video.isInitialized) return
+        video.inPictureInPicture = active
+        enteringPip = false
+        if (!active && video.mode == PlayerMode.FULLSCREEN) {
+            video.transitionTo(restoreAfterPip)
+        }
+    }
+    override fun onPause() {
+        super.onPause()
+        if (::video.isInitialized && !enteringPip &&
+            !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) &&
+            video.playing) video.toggle()
+    }
+    override fun onDestroy() {
+        if (::video.isInitialized) video.release()
+        scope.cancel()
+        super.onDestroy()
+    }
+}
+class FlixState(val store: FlixStore, private val api: FlixApi, private val scope: CoroutineScope) {
+    var tab by mutableStateOf("Home")
+    var message by mutableStateOf("")
+    var loading by mutableStateOf(false)
+    var detailsLoading by mutableStateOf(false)
+    var selected by mutableStateOf<FlixTitle?>(null)
+    var streams by mutableStateOf<List<FlixStream>>(emptyList())
+    var episodes by mutableStateOf<List<FlixEpisode>>(emptyList())
+    var chosenSeason by mutableIntStateOf(-1)
+    var chosenEpisode by mutableIntStateOf(-1)
+    var live by mutableStateOf<List<LiveCategory>>(emptyList())
+    var selectedChannel by mutableStateOf<LiveChannel?>(null)
+    var movies by mutableStateOf<List<FlixTitle>>(emptyList())
+    var series by mutableStateOf<List<FlixTitle>>(emptyList())
+    var search by mutableStateOf("")
+    var searchResults by mutableStateOf<List<FlixTitle>>(emptyList())
+    var searchLoading by mutableStateOf(false)
+    var searchError by mutableStateOf("")
+    var showSplash by mutableStateOf(true)
+        private set
+    private var splashStartedAt = System.currentTimeMillis()
+    private var firstRefreshCompleted = false
+    private var pendingWatchlistTitle: FlixTitle? = null
+    var home by mutableStateOf<List<Pair<String, List<FlixTitle>>>>(emptyList())
+    var localRevision by mutableIntStateOf(0)
+    var account by mutableStateOf<Session?>(store.readSession())
+    var accountBusy by mutableStateOf(false)
+    var showAuth by mutableStateOf(false)
+    var showSignup by mutableStateOf(false)
+    var authError by mutableStateOf("")
+    var showOnboarding by mutableStateOf(false)
+    var streamsChecked by mutableStateOf(false)
+    private var lastCatalogRefreshAt = 0L
+    private var lastCloudPullAt = 0L
+    var updateNotice by mutableStateOf<JSONObject?>(null)
+    var updateForced by mutableStateOf(false)
+    var approvedTvs by mutableStateOf<List<JSONObject>>(emptyList())
+    var onPlay: (FlixTitle, FlixStream) -> Unit = { _, _ -> }
+    var onStopPlayback: () -> Unit = {}
+    var onNavigation: () -> Unit = {}
+    var playingTitle by mutableStateOf<FlixTitle?>(null)
+    var playbackStreams by mutableStateOf<List<FlixStream>>(emptyList())
+    fun closePlayback() = onStopPlayback()
+    var onOpenUrl: (String) -> Unit = {}
+    private var searchJob: Job? = null
+    private var cloudJob: Job? = null
+    private val refreshing = AtomicBoolean(false)
+
+    val watchlist: Set<String> get() { localRevision; return store.watched }
+    val history: List<ResumeEntry> get() { localRevision; return store.history }
+    val favorites: Set<String> get() { localRevision; return store.favorites }
+    val favoriteGenres: Set<String> get() { localRevision; return store.favoriteGenres }
+    val favoriteArtists: Set<String> get() { localRevision; return store.favoriteArtists }
+    fun entryKey(title: FlixTitle): String = title.id +
+        (if (title.season >= 0 && title.episode >= 0) ":s${title.season}e${title.episode}" else "")
+    fun notify(text: String) { message = text }
+    fun initialize() {
+        splashStartedAt = System.currentTimeMillis()
+        refresh()
+        scope.launch {
+            try {
+                val code = 6
+                val result = api.call("/api/gateway/v1/check/flixleo-android?versionCode=$code")
+                if (result.optBoolean("ready")) {
+                    val policy = result.optJSONObject("policy")
+                    if (policy != null) {
+                        val newer = policy.optInt("latestVersionCode", code) > code
+                        val link = policy.optString("updateUrl")
+                        if (newer && link.startsWith("https://") && link.substringBefore('?').endsWith(".apk", true)) {
+                            updateNotice = policy
+                            updateForced = policy.optBoolean("forceUpdate") &&
+                                code < policy.optInt("minVersionCode", 0)
                         }
                     }
-                    if(loading) item(span={GridItemSpan(maxLineSpan)}) { Box(Modifier.fillMaxWidth().padding(20.dp),contentAlignment=Alignment.Center){ CircularProgressIndicator(color=Gold) } }
-                    if(error.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { Column {
-                        Text(error,color=Color.LightGray)
-                        TextButton(onClick={ page++ }) { Text("Retry") }
-                    } }
+                }
+            } catch (_: Exception) { /* offline must not lock native app */ }
+            refreshSession()
+        }
+    }
+    fun refreshOnForeground() {
+        val now = System.currentTimeMillis()
+        // Refresh catalogue automatically after a short background interval.
+        if (now - lastCatalogRefreshAt > 2 * 60_000L) refresh()
+        if (account != null && now - lastCloudPullAt > 2 * 60_000L) {
+            lastCloudPullAt = now
+            scope.launch {
+                refreshSession().join()
+                if (account != null) syncOnLogin(showNotice = false)
+            }
+        }
+    }
+    fun refresh() {
+        lastCatalogRefreshAt = System.currentTimeMillis()
+        scope.launch {
+            loading = true
+            try {
+                supervisorScope {
+                    val trend = async { runCatching { api.titles("/api/tmdb/trending") }.getOrDefault(emptyList()) }
+                    val tv = async { runCatching { api.titles("/api/tmdb/tv/trending") }.getOrDefault(emptyList()) }
+                    val popular = async { runCatching { api.titles("/api/tmdb/popular") }.getOrDefault(emptyList()) }
+                    val south = async { runCatching { api.titles("/api/tmdb/south-indian") }.getOrDefault(emptyList()) }
+                    val collections = async { runCatching { api.call("/api/tmdb/home-collections") }.getOrNull() }
+                    movies = (trend.await() + popular.await()).distinctBy { it.id }
+                    series = tv.await().distinctBy { it.id }
+                    val curated = collections.await()?.optJSONObject("collections")
+                    val sections = mutableListOf<Pair<String, List<FlixTitle>>>()
+                    val mixed = (movies.take(9) + series.take(9)).shuffled()
+                    if (mixed.isNotEmpty()) sections.add("Spotlight" to mixed)
+                    if (movies.isNotEmpty()) sections.add("Trending Movies" to movies.take(24))
+                    if (series.isNotEmpty()) sections.add("Series Trending" to series.take(24))
+                    val southList = south.await()
+                    if (southList.isNotEmpty()) sections.add("South Indian Cinema" to southList.take(35))
+                    // Keep native Home catalogue rows aligned to the SAME keys used
+                    // by FlixLeo web / Windows. The backend owns catalogue freshness.
+                    val genres = listOf("Action", "Sci-Fi", "Thriller", "Comedy", "Drama",
+                        "Romance", "Horror", "Adventure", "Fantasy", "Mystery",
+                        "Crime", "Animation", "Family", "Documentary", "War", "History", "Music")
+                    val seriesGenres = listOf("Animation", "Action", "Sci-Fi", "Comedy",
+                        "Drama", "Mystery", "Crime", "Fantasy", "Family", "Documentary")
+                    val languages = listOf("Tamil", "English", "Hindi", "Sinhala",
+                        "Telugu", "Malayalam", "Kannada", "Korean", "Japanese")
+                    val providers = listOf("Netflix", "Amazon Prime Video", "Disney Plus", "Apple TV")
+                    val priority = buildList {
+                        add("genre:Animation" to "Animation Movies")
+                        add("seriesGenre:Animation" to "Animation Series")
+                        add("anime:movies" to "Anime Movies")
+                        add("anime:series" to "Anime Series")
+                        genres.filter { it != "Animation" }.forEach { add("genre:$it" to "$it Movies") }
+                        seriesGenres.filter { it != "Animation" }.forEach { add("seriesGenre:$it" to "$it Series") }
+                        languages.forEach { add("language:$it" to "$it Movies") }
+                        providers.forEach { provider ->
+                            add("providerMovie:$provider" to "$provider Movies")
+                            add("providerSeries:$provider" to "$provider Series")
+                        }
+                        listOf("STARZ", "ZEE5").forEach { provider ->
+                            add("allProviderMovie:$provider" to "$provider Movies")
+                            add("allProviderSeries:$provider" to "$provider Series")
+                        }
+                    }
+                    priority.forEach { (key, label) ->
+                        val row = curated?.optJSONArray(key).let { data ->
+                            if (data == null) emptyList() else (0 until data.length())
+                                .mapNotNull { data.optJSONObject(it) }.map(::FlixTitle)
+                        }
+                        if (row.isNotEmpty()) sections.add(label to row)
+                    }
+                    home = sections
+                    if (home.isEmpty()) message = "Catalogue temporarily unavailable. Retry when connected."
+                }
+            } catch (e: Exception) { message = e.localizedMessage ?: "Could not load catalogue" }
+            finally {
+                loading = false
+                if (!firstRefreshCompleted) {
+                    firstRefreshCompleted = true
+                    val elapsed = System.currentTimeMillis() - splashStartedAt
+                    delay((1550L - elapsed).coerceAtLeast(0L))
+                    showSplash = false
                 }
             }
         }
     }
+    fun changeTab(section: String) {
+        onNavigation()
+        tab = section
+        selected = null
+        streams = emptyList()
+        if (section == "Live TV" && live.isEmpty()) refreshLive()
+    }
+    fun refreshLive() = scope.launch {
+        try { live = api.liveCategories() }
+        catch (e: Exception) { message = e.localizedMessage ?: "Live TV temporarily unavailable" }
+    }
+    fun performSearch(text: String) {
+        search = text
+        searchJob?.cancel()
+        searchError = ""
+        if (text.isBlank()) { searchResults = emptyList(); searchLoading = false; return }
+        searchJob = scope.launch {
+            delay(400) // debounce keyboard input; cancellation is expected, NOT a server error.
+            searchLoading = true
+            try {
+                val (movieResult, tvResult) = supervisorScope {
+                    val movie = async { runCatching { api.titles("/api/tmdb/search?q=" + Uri.encode(text)) } }
+                    val tv = async { runCatching { api.titles("/api/tmdb/tv/search?q=" + Uri.encode(text)) } }
+                    movie.await() to tv.await()
+                }
+                ensureActive()
+                // Still allow useful results from cached Home data if TMDB is offline.
+                val local = (movies + series + home.flatMap { it.second }).distinctBy { it.id }
+                    .filter {
+                        it.title.contains(text, ignoreCase = true) ||
+                        it.cast.any { name -> name.contains(text, ignoreCase = true) }
+                    }.take(40)
+                searchResults = (
+                    movieResult.getOrDefault(emptyList()) +
+                    tvResult.getOrDefault(emptyList()) + local
+                ).distinctBy { it.id }
+                searchError = if (movieResult.isFailure && tvResult.isFailure &&
+                    searchResults.isEmpty()) "Search is temporarily offline. Check your connection and retry."
+                    else ""
+            } catch (_: CancellationException) {
+                // A new keystroke cancels the previous request. Never show a popup.
+                return@launch
+            } catch (_: Exception) {
+                searchResults = (movies + series).distinctBy { it.id }
+                    .filter { it.title.contains(text, ignoreCase = true) }
+                searchError = if (searchResults.isEmpty())
+                    "Search is temporarily offline. Try again shortly." else ""
+            } finally {
+                if (isActive) searchLoading = false
+            }
+        }
+    }
+    fun open(title: FlixTitle) {
+        selected = title
+        chosenSeason = if (title.season > 0) title.season else -1
+        chosenEpisode = if (title.episode > 0) title.episode else -1
+        selectedChannel = null
+        streams = emptyList()
+        streamsChecked = false
+        episodes = emptyList()
+        scope.launch {
+            detailsLoading = true
+            try {
+                val full = api.details(title)
+                selected = full
+                if (title.type == "tv") {
+                    episodes = full.json.optJSONArray("seasons")?.let { seasons ->
+                        (0 until seasons.length()).flatMap { i ->
+                            val row = seasons.optJSONObject(i) ?: return@flatMap emptyList()
+                            val season = row.optInt("number")
+                            val list = row.optJSONArray("episodes") ?: JSONArray()
+                            (0 until list.length()).mapNotNull { n ->
+                                val ep = list.optJSONObject(n) ?: return@mapNotNull null
+                                FlixEpisode(season, ep.optInt("number"), ep.optString("title", "Episode"))
+                            }
+                        }.filter { it.season > 0 && it.number > 0 }
+                    } ?: emptyList()
+                    if (chosenSeason < 0) {
+                        val first = episodes.minWithOrNull(compareBy({ it.season }, { it.number }))
+                        chosenSeason = first?.season ?: -1
+                        chosenEpisode = first?.number ?: -1
+                    }
+                }
+            } catch (_: Exception) { /* catalogue card still usable */ }
+            finally {
+                detailsLoading = false
+                // The app fetches supported direct-video sources automatically.
+                // No manual "Find servers" step, and no premature playback.
+                resolveStreams()
+            }
+        }
+    }
+    fun chooseEpisode(ep: FlixEpisode) {
+        chosenSeason = ep.season; chosenEpisode = ep.number
+        streams = emptyList()
+        streamsChecked = false
+        resolveStreams()
+    }
+    fun resolveStreams() = scope.launch {
+        val chosen = selected ?: return@launch
+        val target = if (chosen.type == "tv") {
+            if (chosenSeason < 1 || chosenEpisode < 1) {
+                message = "Select a season and episode first"; return@launch
+            }
+            chosen.episodeAt(chosenSeason, chosenEpisode)
+        } else chosen
+        selected = target
+        detailsLoading = true
+        streams = emptyList()
+        streamsChecked = false
+        try {
+            streams = api.streamOptions(target)
+            // All candidate sources are fetched before offering Play.
+        } catch (_: Exception) { streams = emptyList() }
+        finally {
+            streamsChecked = true
+            detailsLoading = false
+        }
+    }
+    fun channel(channel: LiveChannel) = scope.launch {
+        selected = null
+        selectedChannel = channel
+        streams = emptyList()
+        streamsChecked = false
+        detailsLoading = true
+        try {
+            streams = api.liveStreams(channel)
+            if (streams.isEmpty()) message = "No streams available"
+        } catch (_: Exception) { message = "No streams available" }
+        finally { detailsLoading = false; streamsChecked = true }
+    }
+    fun play(stream: FlixStream) {
+        val title = selected ?: selectedChannel?.let {
+            FlixTitle(JSONObject().put("id", "plavio-live-" + it.id).put("title", it.name).put("posterUrl", it.poster))
+        } ?: playingTitle ?: return
+        onPlay(title, stream)
+    }
+    fun playNextEpisode(title: FlixTitle) = scope.launch {
+        try {
+            val all = api.episodes(title)
+            val next = all.firstOrNull { it.season > title.season ||
+                (it.season == title.season && it.number > title.episode) } ?: return@launch
+            val item = title.episodeAt(next.season, next.number)
+            val sources = api.streamOptions(item)
+            if (sources.isNotEmpty()) {
+                selected = item; chosenSeason = next.season; chosenEpisode = next.number
+                streams = sources
+                play(sources.first())
+            } else message = "Next episode has no streams"
+        } catch (_: Exception) { message = "Could not load the next episode" }
+    }
+    fun toggleWatch(title: FlixTitle) {
+        if (account == null) {
+            pendingWatchlistTitle = title
+            showSignup = false
+            showAuth = true
+            message = "Sign in or create an account to use your Watchlist."
+            return
+        }
+        val ids = store.watched
+        if (!ids.add(title.id)) ids.remove(title.id)
+        store.setWatchlist(ids)
+        localRevision++
+        uploadCloud()
+    }
+    fun toggleLanguage(value: String) {
+        val next = store.favorites.toMutableSet()
+        if (!next.add(value)) next.remove(value)
+        store.setFavorites(next)
+        localRevision++
+        if (account != null) saveProfile()
+    }
+    fun toggleGenre(value: String) {
+        val next = store.favoriteGenres.toMutableSet()
+        if (!next.add(value)) next.remove(value)
+        store.setFavoriteGenres(next)
+        localRevision++
+        if (account != null) saveProfile()
+    }
+    fun addArtist(value: String) {
+        val next = store.favoriteArtists.toMutableSet()
+        if (value.isNotBlank()) next.add(value.trim().take(80))
+        store.setFavoriteArtists(next)
+        localRevision++
+        if (account != null) saveProfile()
+    }
+    fun removeArtist(value: String) {
+        store.setFavoriteArtists(store.favoriteArtists - value)
+        localRevision++
+        if (account != null) saveProfile()
+    }
+    fun refreshSession() = scope.launch {
+        val current = account ?: return@launch
+        if (current.expiresAt > System.currentTimeMillis() / 1000 + 120) return@launch
+        if (!refreshing.compareAndSet(false, true)) return@launch
+        try {
+            val result = api.call("/api/native/auth/refresh", "POST",
+                JSONObject().put("refresh_token", current.refreshToken))
+            account = Session.from(result)
+            store.saveSession(account)
+        } catch (_: Exception) {
+            account = null
+            store.saveSession(null)
+        } finally { refreshing.set(false) }
+    }
+    fun signIn(email: String, password: String) = scope.launch {
+        authError = ""
+        accountBusy = true
+        try {
+            account = Session.from(api.call("/api/native/auth/login", "POST",
+                JSONObject().put("email", email.trim()).put("password", password)))
+            store.saveSession(account)
+            account?.user?.optJSONObject("user_metadata")?.let { metadata ->
+                fun optSet(key: String): Set<String> {
+                    val list = metadata.optJSONArray(key) ?: return emptySet()
+                    return (0 until list.length()).mapNotNull { i -> list.optString(i).takeIf(String::isNotBlank) }.toSet()
+                }
+                store.setFavorites(store.favorites + optSet("favorite_languages"))
+                store.setFavoriteGenres(store.favoriteGenres + optSet("favorite_genres"))
+                store.setFavoriteArtists(store.favoriteArtists + optSet("favorite_artists"))
+                localRevision++
+            }
+            showAuth = false
+            authError = ""
+            message = "Signed in"
+            showOnboarding = store.needsSignupOnboarding(
+                account?.user?.optString("email").orEmpty()
+            )
+            syncOnLogin(showNotice = false)
+            pendingWatchlistTitle?.let { title ->
+                pendingWatchlistTitle = null
+                if (!store.watched.contains(title.id)) toggleWatch(title)
+            }
+        } catch (e: Exception) {
+            val detail = e.localizedMessage.orEmpty()
+            authError = if ("HTTP 404" in detail)
+                "Android sign-in service is not deployed yet. Please retry after the backend update."
+                else detail.ifBlank { "Sign-in failed" }
+        }
+        finally { accountBusy = false }
+    }
+    fun signUp(email: String, password: String) = scope.launch {
+        authError = ""
+        accountBusy = true
+        try {
+            val result = api.call("/api/native/auth/signup", "POST",
+                JSONObject().put("email", email.trim()).put("password", password))
+            store.markSignup(email)
+            message = result.optString("message", "Verify your email before signing in")
+            showSignup = false
+            showAuth = false
+        } catch (e: Exception) {
+            val detail = e.localizedMessage.orEmpty()
+            authError = if ("HTTP 404" in detail)
+                "Android sign-in service is not deployed yet. Please retry after the backend update."
+                else detail.ifBlank { "Could not sign up" }
+        }
+        finally { accountBusy = false }
+    }
+    fun emailAction(email: String, action: String) = scope.launch {
+        authError = ""
+        accountBusy = true
+        try {
+            val path = if (action == "recover") "recover" else "resend"
+            val result = api.call("/api/native/auth/$path", "POST", JSONObject().put("email", email.trim()))
+            message = result.optString("message", "Check your email")
+        } catch (e: Exception) {
+            val detail = e.localizedMessage.orEmpty()
+            authError = if ("HTTP 404" in detail)
+                "Android sign-in service is not deployed yet. Please retry after the backend update."
+                else detail.ifBlank { "Could not send email" }
+        }
+        finally { accountBusy = false }
+    }
+    fun signOut() = scope.launch {
+        val active = account
+        account = null
+        store.saveSession(null)
+        if (active != null) try {
+            api.call("/api/native/auth/logout", "POST", JSONObject(), active.accessToken)
+        } catch (_: Exception) { }
+        message = "Signed out"
+    }
+    fun finishOnboarding(save: Boolean) {
+        showOnboarding = false
+        store.clearSignupOnboarding()
+        if (save) saveProfile()
+    }
+    private suspend fun syncOnLogin(showNotice: Boolean = false) {
+        val current = account ?: return
+        try {
+            val cloud = api.remoteHistory(current.accessToken).optJSONObject("payload")
+            val mergedIds = store.watched + (cloud?.optJSONArray("watchlist")?.let {
+                (0 until it.length()).mapNotNull { index -> it.optString(index).takeIf(String::isNotBlank) }
+            } ?: emptyList())
+            val remote = cloud?.optJSONArray("history")?.let {
+                (0 until it.length()).mapNotNull { index -> it.optJSONObject(index)?.let(ResumeEntry::from) }
+            } ?: emptyList()
+            val histories = (store.history + remote).sortedByDescending { it.updatedAt }.distinctBy { it.key }.take(20)
+            store.setWatchlist(mergedIds.toSet())
+            store.setHistory(histories)
+            localRevision++
+            api.sync(current.accessToken, mergedIds, histories)
+        } catch (_: Exception) {
+            if (showNotice) message = "Your account is signed in. Sync will retry automatically."
+        }
+    }
+    fun uploadCloud() {
+        cloudJob?.cancel()
+        cloudJob = scope.launch {
+            delay(1300)
+            refreshSession().join()
+            val active = account ?: return@launch
+            try { api.sync(active.accessToken, store.watched, store.history) }
+            catch (_: Exception) { /* local data is always kept */ }
+        }
+    }
+    fun saveProfile() = scope.launch {
+        refreshSession().join()
+        val active = account ?: return@launch
+        try {
+            val data = api.call("/api/native/account", "PUT", JSONObject()
+                .put("favorite_languages", JSONArray(store.favorites.toList()))
+                .put("favorite_genres", JSONArray(store.favoriteGenres.toList()))
+                .put("favorite_artists", JSONArray(store.favoriteArtists.toList())), active.accessToken)
+            account = active.copy(user = data.optJSONObject("user") ?: active.user)
+            store.saveSession(account)
+        } catch (_: Exception) { message = "Could not update profile choices" }
+    }
+    fun loadApprovedTvs() = scope.launch {
+        refreshSession().join()
+        val active = account ?: return@launch
+        try {
+            val data = api.call("/api/tv/devices", token = active.accessToken).optJSONArray("devices") ?: JSONArray()
+            approvedTvs = (0 until data.length()).mapNotNull { data.optJSONObject(it) }
+        } catch (_: Exception) { message = "Could not load approved TVs" }
+    }
+    fun revokeTv(id: String) = scope.launch {
+        refreshSession().join()
+        val active = account ?: return@launch
+        try {
+            api.call("/api/tv/devices/" + Uri.encode(id) + "/revoke", "POST", JSONObject(), active.accessToken)
+            loadApprovedTvs()
+        } catch (_: Exception) { message = "Could not revoke TV" }
+    }
+    fun approveTv(id: String) = scope.launch {
+        refreshSession().join()
+        val active = account ?: return@launch
+        try {
+            api.call("/api/tv/pair/" + Uri.encode(id) + "/approve", "POST", JSONObject(), active.accessToken)
+            message = "TV approved"
+            loadApprovedTvs()
+        } catch (e: Exception) { message = e.localizedMessage ?: "Could not approve TV" }
+    }
+    fun clearMessage() { message = "" }
 }

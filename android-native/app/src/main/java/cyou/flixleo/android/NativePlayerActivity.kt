@@ -1,122 +1,301 @@
 package cyou.flixleo.android
 
-import android.os.Bundle
+import android.app.Activity
+import android.app.AlertDialog
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
+import android.os.Build
+import android.util.Rational
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.graphics.Color
 import android.net.Uri
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.*
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.*
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.SeekBar
+import android.widget.TextView
+import android.widget.Toast
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.Media
+import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.util.VLCVideoLayout
+import kotlin.math.max
 
-data class StreamOption(val name:String,val url:String)
-class NativePlayerActivity : ComponentActivity() {
-    private var player: ExoPlayer?=null
-    private var activePlaybackKey=""
-    override fun onCreate(savedInstanceState:Bundle?) {
-        super.onCreate(savedInstanceState)
-        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN)
-        val title=intent.getStringExtra("media_name") ?: "FlixLeo"
-        val type=intent.getStringExtra("media_type") ?: "movie"
-        val tmdb=intent.getStringExtra("media_id")?.replace(Regex("^(tv-|tmdb-)"),"").orEmpty()
-        val preferences=getSharedPreferences("flixleo_resume",MODE_PRIVATE)
-        setContent {
-            var season by remember { mutableIntStateOf(1) }
-            var episode by remember { mutableIntStateOf(1) }
-            var streams by remember { mutableStateOf<List<StreamOption>>(emptyList()) }
-            var selected by remember { mutableStateOf<StreamOption?>(null) }
-            var playingKey by remember { mutableStateOf("") }
-            var loading by remember { mutableStateOf(false) }
-            var message by remember { mutableStateOf("") }
-            val key="$type:$tmdb:$season:$episode"
-            LaunchedEffect(key) {
-                player?.let { old -> if(playingKey.isNotEmpty()) preferences.edit().putLong("$playingKey:position",old.currentPosition.coerceAtLeast(0)).apply(); old.pause() }
-                selected=null;loading=true;message=""
+/**
+ * In-app VLC player: a real native decoder, not the Android WebView HTML video
+ * element nor an intent to an external VLC installation.
+ */
+class NativePlayerActivity : Activity() {
+    private var library: LibVLC? = null
+    private var player: MediaPlayer? = null
+    private var surface: VLCVideoLayout? = null
+    private lateinit var controls: LinearLayout
+    private lateinit var seek: SeekBar
+    private lateinit var elapsed: TextView
+    private lateinit var playButton: Button
+    private val handler = Handler(Looper.getMainLooper())
+    private var scrubbing = false
+    private var controlsShown = true
+    private var resumeAtMs = 0L
+    private var ended = false
+    private var lastDuration = 0L
+    private var lastPosition = 0L
+    private var displayAspect = 0
+
+    private val hideControls = Runnable {
+        if (!isFinishing && ::controls.isInitialized) {
+            controls.visibility = View.GONE
+            controlsShown = false
+        }
+    }
+    private val ticker = object : Runnable {
+        override fun run() {
+            val video = player
+            if (video != null) {
                 try {
-                    streams=withContext(Dispatchers.IO) {
-                        val query="type="+if(type=="tv")"series" else "movie"
-                        val suffix=if(type=="tv")"&season=$season&episode=$episode" else ""
-                        val conn=URL("https://flixleo.cyou/api/stremio/streams?$query&tmdb=$tmdb$suffix").openConnection() as HttpURLConnection
-                        try {
-                            conn.connectTimeout=16000;conn.readTimeout=24000
-                            if(conn.responseCode !in 200..299) throw IllegalStateException("Stream service unavailable")
-                            val data=JSONObject(conn.inputStream.bufferedReader().use{it.readText()})
-                            val list=data.optJSONArray("streams")
-                            if(list==null) emptyList() else (0 until list.length()).mapNotNull {
-                                val o=list.optJSONObject(it) ?:return@mapNotNull null
-                                val url=o.optString("url")
-                                if(!url.startsWith("https://"))null else StreamOption(o.optString("title",o.optString("name","Server ${it+1}")),url)
-                            }
-                        }finally{conn.disconnect()}
+                    val duration = video.length.coerceAtLeast(0L)
+                    val position = video.time.coerceAtLeast(0L)
+                    if (duration > 0) lastDuration = duration
+                    if (position > 0) lastPosition = position
+                    if (resumeAtMs > 0 && duration > 0 && resumeAtMs < duration - 10_000) {
+                        video.setTime(resumeAtMs)
+                        resumeAtMs = 0
                     }
-                    if(streams.isEmpty())message="No streams available"
-                    else {
-                        val saved=preferences.getString("$key:url",null)
-                        selected=streams.firstOrNull{it.url==saved} ?: streams.first()
+                    if (!scrubbing) {
+                        seek.isEnabled = duration > 0 && video.isSeekable
+                        seek.max = max(1, (duration / 1000L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                        seek.progress = (position / 1000L).coerceAtMost(seek.max.toLong()).toInt()
                     }
-                } catch(e:Exception){streams=emptyList();message=e.message ?: "Stream request failed"}
-                loading=false
+                    elapsed.text = if (duration > 0) "${time(position)} / ${time(duration)}" else "LIVE"
+                    playButton.text = if (video.isPlaying) "Ⅱ" else "▶"
+                } catch (_: Exception) { }
             }
-            LaunchedEffect(selected?.url,key) {
-                val option=selected ?:return@LaunchedEffect
-                player?.release()
-                val p=ExoPlayer.Builder(this@NativePlayerActivity).build()
-                player=p
-                playingKey=key
-                activePlaybackKey=key
-                val savedUrl=preferences.getString("$key:url",null)
-                val position=if(savedUrl==option.url) preferences.getLong("$key:position",0) else 0
-                preferences.edit().putString("$key:url",option.url).apply()
-                p.setMediaItem(MediaItem.fromUri(Uri.parse(option.url)))
-                p.prepare()
-                if(position>0)p.seekTo(position)
-                p.playWhenReady=true
+            handler.postDelayed(this, 500)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
+        val uri = intent.getStringExtra("stream_url")?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        if (uri == null || uri.scheme != "https" || uri.host.isNullOrBlank() ||
+            uri.host.equals("localhost", true)) {
+            Toast.makeText(this, "Invalid HTTPS stream", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+        resumeAtMs = intent.getLongExtra("resume_ms", 0).coerceAtLeast(0L)
+        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        val videoView = VLCVideoLayout(this)
+        surface = videoView
+        root.addView(videoView, FrameLayout.LayoutParams(-1, -1))
+
+        val toolbar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.argb(230, 10, 13, 20))
+            setPadding(dp(14), dp(8), dp(14), dp(10))
+        }
+        controls = toolbar
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(button("✕") { closePlayer() })
+        header.addView(TextView(this).apply {
+            text = intent.getStringExtra("title")?.take(90).orEmpty().ifBlank { "FlixLeo" }
+            setTextColor(Color.WHITE); textSize = 16f; setSingleLine(true)
+            setPadding(dp(12), 0, 0, 0)
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        toolbar.addView(header)
+        seek = SeekBar(this)
+        toolbar.addView(seek, LinearLayout.LayoutParams(-1, dp(35)))
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) { scrubbing = true; showControls() }
+            override fun onStopTrackingTouch(bar: SeekBar) {
+                player?.let { if (it.isSeekable) it.setTime(bar.progress.toLong() * 1000L) }
+                scrubbing = false; showControls()
             }
-            MaterialTheme(colorScheme=darkColorScheme()){
-                Column(Modifier.fillMaxSize().background(Color(0xFF090C15)).padding(12.dp)){
-                    Text(title,color=Color.White,fontSize=20.sp)
-                    if(type=="tv")Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                        OutlinedButton(onClick={if(season>1){season--;episode=1}}){Text("Season $season −")}
-                        OutlinedButton(onClick={episode++}){Text("Episode $episode +")}
-                    }
-                    val chosen=selected
-                    if(chosen!=null)AndroidView(factory={context->PlayerView(context).apply{useController=true;setShowSubtitleButton(true)}},update={it.player=player},modifier=Modifier.fillMaxWidth().aspectRatio(16f/9f))
-                    if(loading)CircularProgressIndicator()
-                    if(message.isNotBlank())Text(message,color=Color(0xFFFFC453))
-                    Text("Available servers",color=Color.White,modifier=Modifier.padding(top=16.dp,bottom=8.dp))
-                    LazyColumn(verticalArrangement=Arrangement.spacedBy(6.dp)){
-                        items(streams.size){idx->
-                            val stream=streams[idx]
-                            OutlinedButton(onClick={selected=stream},modifier=Modifier.fillMaxWidth()){Text(stream.name.take(110),maxLines=2)}
+            override fun onProgressChanged(bar: SeekBar, value: Int, fromUser: Boolean) {
+                if (fromUser) elapsed.text = time(value.toLong() * 1000L)
+            }
+        })
+        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; orientation = LinearLayout.HORIZONTAL }
+        elapsed = TextView(this).apply {
+            text = "0:00"; setTextColor(Color.WHITE); textSize = 12f; setPadding(dp(3), 0, dp(10), 0)
+        }
+        row.addView(elapsed)
+        row.addView(button("↶10") { skip(-10_000L) })
+        playButton = button("Ⅱ") {
+            player?.let { if (it.isPlaying) it.pause() else it.play() }
+            showControls()
+        }
+        row.addView(playButton)
+        row.addView(button("10↷") { skip(10_000L) })
+        row.addView(button("Audio") { selectAudio() })
+        row.addView(button("CC") { selectSubtitles() })
+        row.addView(button("Aspect") { changeAspect() })
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) row.addView(button("Mini") { enterMini() })
+        toolbar.addView(row)
+        root.addView(toolbar, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+        root.setOnClickListener { if (controlsShown) { controls.visibility = View.GONE; controlsShown = false } else showControls() }
+        setContentView(root)
+
+        try {
+            val vlc = LibVLC(this, arrayListOf("--network-caching=1200", "--audio-time-stretch"))
+            library = vlc
+            val video = MediaPlayer(vlc)
+            player = video
+            video.attachViews(videoView, null, false, false)
+            video.setEventListener { event ->
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    when (event.type) {
+                        MediaPlayer.Event.Playing -> { playButton.text = "Ⅱ"; showControls() }
+                        MediaPlayer.Event.Paused -> { playButton.text = "▶"; showControls() }
+                        MediaPlayer.Event.EndReached -> { ended = true; closePlayer() }
+                        MediaPlayer.Event.EncounteredError -> {
+                            Toast.makeText(this, "This server could not play. Try another quality.", Toast.LENGTH_LONG).show()
+                            showControls()
                         }
                     }
                 }
             }
+            val media = Media(vlc, uri)
+            media.setHWDecoderEnabled(true, false)
+            media.addOption(":network-caching=1200")
+            video.setMedia(media)
+            media.release()
+            video.play()
+            handler.post(ticker)
+            showControls()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Native video player unavailable: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            closePlayer()
         }
     }
-    override fun onStop(){
-        player?.let{p->
-            val type=intent.getStringExtra("media_type") ?: "movie"
-            val tmdb=intent.getStringExtra("media_id")?.replace(Regex("^(tv-|tmdb-)"),"").orEmpty()
-            val savedKey=activePlaybackKey
-            if(savedKey.isNotEmpty())getSharedPreferences("flixleo_resume",MODE_PRIVATE).edit().putLong("$savedKey:position",p.currentPosition.coerceAtLeast(0)).apply()
-            p.release()
+
+    private fun time(ms: Long): String {
+        val t = ms.coerceAtLeast(0L) / 1000L
+        return if (t >= 3600) "%d:%02d:%02d".format(t / 3600, (t % 3600) / 60, t % 60)
+        else "%d:%02d".format(t / 60, t % 60)
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+    private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
+        text = label
+        isAllCaps = false
+        textSize = 12f
+        setTextColor(Color.WHITE)
+        setBackgroundColor(Color.rgb(34, 39, 52))
+        minWidth = dp(44)
+        minHeight = dp(42)
+        setOnClickListener { action(); showControls() }
+    }
+    private fun showControls() {
+        if (!::controls.isInitialized) return
+        controls.visibility = View.VISIBLE
+        controlsShown = true
+        handler.removeCallbacks(hideControls)
+        handler.postDelayed(hideControls, 4500L)
+    }
+    private fun skip(amount: Long) {
+        player?.let {
+            if (it.isSeekable) it.setTime((it.time + amount).coerceIn(0L, max(it.length, 0L)))
         }
-        player=null
-        super.onStop()
+    }
+    private fun selectAudio() {
+        val video = player ?: return
+        val tracks = video.audioTracks?.filter { it.id >= 0 } ?: emptyList()
+        if (tracks.isEmpty()) { Toast.makeText(this, "No audio tracks detected yet", Toast.LENGTH_SHORT).show(); return }
+        AlertDialog.Builder(this).setTitle("Audio language")
+            .setSingleChoiceItems(tracks.map { it.name ?: "Audio ${it.id}" }.toTypedArray(),
+                tracks.indexOfFirst { it.id == video.audioTrack }) { dialog, which ->
+                video.setAudioTrack(tracks[which].id)
+                dialog.dismiss()
+            }.setNegativeButton("Cancel", null).show()
+    }
+    private fun selectSubtitles() {
+        val video = player ?: return
+        val tracks = video.spuTracks?.filter { it.id >= 0 } ?: emptyList()
+        val names = arrayOf("Off") + tracks.map { it.name ?: "Subtitle ${it.id}" }
+        AlertDialog.Builder(this).setTitle("Subtitle language")
+            .setSingleChoiceItems(names, tracks.indexOfFirst { it.id == video.spuTrack } + 1) { dialog, which ->
+                video.setSpuTrack(if (which == 0) -1 else tracks[which - 1].id)
+                dialog.dismiss()
+            }.setNegativeButton("Cancel", null).show()
+    }
+    private fun changeAspect() {
+        val video = player ?: return
+        val names = arrayOf("Original (Auto)", "16:9", "4:3", "21:9")
+        AlertDialog.Builder(this).setTitle("Aspect ratio")
+            .setSingleChoiceItems(names, displayAspect) { dialog, which ->
+                displayAspect = which
+                video.setAspectRatio(when(which) { 1 -> "16:9"; 2 -> "4:3"; 3 -> "21:9"; else -> null })
+                video.setScale(0f)
+                dialog.dismiss()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun closePlayer() {
+        try {
+            player?.let {
+                if (it.time > 0) lastPosition = it.time
+                if (it.length > 0) lastDuration = it.length
+            }
+        } catch (_: Exception) { }
+        setResult(RESULT_OK, Intent().apply {
+            putExtra("position_ms", lastPosition)
+            putExtra("duration_ms", lastDuration)
+            putExtra("ended", ended)
+            putExtra("mirror_id", intent.getStringExtra("mirror_id"))
+        })
+        finish()
+    }
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() { closePlayer() }
+
+    private fun enterMini() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && player?.isPlaying == true) {
+            val params = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
+            try { enterPictureInPictureMode(params) } catch (_: Exception) { }
+        }
+    }
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        enterMini()
+    }
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (::controls.isInitialized) {
+            controls.visibility = if (isInPictureInPictureMode) View.GONE else View.VISIBLE
+            if (!isInPictureInPictureMode) showControls()
+        }
+    }
+    override fun onPause() {
+        super.onPause()
+        if (!isFinishing && !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode)) {
+            player?.let { if (it.isPlaying) it.pause() }
+        }
+    }
+    override fun onDestroy() {
+        handler.removeCallbacks(ticker)
+        handler.removeCallbacks(hideControls)
+        player?.let {
+            try { it.setEventListener(null); it.stop(); it.detachViews(); it.release() } catch (_: Exception) { }
+        }
+        player = null
+        library?.release()
+        library = null
+        surface = null
+        super.onDestroy()
     }
 }
