@@ -507,7 +507,7 @@ private fun HomeScreen(state: FlixState) {
                 LazyRow(contentPadding = PaddingValues(horizontal = 17.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(history, key = { it.key }) { entry ->
-                        Column(Modifier.width(165.dp).clickable { state.open(entry.title) }) {
+                        Column(Modifier.width(165.dp).clickable { state.resume(entry) }) {
                             Box(Modifier.fillMaxWidth().height(99.dp)
                                 .clip(RoundedCornerShape(12.dp)).background(Card)) {
                                 AsyncImage(entry.title.backdrop.ifBlank { entry.title.poster },
@@ -524,6 +524,9 @@ private fun HomeScreen(state: FlixState) {
                                 color = Color.White, fontSize = 12.sp)
                             if (entry.title.episode > 0) Text("S${entry.title.season} · E${entry.title.episode}",
                                 fontSize = 11.sp, color = Gold)
+                            if (entry.duration > 0 && entry.progress > 0)
+                                Text("${kotlin.math.ceil((entry.duration - entry.progress).coerceAtLeast(0.0) / 60.0).toInt()} min remaining",
+                                    fontSize = 11.sp, color = Muted)
                         }
                     }
                 }
@@ -553,7 +556,18 @@ private fun HomeScreen(state: FlixState) {
 @Composable
 private fun BrowseScreen(state: FlixState, tv: Boolean) {
     val titles = if (tv) state.series else state.movies
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(14.dp)) {
+    val scroll = androidx.compose.foundation.lazy.rememberLazyListState()
+    val nearEnd by remember(scroll, titles.size, state.paging, state.loading) {
+        derivedStateOf {
+            val info = scroll.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            info.totalItemsCount > 0 && last >= info.totalItemsCount - 3 &&
+                !state.paging && !state.loading && state.pagingError.isEmpty() &&
+                (if (tv) state.seriesMore else state.moviesMore)
+        }
+    }
+    LaunchedEffect(nearEnd, tv) { if (nearEnd) state.loadNextPage(tv) }
+    LazyColumn(Modifier.fillMaxSize(), state = scroll, contentPadding = PaddingValues(14.dp)) {
         item {
             Text(if (tv) "Series" else "Movies", fontSize = 29.sp, fontWeight = FontWeight.Black)
             Text("Discover your next watch", color = Muted, fontSize = 12.sp)
@@ -591,6 +605,17 @@ private fun BrowseScreen(state: FlixState, tv: Boolean) {
                 repeat(3 - group.size) { Spacer(Modifier.weight(1f)) }
             }
             Spacer(Modifier.height(14.dp))
+        }
+        if (state.paging) item {
+            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Gold)
+            }
+        }
+        if (state.pagingError.isNotEmpty()) item {
+            TextButton(onClick = {
+                state.pagingError = ""
+                state.loadNextPage(tv)
+            }) { Text("Retry loading more", color = Gold) }
         }
     }
 }
