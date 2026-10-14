@@ -46,6 +46,13 @@ export function useDesktopControlsVisible(fullscreen: boolean): boolean {
     const off = desktopBridge()?.onNativeControlsVisible?.(setVisible);
     return () => off?.();
   }, [fullscreen]);
+  // Hide the underlying catalogue's poster menus while the native Win32
+  // fullscreen video is active. Those buttons otherwise bleed through the
+  // reserved HTML control area as repeated vertical three-dot circles.
+  useEffect(() => {
+    document.body.classList.toggle('flixleo-native-fullscreen', fullscreen);
+    return () => document.body.classList.remove('flixleo-native-fullscreen');
+  }, [fullscreen]);
   // Hide the Chromium cursor too; mpv hides its own native cursor.
   // A class is used so interactive child elements cannot override it.
   useEffect(() => {
