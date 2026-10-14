@@ -162,6 +162,7 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
             }
         }
         if (state.showAuth) AccountDialog(state)
+        if (state.showOnboarding && state.account != null) PostSignupInterestsDialog(state)
         val update = state.updateNotice
         if (update != null) AlertDialog(
             onDismissRequest = { if (!state.updateForced) state.updateNotice = null },
@@ -628,98 +629,310 @@ private fun DetailSheet(state: FlixState) {
 }
 @Composable
 private fun ProfileScreen(state: FlixState) {
+    var interestsOpen by remember { mutableStateOf(false) }
+    var tvOpen by remember { mutableStateOf(false) }
     var pairId by remember { mutableStateOf("") }
     var newArtist by remember { mutableStateOf("") }
     val session = state.account
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+
+    LazyColumn(Modifier.fillMaxSize().background(Ink),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 30.dp),
+        verticalArrangement = Arrangement.spacedBy(13.dp)) {
         item {
-            Text("Your FlixLeo", fontSize = 27.sp, fontWeight = FontWeight.Black)
             Spacer(Modifier.height(8.dp))
-            Surface(color = Card, shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(session?.user?.optString("email") ?: "Guest account",
-                        fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                    Text(if (session == null) "Sign in to sync across devices"
-                        else "Email verified · Cloud account",
-                        color = Muted, fontSize = 12.sp)
-                    Spacer(Modifier.height(10.dp))
-                    if (session == null) Button(onClick = { state.showAuth = true }) { Text("Sign in / Create account") }
-                    else TextButton(onClick = { state.signOut() }) { Text("Sign out") }
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Heading("Your movie languages", "Choose for native For You recommendations")
-            val choices = listOf("English", "Tamil", "Hindi", "Telugu", "Malayalam", "Kannada", "Sinhala", "Korean", "Japanese")
-            choices.chunked(3).forEach { group ->
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    group.forEach { label ->
-                        FilterChip(selected = label in state.favorites, onClick = { state.toggleLanguage(label) },
-                            label = { Text(label, fontSize = 10.sp) })
+            Text("My FlixLeo", fontSize = 27.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text("Your entertainment, your way", fontSize = 13.sp, color = Muted)
+        }
+        item {
+            Column(Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF222440), Color(0xFF151D2D), Color(0xFF141722))))
+                .border(1.dp, Color.White.copy(alpha = .10f), RoundedCornerShape(24.dp))
+                .padding(19.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(64.dp).clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(Gold, Color(0xFFF97316)))),
+                        contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = Ink,
+                            modifier = Modifier.size(33.dp))
+                    }
+                    Spacer(Modifier.width(13.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(session?.user?.optJSONObject("user_metadata")
+                            ?.optString("display_name")?.takeIf { it.isNotBlank() }
+                            ?: if (session == null) "Welcome to FlixLeo" else "Your account",
+                            color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(session?.user?.optString("email") ?: "Enjoy movies without signing in",
+                            color = Muted, fontSize = 12.sp, maxLines = 2)
+                        Spacer(Modifier.height(6.dp))
+                        Text(if (session == null) "GUEST MODE" else "✓ VERIFIED ACCOUNT",
+                            color = if (session == null) Color(0xFFFCD34D) else Color(0xFF86EFAC),
+                            fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp)
                     }
                 }
-            }
-            Heading("Favorite genres", "Used to build your personal For You section")
-            listOf("Action", "Comedy", "Drama", "Thriller", "Romance", "Sci-Fi",
-                "Animation", "Horror", "Fantasy", "Adventure", "Crime", "Documentary")
-                .chunked(3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        row.forEach { genre ->
-                            FilterChip(selected = genre in state.favoriteGenres,
-                                onClick = { state.toggleGenre(genre) },
-                                label = { Text(genre, fontSize = 10.sp) })
+                Spacer(Modifier.height(16.dp))
+                if (session == null) {
+                    Button(onClick = { state.showAuth = true },
+                        modifier = Modifier.fillMaxWidth().height(49.dp),
+                        shape = RoundedCornerShape(14.dp)) {
+                        Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(19.dp))
+                        Spacer(Modifier.width(9.dp))
+                        Text("Sign in or create account", fontWeight = FontWeight.Bold)
+                    }
+                    Text("Sign in to share your watchlist and playback progress across platforms.",
+                        color = Muted, fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 10.dp))
+                } else {
+                    Surface(color = Color.White.copy(alpha = .07f),
+                        shape = RoundedCornerShape(14.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(13.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CloudDone, contentDescription = null, tint = Color(0xFF86EFAC))
+                            Spacer(Modifier.width(10.dp))
+                            Text("Syncs with your FlixLeo account",
+                                fontSize = 12.sp, color = Color.White,
+                                modifier = Modifier.weight(1f))
                         }
                     }
                 }
-            Heading("Favorite artists", "Match movies by actor or actress")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = newArtist, onValueChange = { newArtist = it.take(80) },
-                    modifier = Modifier.weight(1f), singleLine = true, label = { Text("Artist name") })
-                TextButton(onClick = { state.addArtist(newArtist); newArtist = "" },
-                    enabled = newArtist.isNotBlank()) { Text("Add") }
             }
-            state.favoriteArtists.forEach { artist ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(artist, Modifier.weight(1f), fontSize = 12.sp)
-                    IconButton(onClick = { state.removeArtist(artist) }) {
-                        Icon(Icons.Default.Close, "Remove artist", tint = Muted, modifier = Modifier.size(17.dp))
-                    }
-                }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ProfileStat("Watchlist", state.watchlist.size.toString(), Icons.Default.Bookmark,
+                    Modifier.weight(1f))
+                ProfileStat("Continue", state.history.size.toString(), Icons.Default.PlayCircle,
+                    Modifier.weight(1f))
+                ProfileStat("Languages", state.favorites.size.toString(), Icons.Default.Language,
+                    Modifier.weight(1f))
             }
-            Heading("Watchlist", "${state.watchlist.size} titles saved")
-            val all = (state.home.flatMap { it.second } + state.movies + state.series +
+        }
+        item {
+            ProfileHeading("My Watchlist", "Saved movies and series", Icons.Default.Bookmarks)
+            val items = (state.home.flatMap { it.second } + state.movies + state.series +
                 state.history.map { it.title }).distinctBy { it.id }
-            val saved = all.filter { it.id in state.watchlist }
-            if (saved.isEmpty()) Text("Tap the bookmark on any title to save it.",
-                color = Muted, fontSize = 13.sp, modifier = Modifier.padding(10.dp))
-            if (saved.isNotEmpty()) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(saved) { title -> Poster(title, true, compact = true) { state.open(title) } }
-                }
-            }
-            if (session != null) {
-                Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = Muted.copy(alpha = .15f))
-                Heading("Approved TVs", "Revoke TV access or approve pairing code")
-                OutlinedButton(onClick = { state.loadApprovedTvs() }) { Text("Load paired TVs") }
-                state.approvedTvs.forEach { tv ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(tv.optString("label", "TV"), Modifier.weight(1f), color = Color.White)
-                        TextButton(onClick = { state.revokeTv(tv.optString("id")) }) { Text("Revoke") }
+                .filter { it.id in state.watchlist }
+            if (items.isEmpty()) {
+                Surface(color = Card, shape = RoundedCornerShape(17.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.BookmarkBorder, null, tint = Gold)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Save titles from Home or Search to see them here.",
+                            color = Muted, fontSize = 12.sp)
                     }
                 }
-                OutlinedTextField(value = pairId, onValueChange = { pairId = it.take(90) },
-                    label = { Text("TV pairing code / ID") }, singleLine = true)
-                TextButton(onClick = { state.approveTv(pairId); pairId = "" }, enabled = pairId.isNotBlank()) {
-                    Text("Approve TV")
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(11.dp),
+                    contentPadding = PaddingValues(vertical = 7.dp)) {
+                    items(items, key = { it.id }) { item ->
+                        Poster(item, true, compact = true) { state.open(item) }
+                    }
                 }
             }
-            Spacer(Modifier.height(28.dp))
-            Text("FLIXLEO · Native Android · v1.2.0", color = Gold, fontWeight = FontWeight.Bold)
-            Text("Discover using TMDB metadata. Availability and source compatibility vary.",
-                color = Muted, fontSize = 11.sp)
+        }
+        if (session != null) {
+            item {
+                Spacer(Modifier.height(3.dp))
+                Surface(color = Card, shape = RoundedCornerShape(17.dp),
+                    modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().animateContentSize()) {
+                        Row(Modifier.fillMaxWidth().clickable { interestsOpen = !interestsOpen }
+                            .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Tune, null, tint = Gold)
+                            Spacer(Modifier.width(11.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Personalize For You", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("Languages, genres & artists", color = Muted, fontSize = 12.sp)
+                            }
+                            Icon(if (interestsOpen) Icons.Default.ExpandLess else Icons.Default.ChevronRight,
+                                "Edit preferences", tint = Muted)
+                        }
+                        AnimatedVisibility(interestsOpen) {
+                            Column(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 15.dp)) {
+                                InterestOptions(state,
+                                    newArtist = newArtist,
+                                    onArtistChange = { newArtist = it },
+                                    onArtistAdd = {
+                                        state.addArtist(newArtist)
+                                        newArtist = ""
+                                    })
+                                OutlinedButton(onClick = { state.saveProfile(); interestsOpen = false },
+                                    modifier = Modifier.fillMaxWidth()) {
+                                    Icon(Icons.Default.Check, null)
+                                    Spacer(Modifier.width(7.dp))
+                                    Text("Save preferences")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                Surface(color = Card, shape = RoundedCornerShape(17.dp),
+                    modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().animateContentSize()) {
+                        Row(Modifier.fillMaxWidth().clickable {
+                            tvOpen = !tvOpen
+                            if (tvOpen) state.loadApprovedTvs()
+                        }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Tv, null, tint = Gold)
+                            Spacer(Modifier.width(11.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Connected TVs", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("Manage access and pairing", color = Muted, fontSize = 12.sp)
+                            }
+                            Icon(if (tvOpen) Icons.Default.ExpandLess else Icons.Default.ChevronRight,
+                                "Manage TVs", tint = Muted)
+                        }
+                        AnimatedVisibility(tvOpen) {
+                            Column(Modifier.padding(horizontal = 15.dp, vertical = 10.dp)) {
+                                state.approvedTvs.forEach { tv ->
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically) {
+                                        Text(tv.optString("label", "TV"),
+                                            color = Color.White, modifier = Modifier.weight(1f))
+                                        TextButton(onClick = { state.revokeTv(tv.optString("id")) }) {
+                                            Text("Revoke")
+                                        }
+                                    }
+                                }
+                                OutlinedTextField(pairId, onValueChange = { pairId = it.take(90) },
+                                    label = { Text("TV pairing ID") }, singleLine = true,
+                                    modifier = Modifier.fillMaxWidth())
+                                Button(onClick = {
+                                    state.approveTv(pairId); pairId = ""
+                                }, enabled = pairId.isNotBlank(),
+                                    modifier = Modifier.fillMaxWidth().padding(top = 7.dp)) {
+                                    Text("Approve TV")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                OutlinedButton(onClick = { state.signOut() },
+                    modifier = Modifier.fillMaxWidth().height(47.dp),
+                    shape = RoundedCornerShape(15.dp)) {
+                    Icon(Icons.Default.Logout, null, tint = Color(0xFFFDA4AF))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Sign out", color = Color(0xFFFDA4AF), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        item {
+            Column(Modifier.fillMaxWidth().padding(top = 9.dp),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(painterResource(R.drawable.flixleo_brand), contentDescription = null,
+                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)))
+                Spacer(Modifier.height(5.dp))
+                Text("FlixLeo · Native Android", fontSize = 12.sp, color = Muted)
+                Text("Movies & TV series powered by TMDB", fontSize = 10.sp, color = Muted)
+            }
         }
     }
+}
+@Composable
+private fun ProfileStat(label: String, number: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+    Surface(color = Card, shape = RoundedCornerShape(15.dp), modifier = modifier) {
+        Column(Modifier.padding(horizontal = 11.dp, vertical = 13.dp)) {
+            Icon(icon, null, tint = Gold, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.height(7.dp))
+            Text(number, color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp)
+            Text(label, color = Muted, fontSize = 10.sp, maxLines = 1)
+        }
+    }
+}
+@Composable
+private fun ProfileHeading(text: String, subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = Gold, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text(subtitle, color = Muted, fontSize = 11.sp)
+        }
+    }
+}
+@Composable
+private fun InterestOptions(state: FlixState, newArtist: String,
+    onArtistChange: (String) -> Unit, onArtistAdd: () -> Unit) {
+    Text("Preferred languages", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    Spacer(Modifier.height(4.dp))
+    val languages = listOf("English","Tamil","Hindi","Telugu","Malayalam","Kannada",
+        "Sinhala","Korean","Japanese")
+    languages.chunked(3).forEach { group ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            group.forEach { label ->
+                FilterChip(label in state.favorites, onClick = { state.toggleLanguage(label) },
+                    label = { Text(label, fontSize = 10.sp) },
+                    modifier = Modifier.height(39.dp))
+            }
+        }
+    }
+    Spacer(Modifier.height(9.dp))
+    Text("Favorite genres", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    listOf("Action","Comedy","Drama","Thriller","Romance","Sci-Fi","Animation",
+        "Horror","Fantasy","Adventure","Crime","Documentary").chunked(3).forEach { group ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            group.forEach { label ->
+                FilterChip(label in state.favoriteGenres, onClick = { state.toggleGenre(label) },
+                    label = { Text(label, fontSize = 10.sp) },
+                    modifier = Modifier.height(39.dp))
+            }
+        }
+    }
+    Spacer(Modifier.height(9.dp))
+    Text("Favorite artists", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(newArtist, onValueChange = onArtistChange,
+            label = { Text("Artist") }, singleLine = true,
+            modifier = Modifier.weight(1f))
+        TextButton(onClick = onArtistAdd, enabled = newArtist.isNotBlank()) { Text("Add") }
+    }
+    state.favoriteArtists.forEach { artist ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(artist, Modifier.weight(1f), color = Color.White, fontSize = 12.sp)
+            IconButton(onClick = { state.removeArtist(artist) }) {
+                Icon(Icons.Default.Close, "Remove artist", tint = Muted, modifier = Modifier.size(17.dp))
+            }
+        }
+    }
+}
+@Composable
+private fun PostSignupInterestsDialog(state: FlixState) {
+    var artist by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { /* Only explicit save/skip clears the signup prompt. */ },
+        title = {
+            Column {
+                Text("Make FlixLeo yours", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                Text("Choose what you enjoy. We will build your For You collection.",
+                    fontSize = 12.sp, color = Muted)
+            }
+        },
+        text = {
+            Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                InterestOptions(state, artist, { artist = it.take(80) }) {
+                    state.addArtist(artist)
+                    artist = ""
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { state.finishOnboarding(true) },
+                shape = RoundedCornerShape(12.dp)) { Text("Save choices") }
+        },
+        dismissButton = {
+            TextButton(onClick = { state.finishOnboarding(false) }) {
+                Text("Skip for now")
+            }
+        }
+    )
 }
 @Composable
 private fun AccountDialog(state: FlixState) {
