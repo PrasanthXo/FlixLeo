@@ -54,7 +54,9 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
         secondary = Color(0xFF64748B), error = Color(0xFFFB7185)
     )
     MaterialTheme(colorScheme = colors) {
-        Scaffold(
+        if (state.showSplash) {
+            FlixLeoStartupSplash()
+        } else Scaffold(
             containerColor = Ink,
             topBar = {
                 if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) {
@@ -70,16 +72,7 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
                             Text("YOUR CINEMA, REIMAGINED", color = Muted, fontSize = 9.sp,
                                 letterSpacing = 1.3.sp, maxLines = 1)
                         }
-                        IconButton(onClick = { state.changeTab("Search") },
-                            modifier = Modifier.size(42.dp)) {
-                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White,
-                                modifier = Modifier.size(22.dp))
-                        }
-                        IconButton(onClick = { state.changeTab("Profile") },
-                            modifier = Modifier.size(42.dp)) {
-                            Icon(Icons.Default.AccountCircle, contentDescription = "Your profile", tint = Gold,
-                                modifier = Modifier.size(26.dp))
-                        }
+                        // Search and Profile have their own bottom tabs; no duplicate top actions.
                     }
                 }
             },
@@ -180,6 +173,52 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
     }
 }
 
+@Composable
+private fun FlixLeoStartupSplash() {
+    val infinite = rememberInfiniteTransition(label = "FlixLeo splash")
+    val pulse by infinite.animateFloat(
+        initialValue = .94f, targetValue = 1.07f,
+        animationSpec = infiniteRepeatable(tween(1550, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse), label = "Logo breathe"
+    )
+    val spin by infinite.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(3700, easing = LinearEasing)),
+        label = "Cinema orbit"
+    )
+    Box(Modifier.fillMaxSize()
+        .background(Brush.verticalGradient(listOf(
+            Color(0xFF0D1020), Color(0xFF0B0C16), Color(0xFF05060D))))
+        .statusBarsPadding().navigationBarsPadding()) {
+        Box(Modifier.align(Alignment.Center).size(270.dp),
+            contentAlignment = Alignment.Center) {
+            Box(Modifier.size(238.dp).graphicsLayer { rotationZ = spin }
+                .border(2.dp, Color(0xFF9577F6).copy(alpha = .65f), CircleShape))
+            Box(Modifier.size(206.dp).graphicsLayer { rotationZ = -spin * .65f }
+                .border(1.dp, Color(0xFF60C7FF).copy(alpha = .42f), CircleShape))
+            Image(painterResource(R.drawable.flixleo_splash_vector),
+                contentDescription = "FlixLeo cinematic logo",
+                modifier = Modifier.size(184.dp)
+                    .graphicsLayer { scaleX = pulse; scaleY = pulse }
+                    .shadow(30.dp, RoundedCornerShape(38.dp)))
+        }
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+            .padding(bottom = 65.dp, start = 25.dp, end = 25.dp),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("FLIXLEO", color = Color.White, fontSize = 29.sp,
+                fontWeight = FontWeight.Black, letterSpacing = 4.sp)
+            Spacer(Modifier.height(7.dp))
+            Text("YOUR CINEMA · YOUR WORLD", color = Color(0xFFD3B5FF),
+                letterSpacing = 1.5.sp, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(24.dp))
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(.50f).clip(RoundedCornerShape(6.dp)),
+                color = Gold, trackColor = Color.White.copy(alpha = .14f))
+            Spacer(Modifier.height(13.dp))
+            Text("Preparing your catalogue…", fontSize = 12.sp, color = Muted)
+        }
+    }
+}
 @Composable
 private fun Heading(title: String, subtitle: String? = null, action: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().padding(start = 17.dp, end = 14.dp, top = 19.dp, bottom = 9.dp),
@@ -495,7 +534,12 @@ private fun BrowseScreen(state: FlixState, tv: Boolean) {
         item {
             Text(if (tv) "Series" else "Movies", fontSize = 29.sp, fontWeight = FontWeight.Black)
             Text("Discover your next watch", color = Muted, fontSize = 12.sp)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
+        }
+        if (titles.isNotEmpty()) item {
+            HeroWheel(titles.take(15), state)
+            Spacer(Modifier.height(11.dp))
+            Heading(if (tv) "Explore Series" else "Explore Movies")
         }
         if (titles.isEmpty() && !state.loading) item {
             Text("No catalogue entries found. Tap Refresh.", color = Muted)
@@ -531,6 +575,16 @@ private fun SearchScreen(state: FlixState) {
             singleLine = true, shape = RoundedCornerShape(15.dp),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp))
         if (state.searchLoading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Gold)
+        if (state.searchError.isNotBlank()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.WifiOff, null, tint = Muted, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(9.dp))
+                Text(state.searchError, color = Muted, fontSize = 12.sp,
+                    modifier = Modifier.weight(1f))
+                TextButton(onClick = { state.performSearch(state.search) }) { Text("Retry") }
+            }
+        }
         LazyColumn(contentPadding = PaddingValues(17.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
             items(state.searchResults) { item ->
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
@@ -596,6 +650,17 @@ private fun DetailSheet(state: FlixState) {
             Text(title.title, fontWeight = FontWeight.Black, fontSize = 24.sp)
             Text(listOf(title.year, title.language, title.type.uppercase()).filter { it.isNotBlank() }
                 .joinToString(" · "), color = Gold, fontSize = 12.sp)
+            if (title.rating.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, null, tint = Gold, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text(title.rating + " / 10", fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                        color = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("TMDB score", color = Muted, fontSize = 11.sp)
+                }
+            }
             Spacer(Modifier.height(7.dp))
             if (title.description.isNotBlank()) Text(title.description, fontSize = 13.sp, color = Color.LightGray)
             if (title.cast.isNotEmpty()) {
@@ -604,9 +669,13 @@ private fun DetailSheet(state: FlixState) {
             }
             Spacer(Modifier.height(11.dp))
             OutlinedButton(onClick = { state.toggleWatch(title) }) {
-                Icon(if (state.watchlist.contains(title.id)) Icons.Default.BookmarkAdded else Icons.Default.BookmarkAdd, null)
+                Icon(if (state.account == null) Icons.Default.LockOutline
+                    else if (state.watchlist.contains(title.id)) Icons.Default.BookmarkAdded
+                    else Icons.Default.BookmarkAdd, null)
                 Spacer(Modifier.width(7.dp))
-                Text(if (state.watchlist.contains(title.id)) "Remove from Watchlist" else "Add to Watchlist")
+                Text(if (state.account == null) "Sign in to save to Watchlist"
+                    else if (state.watchlist.contains(title.id)) "Remove from Watchlist"
+                    else "Add to Watchlist")
             }
             if (title.type == "tv") {
                 Spacer(Modifier.height(15.dp))
