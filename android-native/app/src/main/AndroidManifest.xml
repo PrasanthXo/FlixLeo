@@ -11,7 +11,7 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity android:name=".NativePlayerActivity" android:screenOrientation="sensorLandscape"
-            android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:exported="false" android:supportsPictureInPicture="true" android:resizeableActivity="true" android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
