@@ -34,6 +34,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.delay
 import coil.compose.AsyncImage
 import kotlin.math.absoluteValue
+import kotlin.math.abs
 import org.json.JSONObject
 
 private val Ink = Color(0xFF090B11)
@@ -223,36 +224,148 @@ private fun PosterRow(label: String, data: List<FlixTitle>, state: FlixState) {
 @Composable
 private fun HeroWheel(items: List<FlixTitle>, state: FlixState) {
     if (items.isEmpty()) return
-    val pager = rememberPagerState(pageCount = { items.size.coerceAtMost(18) })
-    Box(Modifier.fillMaxWidth().height(270.dp)) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 43.dp), pageSpacing = 10.dp) { page ->
-            val item = items[page]
-            val offset = ((pager.currentPage - page) + pager.currentPageOffsetFraction).absoluteValue
-            Box(Modifier.fillMaxSize().padding(vertical = 7.dp)
-                .graphicsLayer {
-                    scaleX = 1f - (offset * .1f).coerceAtMost(.18f)
-                    scaleY = 1f - (offset * .1f).coerceAtMost(.18f)
-                    rotationY = ((pager.currentPage - page) + pager.currentPageOffsetFraction) * 15f
-                    cameraDistance = 13f * density
-                }
-                .clip(RoundedCornerShape(23.dp))
-                .background(Card).clickable { state.open(item) }) {
-                AsyncImage(item.backdrop.takeIf { it.isNotBlank() } ?: item.poster,
-                    contentDescription = item.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
-                    Color.Transparent, Ink.copy(alpha = .23f), Ink.copy(alpha = .98f)))))
-                Column(Modifier.align(Alignment.BottomStart).padding(18.dp)) {
-                    Text("FLIXLEO FEATURED", color = Gold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text(item.title, color = Color.White, fontWeight = FontWeight.Black,
-                        fontSize = 23.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(item.year + "  ·  " + item.language + if (item.type == "tv") "  ·  Series" else "",
-                        color = Color.LightGray, fontSize = 12.sp)
-                    Spacer(Modifier.height(7.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.PlayCircleFilled, contentDescription = null, tint = Gold)
-                        Text("  View details", color = Color.White, fontSize = 13.sp)
+    val slides = remember(items) { items.distinctBy { it.id }.take(15) }
+    var currentIndex by remember(slides) { mutableIntStateOf(0) }
+    val current = slides[currentIndex.coerceIn(slides.indices)]
+    var lastTouched by remember { mutableLongStateOf(0L) }
+
+    // This is a real five-poster 3D wheel, not a one-poster banner/pager.
+    LaunchedEffect(slides) {
+        while (true) {
+            delay(4600L)
+            if (slides.size > 1 && System.currentTimeMillis() - lastTouched > 5000L) {
+                currentIndex = (currentIndex + 1) % slides.size
+            }
+        }
+    }
+    Column(
+        Modifier.fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(25.dp))
+            .border(1.dp, Color(0xFF726DA3).copy(alpha = .5f), RoundedCornerShape(25.dp))
+            .background(Color(0xFF10132A))
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth().height(298.dp).clip(RoundedCornerShape(25.dp))) {
+            val centerSlide = current
+            AsyncImage(
+                model = centerSlide.backdrop.ifBlank { centerSlide.poster },
+                contentDescription = null, contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().blur(24.dp)
+            )
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                listOf(Color(0xCB090A1A), Color(0xD80F1031), Color(0xFF0D1028)))))
+            val posterWidth = minOf(maxWidth * .36f, 154.dp)
+            val stride = minOf(maxWidth * .235f, 94.dp)
+            // Perspective halo matches FlixLeo's cinematic violet/blue glass wheel.
+            Box(Modifier.align(Alignment.BottomCenter)
+                .padding(bottom = 17.dp)
+                .fillMaxWidth(.70f).height(38.dp)
+                .border(2.dp, Color(0xFF9C83FF).copy(alpha = .75f), CircleShape)
+                .background(Brush.radialGradient(listOf(Color(0x664E3BAB), Color.Transparent)), CircleShape))
+            if (slides.size > 1) {
+                (-2..2).sortedByDescending { abs(it) }.forEach { offset ->
+                    val position = (currentIndex + offset + slides.size * 4) % slides.size
+                    val item = slides[position]
+                    val isCenter = offset == 0
+                    val slideX by animateDpAsState(stride * offset,
+                        animationSpec = tween(460, easing = FastOutSlowInEasing), label = "wheel-x")
+                    val rotate by animateFloatAsState(
+                        when (offset) { -2 -> 42f; -1 -> 24f; 1 -> -24f; 2 -> -42f; else -> 0f },
+                        animationSpec = tween(460), label = "wheel-rotation"
+                    )
+                    val scale by animateFloatAsState(
+                        when (abs(offset)) { 0 -> 1f; 1 -> .86f; else -> .71f },
+                        animationSpec = tween(460), label = "wheel-scale"
+                    )
+                    Box(
+                        Modifier.align(Alignment.Center)
+                            .offset(x = slideX, y = if (isCenter) (-4).dp else 5.dp)
+                            .width(posterWidth).height(211.dp)
+                            .zIndex((4 - abs(offset)).toFloat())
+                            .graphicsLayer {
+                                rotationY = rotate
+                                scaleX = scale
+                                scaleY = scale
+                                cameraDistance = 13f * density
+                                alpha = if (abs(offset) == 2) .75f else 1f
+                            }
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(if (isCenter) 2.dp else 1.dp,
+                                if (isCenter) Color(0xFFC4A8FF) else Color.White.copy(alpha = .27f),
+                                RoundedCornerShape(14.dp))
+                            .background(Card)
+                            .clickable {
+                                lastTouched = System.currentTimeMillis()
+                                if (isCenter) state.open(item)
+                                else currentIndex = position
+                            }
+                    ) {
+                        AsyncImage(model = item.poster, contentDescription = item.title,
+                            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        if (isCenter) Box(Modifier.fillMaxSize()
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0x4D121526)))))
                     }
+                }
+            } else {
+                AsyncImage(model = current.poster, contentDescription = current.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.align(Alignment.Center).width(posterWidth).height(208.dp)
+                        .clip(RoundedCornerShape(14.dp)).clickable { state.open(current) })
+            }
+            if (slides.size > 1) {
+                IconButton(onClick = {
+                    lastTouched = System.currentTimeMillis()
+                    currentIndex = (currentIndex - 1 + slides.size) % slides.size
+                }, modifier = Modifier.align(Alignment.CenterStart)
+                    .padding(start = 6.dp).size(34.dp)
+                    .background(Color(0xB910162A), CircleShape)) {
+                    Icon(Icons.Default.ChevronLeft, "Previous featured title", tint = Color.White)
+                }
+                IconButton(onClick = {
+                    lastTouched = System.currentTimeMillis()
+                    currentIndex = (currentIndex + 1) % slides.size
+                }, modifier = Modifier.align(Alignment.CenterEnd)
+                    .padding(end = 6.dp).size(34.dp)
+                    .background(Color(0xB910162A), CircleShape)) {
+                    Icon(Icons.Default.ChevronRight, "Next featured title", tint = Color.White)
+                }
+            }
+        }
+        Column(Modifier.fillMaxWidth().padding(start = 17.dp, end = 17.dp, bottom = 17.dp)) {
+            Text("✦  CINEMATIC SPOTLIGHT", color = Color(0xFFC5B3FF), fontSize = 10.sp,
+                fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
+            Spacer(Modifier.height(5.dp))
+            Text(current.title, fontWeight = FontWeight.Black, fontSize = 22.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, color = Color.White)
+            Text(listOf(current.year, current.language, if (current.type == "tv") "Series" else "Movie")
+                .filter { it.isNotBlank() }.joinToString("  ·  "), color = Muted, fontSize = 12.sp)
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Button(onClick = { state.open(current) },
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).height(42.dp)) {
+                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Watch", fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(onClick = { state.toggleWatch(current) },
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.height(42.dp)) {
+                    Icon(if (state.watchlist.contains(current.id)) Icons.Default.BookmarkAdded
+                        else Icons.Default.BookmarkBorder,
+                        contentDescription = "Save featured title", modifier = Modifier.size(19.dp))
+                }
+                OutlinedButton(onClick = { state.open(current) },
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.height(42.dp)) {
+                    Text("Details", fontSize = 12.sp)
+                }
+            }
+            if (slides.size > 1) Row(Modifier.fillMaxWidth().padding(top = 13.dp),
+                horizontalArrangement = Arrangement.Center) {
+                repeat(slides.size.coerceAtMost(11)) { i ->
+                    Box(Modifier.padding(horizontal = 3.dp)
+                        .width(if (i == currentIndex) 16.dp else 5.dp).height(5.dp)
+                        .clip(CircleShape)
+                        .background(if (i == currentIndex) Color(0xFFBFA6FF) else Color(0xFF4A4C68)))
                 }
             }
         }
