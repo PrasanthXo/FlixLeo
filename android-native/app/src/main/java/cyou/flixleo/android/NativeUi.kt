@@ -39,7 +39,7 @@ private val Nav = listOf("Home", "Movies", "Series", "Live TV", "Search", "Profi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FlixLeoNativeApp(state: FlixState) {
+fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
     val colors = darkColorScheme(
         primary = Gold, onPrimary = Ink, background = Ink, onBackground = Color.White,
         surface = Color(0xFF111520), onSurface = Color.White,
@@ -49,7 +49,7 @@ fun FlixLeoNativeApp(state: FlixState) {
         Scaffold(
             containerColor = Ink,
             topBar = {
-                Row(Modifier.fillMaxWidth().background(Ink).statusBarsPadding()
+                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) Row(Modifier.fillMaxWidth().background(Ink).statusBarsPadding()
                     .padding(start = 17.dp, end = 14.dp, top = 7.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Text("F", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.Black,
@@ -66,7 +66,7 @@ fun FlixLeoNativeApp(state: FlixState) {
                 }
             },
             bottomBar = {
-                Row(Modifier.fillMaxWidth().background(Color(0xFF121722))
+                if (player.mode != PlayerMode.FULLSCREEN && !player.inPictureInPicture) Row(Modifier.fillMaxWidth().background(Color(0xFF121722))
                     .navigationBarsPadding().horizontalScroll(rememberScrollState())
                     .padding(horizontal = 6.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -98,9 +98,12 @@ fun FlixLeoNativeApp(state: FlixState) {
                     "Search" -> SearchScreen(state)
                     else -> ProfileScreen(state)
                 }
-                if (state.loading) LinearProgressIndicator(
+                if (player.mode != PlayerMode.CLOSED) {
+                    NativePlaybackOverlay(player, state, modifier = Modifier.fillMaxSize())
+                }
+                if (state.loading && player.mode == PlayerMode.CLOSED) LinearProgressIndicator(
                     Modifier.fillMaxWidth().align(Alignment.TopCenter), color = Gold)
-                if (state.message.isNotBlank()) {
+                if (state.message.isNotBlank() && player.mode != PlayerMode.FULLSCREEN) {
                     Surface(
                         color = Color(0xFF3C2F17), shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.align(Alignment.BottomCenter)
@@ -115,7 +118,7 @@ fun FlixLeoNativeApp(state: FlixState) {
                 }
             }
         }
-        if (state.selected != null || state.selectedChannel != null) {
+        if (player.mode == PlayerMode.CLOSED && (state.selected != null || state.selectedChannel != null)) {
             ModalBottomSheet(onDismissRequest = {
                 state.selected = null; state.selectedChannel = null; state.streams = emptyList()
             }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
