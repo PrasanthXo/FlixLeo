@@ -177,14 +177,14 @@ class InlineVlcController(context: Context) {
         attached = false
         surface = null
     }
-    fun setMode(value: PlayerMode) {
+    fun transitionTo(value: PlayerMode) {
         if (mode == PlayerMode.CLOSED || value == PlayerMode.CLOSED) return
         if (value == PlayerMode.FULLSCREEN && mode != PlayerMode.FULLSCREEN) previousMode = mode
         mode = value
         controlsVisible = true
     }
     fun leaveFullscreen() {
-        if (mode == PlayerMode.FULLSCREEN) setMode(previousMode)
+        if (mode == PlayerMode.FULLSCREEN) transitionTo(previousMode)
     }
     fun toggle() {
         val video = engine ?: return
