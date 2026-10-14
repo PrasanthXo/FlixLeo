@@ -19,7 +19,7 @@ let lastUpdateNotice = '';
 // Match the gateway's version codes for the packaged app. 1.0.0 => 1,
 // 1.0.1 => 2, 1.1.0 => 1001. Increment package.json version for each release.
 function installedVersionCode(version = app.getVersion()) {
-  const match = /^(\\d+)\\.(\\d+)\\.(\\d+)/.exec(String(version));
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(String(version));
   if (!match) return 1;
   return Math.max(1, (Number(match[1]) - 1) * 1000000 + Number(match[2]) * 1000 + Number(match[3]) + 1);
 }
@@ -47,7 +47,7 @@ async function checkDesktopUpdate() {
     const latest = Number(policy?.latestVersionCode);
     if (!Number.isSafeInteger(latest) || latest <= versionCode || !policy?.updateAvailable) return;
     const link = validUrl(policy.updateUrl);
-    if (!link || !/\\.exe(?:\\?|$)/i.test(link)) return;
+    if (!link || !/\.exe(?:\?|$)/i.test(link)) return;
     const required = policy.forceUpdate === true && versionCode < Number(policy.minVersionCode);
     const noticeKey = latest + ':' + String(required);
     if (!required && lastUpdateNotice === noticeKey) return;
