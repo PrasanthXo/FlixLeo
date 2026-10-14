@@ -3,7 +3,7 @@ import { DesktopFullscreenControls, DesktopAspectRatioPicker, type NativeAspectR
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { StremioNativePlayer } from './StremioNativePlayer';
-import { ArrowLeft, ExternalLink, RefreshCw, Share2, Maximize2, Minimize2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, RefreshCw, Share2, Maximize2, Minimize2, X } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
 const resumeKey = (m: MediaItem) => m.id + (m.playbackSeason !== undefined && m.playbackEpisode !== undefined ? ':s' + m.playbackSeason + 'e' + m.playbackEpisode : '');
@@ -250,7 +250,10 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           <h2 className="text-white font-semibold text-sm sm:text-lg truncate">{media.title}</h2>
           <p className="text-slate-400 text-xs truncate">{active?.label || 'No servers available'}</p>
         </div>
-        {desktopNative && !nativeFullscreen && !docked && <button type="button" onClick={() => { manualMinimize.current = true; setDocked(true); }} className="shrink-0 rounded-lg border border-amber-500/30 bg-slate-800 px-3 py-2 text-xs text-white hover:bg-slate-700" aria-label="Minimize native video to mini player"><Minimize2 className="mr-1 inline h-4 w-4" />Mini player</button>}
+        {desktopNative && !nativeFullscreen && !docked && <div className="flex shrink-0 items-center gap-2">
+          <button type="button" onClick={() => { manualMinimize.current = true; setDocked(true); }} className="rounded-lg border border-amber-500/30 bg-slate-800 px-3 py-2 text-xs text-white hover:bg-slate-700" aria-label="Minimize native video to mini player"><Minimize2 className="mr-1 inline h-4 w-4" />Mini player</button>
+          <button type="button" onClick={() => { saveProgress(); onClose(); }} className="inline-flex items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/30" title="Stop playback and close player" aria-label="Close Windows video player"><X size={16} />Close player</button>
+        </div>}
         {!desktopNative && <div className="flex items-center gap-2 shrink-0"><button type="button" onClick={() => setDocked(true)} className="rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Minimize player">Mini player</button><button type="button" onClick={() => void shareMovie()} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white" aria-label="Share movie"><Share2 className="h-4 w-4" /> Share</button><button type="button" onClick={() => { saveProgress(); onClose(); }} className="flex items-center gap-1 rounded-lg bg-slate-800 p-2 text-xs text-white"><ArrowLeft className="h-4 w-4" /> Close</button></div>}
       </div>
       {docked && desktopNative && !nativeFullscreen && <div className="aspect-video w-full" aria-hidden="true" />}
@@ -276,6 +279,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         {desktopNative && !nativeFullscreen && <div className="flex flex-wrap items-center gap-3">
           <button type="button" aria-label="Fullscreen" title="Fullscreen · Esc to exit" onClick={() => void desktopBridge()?.commandNative('toggleFullscreen')} className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-white">⛶ Fullscreen</button>
           <DesktopAspectRatioPicker value={aspectRatio} onChange={changeAspectRatio} />
+          <button type="button" onClick={() => { saveProgress(); onClose(); }} className="inline-flex items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/30" title="Stop playback and close player" aria-label="Close Windows video player"><X size={16} />Close player</button>
         </div>}
         {/^(tamil|ta)(?:\\b|\\s|\\W)/i.test(media.language.trim()) && <div className="rounded-lg border border-amber-500/40 bg-slate-900 p-3">
           <p className="text-sm font-semibold text-white">Tamil movies · Einthusan preferred</p>
