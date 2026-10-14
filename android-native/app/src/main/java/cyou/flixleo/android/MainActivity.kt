@@ -143,6 +143,52 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var selectedChannel by mutableStateOf<LiveChannel?>(null)
     var movies by mutableStateOf<List<FlixTitle>>(emptyList())
     var series by mutableStateOf<List<FlixTitle>>(emptyList())
+    var moviesPage by mutableIntStateOf(1)
+    var seriesPage by mutableIntStateOf(1)
+    var moviesMore by mutableStateOf(true)
+    var seriesMore by mutableStateOf(true)
+    var paging by mutableStateOf(false)
+    var pagingError by mutableStateOf("")
+    fun loadNextPage(tv: Boolean) {
+        if (paging || loading || !(if (tv) seriesMore else moviesMore)) return
+        scope.launch {
+            paging = true; pagingError = ""
+            val page = (if (tv) seriesPage else moviesPage) + 1
+            try {
+                val next = api.titles(if (tv) "/api/tmdb/tv/trending?page=$page" else "/api/tmdb/trending?page=$page")
+                if (tv) {
+                    series = (series + next).distinctBy { it.id }
+                    seriesPage = page
+                    seriesMore = next.isNotEmpty() && page < 500
+                } else {
+                    movies = (movies + next).distinctBy { it.id }
+                    moviesPage = page
+                    moviesMore = next.isNotEmpty() && page < 500
+                }
+            } catch (_: Exception) { pagingError = "Couldn't load more titles. Tap to retry." }
+            finally { paging = false }
+        }
+    }
+    fun resume(entry: ResumeEntry) = scope.launch {
+        val title = entry.title
+        if (title.type == "tv" && (title.season < 1 || title.episode < 1)) {
+            open(title); return@launch
+        }
+        detailsLoading = true
+        try {
+            val available = api.streamOptions(title)
+            val saved = available.firstOrNull { it.id == entry.mirror }
+            if (saved == null) {
+                message = "Saved server unavailable. Choose another server to continue."
+                open(title)
+                return@launch
+            }
+            selected = title
+            streams = available
+            play(saved)
+        } catch (_: Exception) { message = "Unable to resume. Try again." }
+        finally { detailsLoading = false }
+    }
     var search by mutableStateOf("")
     var searchResults by mutableStateOf<List<FlixTitle>>(emptyList())
     var searchLoading by mutableStateOf(false)
@@ -224,6 +270,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         lastCatalogRefreshAt = System.currentTimeMillis()
         scope.launch {
             loading = true
+            moviesPage = 1; seriesPage = 1; moviesMore = true; seriesMore = true
             try {
                 supervisorScope {
                     val trend = async { runCatching { api.titles("/api/tmdb/trending") }.getOrDefault(emptyList()) }
