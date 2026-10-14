@@ -128,8 +128,8 @@ fun NativePlaybackOverlay(
                     HorizontalDivider(Modifier.padding(vertical = 17.dp), color = Color.DarkGray)
                     Text("Select quality & server", fontWeight = FontWeight.Bold, color = Color.White)
                     Spacer(Modifier.height(8.dp))
-                    if (state.streams.isEmpty()) Text("No streams available", color = Color.LightGray)
-                    state.streams.forEach { stream ->
+                    if (state.playbackStreams.isEmpty()) Text("No streams available", color = Color.LightGray)
+                    state.playbackStreams.forEach { stream ->
                         Surface(onClick = { state.play(stream) },
                             color = Color(0xFF202838), shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
