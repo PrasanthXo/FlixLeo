@@ -5,6 +5,7 @@ import Hls from 'hls.js';
 import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Maximize, Settings, Subtitles, Volume2, Upload, Minimize2, Maximize2, X } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 import { getAppleVlcTarget, getAppleVlcLaunchUrl } from '../../lib/appleVlc';
+import { isFlixLeoAndroid, launchFlixLeoAndroidStream, savedAndroidPosition, saveFlixLeoAndroidProgress, type AndroidPlaybackResult } from '../../lib/androidNative';
 
 const resumeKey = (m: MediaItem) => m.id + (m.playbackSeason !== undefined && m.playbackEpisode !== undefined ? ':s' + m.playbackSeason + 'e' + m.playbackEpisode : '');
 type Props = { media: MediaItem; mirrors: StreamMirror[]; initialMirrorId?: string; minimizeSignal?: number; onClose: () => void; onProgressSaved?: () => void; onEpisodeEnded?: () => void };
@@ -102,6 +103,28 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const [subtitleLoading, setSubtitleLoading] = useState(false);
   const active = sorted.find(m => m.id === selected) || sorted[0];
   const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
+  const androidNative = Boolean(isFlixLeoAndroid() && active && active.streamType !== 'embed-iframe');
+  const lastAndroidLaunch = useRef('');
+  useEffect(() => {
+    if (!androidNative || !active?.url) return;
+    const launchKey = active.id + ':' + active.url;
+    if (lastAndroidLaunch.current === launchKey) return;
+    lastAndroidLaunch.current = launchKey;
+    const ok = launchFlixLeoAndroidStream(active.url, media.title, active.id, liveChannel ? 0 : savedAndroidPosition(media));
+    if (!ok) setError('This stream cannot be played in the Android app.');
+  }, [androidNative, active?.id, active?.url, media.id, media.title, liveChannel]);
+  useEffect(() => {
+    if (!androidNative) return;
+    const finished = (event: Event) => {
+      const result = (event as CustomEvent<AndroidPlaybackResult>).detail;
+      if (!result || result.mirrorId !== active?.id) return;
+      saveFlixLeoAndroidProgress(media, active.id, result);
+      onProgressSaved?.();
+      if (result.ended) onEpisodeEnded?.();
+    };
+    window.addEventListener('flixleo:android-player-result', finished);
+    return () => window.removeEventListener('flixleo:android-player-result', finished);
+  }, [androidNative, active?.id, media.id, media.playbackSeason, media.playbackEpisode, onEpisodeEnded, onProgressSaved]);
   const nativeFullscreen = desktopNative && nativeWindowFullscreen;
   const fullscreenControlsVisible = useDesktopControlsVisible(nativeFullscreen);
   const [aspectRatio, setAspectRatio] = useState<NativeAspectRatio>('no');
@@ -547,7 +570,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Expand mini player" onClick={() => { playerAnchor.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); setDocked(false); }} className="rounded bg-black/85 p-1 text-white"><Maximize2 size={16}/></button>
         <button type="button" aria-label="Close mini player" onClick={() => { save(); onClose(); }} className="rounded bg-black/85 px-2 text-white">×</button>
       </div>}
-      {desktopNative && active ? <div className={nativeFullscreen ? (fullscreenControlsVisible ? "h-[calc(100%-96px)] w-full" : "h-full w-full") : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain" onDoubleClick={() => void toggleDesktopFullscreen()}
+      {desktopNative && active ? <div className={nativeFullscreen ? (fullscreenControlsVisible ? "h-[calc(100%-96px)] w-full" : "h-full w-full") : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div> : androidNative ? <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center text-white"><p className="text-sm text-slate-300">Playing in the FlixLeo Android player</p><button type="button" className="rounded-xl bg-amber-400 px-6 py-3 font-bold text-black" onClick={() => active && launchFlixLeoAndroidStream(active.url, media.title, active.id, liveChannel ? 0 : savedAndroidPosition(media))}>▶ Open native player</button></div> : <video ref={videoRef} playsInline preload="auto" className="h-full w-full object-contain" onDoubleClick={() => void toggleDesktopFullscreen()}
         onPlay={() => { setPlaying(true); setBuffering(false); setError(''); }}
         onPause={() => { setPlaying(false); setBuffering(false); }}
         onWaiting={() => setBuffering(true)}
@@ -564,8 +587,8 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         <button type="button" aria-label="Expand mini player" title="Expand" className="rounded-lg p-2 hover:bg-white/15" onClick={() => { manualMinimize.current = false; setDocked(false); playerAnchor.current?.scrollIntoView({ behavior:'smooth', block:'start' }); }}><Maximize2 size={19}/></button>
         <button type="button" aria-label="Close mini player" title="Close" className="rounded-lg p-2 hover:bg-red-500/30" onClick={() => { save(); onClose(); }}>✕</button>
       </div>}
-      {!desktopNative && buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
-      {!desktopNative && !playing && !buffering && active && <button type="button"
+      {!desktopNative && !androidNative && buffering && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-600 border-t-amber-400" /></div>}
+      {!desktopNative && !androidNative && !playing && !buffering && active && <button type="button"
         className="absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 grid h-16 w-16 place-items-center rounded-full border border-white/30 bg-amber-500/95 text-black shadow-xl hover:scale-105"
         aria-label="Play video" title="Play video"
         onClick={() => {
@@ -603,6 +626,13 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
       </div>
       <label className="block text-xs text-slate-300">Video quality / stream
         <select className="mt-1 w-full rounded-lg bg-slate-800 p-2 text-white" value={active?.id || ''} onChange={e => setSelected(e.target.value)}>
+          {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}{m.fileSize ? ' · ' + m.fileSize : ''}</option>)}
+        </select>
+      </label>
+    </div> : androidNative ? <div className="space-y-3 p-4">
+      <p className="text-sm text-amber-300">Native VLC playback supports more audio formats, multiple audio languages, and embedded subtitles. Change audio/subtitles inside the fullscreen Android player.</p>
+      <label className="block text-xs text-slate-300">Video quality / stream
+        <select className="mt-1 w-full rounded-lg bg-slate-800 p-3 text-white" value={active?.id || ''} onChange={e => setSelected(e.target.value)}>
           {sorted.map(m => <option key={m.id} value={m.id}>{m.quality} · {m.label}{m.fileSize ? ' · ' + m.fileSize : ''}</option>)}
         </select>
       </label>
