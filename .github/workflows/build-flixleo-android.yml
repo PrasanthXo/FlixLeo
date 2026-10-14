@@ -54,3 +54,17 @@ jobs:
           name: FlixLeo-Android-debug-APK
           path: android-native/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Validate Android Studio Gradle wrapper and package project
+        run: |
+          set -eu
+          test -s android-native/gradle/wrapper/gradle-wrapper.jar
+          bash android-native/gradlew --version | grep 'Gradle 8.10.2'
+          zip -qr FlixLeo-AndroidStudio-Source.zip android-native \
+            -x 'android-native/.gradle/*' 'android-native/app/build/*' 'android-native/build/*'
+          unzip -l FlixLeo-AndroidStudio-Source.zip | grep 'android-native/app/src/main/java/cyou/flixleo/android/NativeUi.kt'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FlixLeo-AndroidStudio-Source
+          path: FlixLeo-AndroidStudio-Source.zip
+          if-no-files-found: error
