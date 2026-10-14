@@ -4,6 +4,10 @@ on:
   push:
     paths:
       - 'android-native/**'
+      - 'src/**'
+      - 'server/**'
+      - 'server.ts'
+      - 'public/**'
       - '.github/workflows/build-flixleo-android.yml'
 jobs:
   android:
