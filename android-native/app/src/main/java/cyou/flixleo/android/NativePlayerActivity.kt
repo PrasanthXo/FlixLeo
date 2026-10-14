@@ -62,7 +62,7 @@ class NativePlayerActivity : Activity() {
                     if (duration > 0) lastDuration = duration
                     if (position > 0) lastPosition = position
                     if (resumeAtMs > 0 && duration > 0 && resumeAtMs < duration - 10_000) {
-                        video.time = resumeAtMs
+                        video.setTime(resumeAtMs)
                         resumeAtMs = 0
                     }
                     if (!scrubbing) {
@@ -117,7 +117,7 @@ class NativePlayerActivity : Activity() {
         seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onStartTrackingTouch(bar: SeekBar) { scrubbing = true; showControls() }
             override fun onStopTrackingTouch(bar: SeekBar) {
-                player?.let { if (it.isSeekable) it.time = bar.progress.toLong() * 1000L }
+                player?.let { if (it.isSeekable) it.setTime(bar.progress.toLong() * 1000L) }
                 scrubbing = false; showControls()
             }
             override fun onProgressChanged(bar: SeekBar, value: Int, fromUser: Boolean) {
@@ -167,7 +167,7 @@ class NativePlayerActivity : Activity() {
             val media = Media(vlc, uri)
             media.setHWDecoderEnabled(true, false)
             media.addOption(":network-caching=1200")
-            video.media = media
+            video.setMedia(media)
             media.release()
             video.play()
             handler.post(ticker)
@@ -204,7 +204,7 @@ class NativePlayerActivity : Activity() {
     }
     private fun skip(amount: Long) {
         player?.let {
-            if (it.isSeekable) it.time = (it.time + amount).coerceIn(0L, max(it.length, 0L))
+            if (it.isSeekable) it.setTime((it.time + amount).coerceIn(0L, max(it.length, 0L)))
         }
     }
     private fun selectAudio() {
@@ -214,7 +214,7 @@ class NativePlayerActivity : Activity() {
         AlertDialog.Builder(this).setTitle("Audio language")
             .setSingleChoiceItems(tracks.map { it.name ?: "Audio ${it.id}" }.toTypedArray(),
                 tracks.indexOfFirst { it.id == video.audioTrack }) { dialog, which ->
-                video.audioTrack = tracks[which].id
+                video.setAudioTrack(tracks[which].id)
                 dialog.dismiss()
             }.setNegativeButton("Cancel", null).show()
     }
@@ -224,7 +224,7 @@ class NativePlayerActivity : Activity() {
         val names = arrayOf("Off") + tracks.map { it.name ?: "Subtitle ${it.id}" }
         AlertDialog.Builder(this).setTitle("Subtitle language")
             .setSingleChoiceItems(names, tracks.indexOfFirst { it.id == video.spuTrack } + 1) { dialog, which ->
-                video.spuTrack = if (which == 0) -1 else tracks[which - 1].id
+                video.setSpuTrack(if (which == 0) -1 else tracks[which - 1].id)
                 dialog.dismiss()
             }.setNegativeButton("Cancel", null).show()
     }
@@ -234,8 +234,8 @@ class NativePlayerActivity : Activity() {
         AlertDialog.Builder(this).setTitle("Aspect ratio")
             .setSingleChoiceItems(names, displayAspect) { dialog, which ->
                 displayAspect = which
-                video.aspectRatio = when(which) { 1 -> "16:9"; 2 -> "4:3"; 3 -> "21:9"; else -> null }
-                video.scale = 0f
+                video.setAspectRatio(when(which) { 1 -> "16:9"; 2 -> "4:3"; 3 -> "21:9"; else -> null })
+                video.setScale(0f)
                 dialog.dismiss()
             }.setNegativeButton("Cancel", null).show()
     }
