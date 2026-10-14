@@ -1,239 +1,116 @@
 package cyou.flixleo.android
 
 import android.app.Activity
-import android.app.AlertDialog
-import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.*
+import coil.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import android.os.Bundle
-import android.view.View
-import android.webkit.CookieManager
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.FrameLayout
-import android.widget.Toast
 
-class MainActivity : Activity() {
-    private lateinit var browser: WebView
-    private var fullscreenView: View? = null
-    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
-    private var fileCallback: android.webkit.ValueCallback<Array<Uri>>? = null
-    private val fileRequestCode = 450
-    private val home = "https://flixleo.cyou/"
-    private var lastPolicyCheck = 0L
-    private var blockingDialog: AlertDialog? = null
-    private fun installedVersionCode(): Int = try {
-        val details = packageManager.getPackageInfo(packageName, 0)
-        if (android.os.Build.VERSION.SDK_INT >= 28) details.longVersionCode.toInt()
-        else @Suppress("DEPRECATION") details.versionCode
-    } catch (_: Exception) { 1 }
-
-    private fun safeApkUpdateUrl(url: String): Boolean = try {
-        val uri = Uri.parse(url)
-        uri.scheme == "https" && !uri.host.isNullOrBlank() &&
-            uri.path?.endsWith(".apk", ignoreCase = true) == true
-    } catch (_: Exception) { false }
-    private var updateBlocked = false
-    private var lastOptionalVersion = 0
-    private val shownNotices = mutableSetOf<String>()
-
-    override fun onCreate(savedInstanceState: Bundle?) {
+private val Dark = Color(0xFF090C15)
+private val Gold = Color(0xFFFFC453)
+data class TitleItem(val id:String,val name:String,val year:String,val poster:String,val genres:String,val rating:String,val type:String)
+private fun parseTitles(json: JSONObject, type:String):List<TitleItem> {
+    val array = json.optJSONArray("items") ?: return emptyList()
+    return (0 until array.length()).mapNotNull { n ->
+        val obj=array.optJSONObject(n) ?: return@mapNotNull null
+        val genreArray=obj.optJSONArray("genres")
+        val genres=if (genreArray==null) "" else (0 until genreArray.length()).map { genreArray.optString(it) }.filter { it.isNotBlank() }.take(2).joinToString(" · ")
+        TitleItem(obj.optString("id"),obj.optString("title"),obj.optString("year"),obj.optString("posterUrl"),genres,obj.optString("imdbRating"),type)
+    }.filter { it.id.isNotBlank() }
+}
+private suspend fun fetchTitles(type:String,page:Int):Pair<List<TitleItem>,Boolean> = withContext(Dispatchers.IO) {
+    val endpoint=if(type=="Movies") "trending" else "tv/trending"
+    val connection=URL("https://flixleo.cyou/api/tmdb/$endpoint?page=$page").openConnection() as HttpURLConnection
+    try {
+        connection.connectTimeout=12000;connection.readTimeout=12000
+        if(connection.responseCode !in 200..299) throw IllegalStateException("Catalogue unavailable")
+        val body=connection.inputStream.bufferedReader().use { it.readText() }
+        val json=JSONObject(body)
+        if(!json.optBoolean("success")) throw IllegalStateException("Catalogue response unavailable")
+        Pair(parseTitles(json,if(type=="Movies") "movie" else "tv"),json.optBoolean("isLive",true) && page<json.optInt("totalPages",500))
+    } finally { connection.disconnect() }
+}
+class MainActivity:ComponentActivity(){
+    override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.rgb(8, 10, 15)
-        window.navigationBarColor = android.graphics.Color.rgb(8, 10, 15)
-        val frame = FrameLayout(this)
-        browser = WebView(this)
-        frame.addView(browser, FrameLayout.LayoutParams(-1, -1))
-        setContentView(frame)
-        browser.settings.apply {
-            userAgentString = userAgentString + " FlixLeoNative/1.0"
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            mediaPlaybackRequiresUserGesture = false
-            cacheMode = WebSettings.LOAD_DEFAULT
-            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            allowFileAccess = false
-            allowContentAccess = true
-            javaScriptCanOpenWindowsAutomatically = false
-            setSupportMultipleWindows(false)
-        }
-        CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(browser, true)
-        browser.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
-                handleUrl(request.url.toString())
-            @Deprecated("Deprecated in Java")
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = handleUrl(url)
-        }
-        browser.webChromeClient = object : WebChromeClient() {
-            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
-                if (fullscreenView != null) { callback.onCustomViewHidden(); return }
-                fullscreenView = view
-                fullscreenCallback = callback
-                frame.addView(view, FrameLayout.LayoutParams(-1, -1))
-                browser.visibility = View.GONE
-            }
-            override fun onHideCustomView() {
-                fullscreenView?.let { frame.removeView(it) }
-                fullscreenView = null
-                browser.visibility = View.VISIBLE
-                fullscreenCallback?.onCustomViewHidden()
-                fullscreenCallback = null
-            }
-            override fun onShowFileChooser(webView: WebView, callback: android.webkit.ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
-                fileCallback?.onReceiveValue(null)
-                fileCallback = callback
-                return try {
-                    startActivityForResult(params.createIntent(), fileRequestCode)
-                    true
-                } catch (e: ActivityNotFoundException) {
-                    fileCallback = null
-                    callback.onReceiveValue(null)
-                    false
+        window.statusBarColor=android.graphics.Color.rgb(9,12,21)
+        window.navigationBarColor=android.graphics.Color.rgb(9,12,21)
+        setContent { NativeFlixLeo { title -> startActivity(Intent(this,NativePlayerActivity::class.java).apply {
+            putExtra("media_id",title.id);putExtra("media_name",title.name);putExtra("media_type",title.type)
+        }) } }
+    }
+}
+@Composable private fun NativeFlixLeo(onOpen:(TitleItem)->Unit){
+    var tab by remember { mutableStateOf("Movies") }
+    var page by remember(tab) { mutableIntStateOf(1) }
+    var entries by remember(tab) { mutableStateOf<List<TitleItem>>(emptyList()) }
+    var loading by remember(tab) { mutableStateOf(false) }
+    var more by remember(tab) { mutableStateOf(true) }
+    var error by remember(tab) { mutableStateOf("") }
+    val gridState=rememberLazyGridState()
+    LaunchedEffect(tab,page){
+        loading=true;error=""
+        try {
+            val (items,hasMore)=fetchTitles(tab,page)
+            entries=(entries+items).distinctBy { it.id }
+            more=hasMore && items.isNotEmpty()
+        } catch(e:Exception) { error=e.message ?: "Unable to load catalogue" }
+        loading=false
+    }
+    val loadNext by remember(gridState,entries,loading,more) { derivedStateOf {
+        val last=gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        entries.isNotEmpty() && more && !loading && error.isEmpty() && last>=entries.size-5
+    } }
+    LaunchedEffect(loadNext){if(loadNext)page++}
+    MaterialTheme(colorScheme=darkColorScheme(primary=Gold,background=Dark,surface=Color(0xFF151927))){
+        Scaffold(containerColor=Dark,topBar={Column {
+            Text("FLIXLEO",fontWeight=FontWeight.Black,color=Gold,fontSize=28.sp,modifier=Modifier.padding(start=18.dp,top=18.dp,bottom=10.dp))
+            Text("Discover movies and series",color=Color.LightGray,fontSize=13.sp,modifier=Modifier.padding(start=18.dp,bottom=8.dp))
+        }},bottomBar={
+            NavigationBar(containerColor=Color(0xFF121624)){
+                listOf("Movies","Series").forEach { name ->
+                    NavigationBarItem(selected=tab==name,onClick={tab=name},icon={Text(if(name=="Movies") "🎬" else "📺")},label={Text(name)})
                 }
             }
-        }
-        if (savedInstanceState != null) browser.restoreState(savedInstanceState)
-        else browser.loadUrl(home)
-        checkUpdatePolicy()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (::browser.isInitialized && System.currentTimeMillis() - lastPolicyCheck > 60L * 60 * 1000) {
-            checkUpdatePolicy()
-        }
-    }
-
-    private fun checkUpdatePolicy() {
-        if (System.currentTimeMillis() - lastPolicyCheck < 30_000) return
-        lastPolicyCheck = System.currentTimeMillis()
-        val installedCode = installedVersionCode()
-        Thread {
-            var conn: HttpURLConnection? = null
-            try {
-                conn = (URL(home + "api/gateway/v1/check/flixleo-android?versionCode=" + installedCode).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 5000
-                    readTimeout = 5000
-                    requestMethod = "GET"
-                }
-                if (conn.responseCode != 200) return@Thread
-                val body = conn.inputStream.bufferedReader().use { it.readText() }
-                val response = JSONObject(body)
-                if (!response.optBoolean("ready", false)) return@Thread
-                val policy = response.optJSONObject("policy") ?: return@Thread
-                val notices = response.optJSONArray("notices")
-                val latest = policy.optInt("latestVersionCode", installedCode)
-                val minimum = policy.optInt("minVersionCode", 0)
-                val url = policy.optString("updateUrl", "")
-                // Never lock out an existing installation with an invalid download link.
-                val available = latest > installedCode && safeApkUpdateUrl(url)
-                val forced = available && policy.optBoolean("forceUpdate", false) && installedCode < minimum
-                val optional = available && policy.optBoolean("updateAvailable", false)
-                val maintenance = policy.optBoolean("maintenance", false)
-                val notes = policy.optString("notes", "")
-                runOnUiThread {
-                    if (isFinishing || isDestroyed) return@runOnUiThread
-                    if (forced) {
-                        blockingDialog?.dismiss()
-                        blockingDialog = AlertDialog.Builder(this)
-                            .setTitle("FlixLeo update required")
-                            .setMessage(if (notes.isBlank()) "Please update FlixLeo to continue." else notes)
-                            .setCancelable(false)
-                            .setPositiveButton("Update") { _, _ -> openUpdatePage(url); lastPolicyCheck = 0; checkUpdatePolicy() }
-                            .create()
-                        blockingDialog?.show()
-                    } else if (maintenance) {
-                        blockingDialog?.dismiss()
-                        blockingDialog = AlertDialog.Builder(this)
-                            .setTitle("FlixLeo maintenance")
-                            .setMessage(policy.optString("maintenanceMessage", "Service is temporarily unavailable."))
-                            .setCancelable(false)
-                            .setPositiveButton("Retry") { _, _ -> lastPolicyCheck = 0; checkUpdatePolicy() }
-                            .create()
-                        blockingDialog?.show()
-                    } else if (optional && latest != lastOptionalVersion) {
-                        lastOptionalVersion = latest
-                        AlertDialog.Builder(this)
-                            .setTitle("FlixLeo update available")
-                            .setMessage(notes.ifBlank { "Version " + policy.optString("latestVersionName") + " is available." })
-                            .setPositiveButton("Update") { _, _ -> openUpdatePage(url) }
-                            .setNegativeButton("Later", null)
-                            .show()
-                    } else if (!forced && !maintenance && notices != null && notices.length() > 0) {
-                        val notice = notices.optJSONObject(0)
-                        val noticeId = notice?.optString("id", "").orEmpty()
-                        if (notice != null && noticeId.isNotBlank() && shownNotices.add(noticeId)) {
-                            AlertDialog.Builder(this)
-                                .setTitle(notice.optString("title", "FlixLeo announcement"))
-                                .setMessage(notice.optString("body", ""))
-                                .setPositiveButton("OK", null)
-                                .show()
+        }) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                LazyVerticalGrid(columns=GridCells.Fixed(2),state=gridState,contentPadding=PaddingValues(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                    items(entries,key={it.id}) { title ->
+                        Column(Modifier.fillMaxWidth().clickable { onOpen(title) }) {
+                            Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(Color(0xFF22283A),RoundedCornerShape(12.dp))) {
+                                AsyncImage(model=title.poster.takeIf { it.startsWith("https://") },contentDescription=title.name,contentScale=ContentScale.Crop,modifier=Modifier.fillMaxSize())
+                                Text(if(title.type=="tv") "SERIES" else "MOVIE",color=Color.White,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.align(Alignment.TopStart).padding(7.dp).background(Color.Black.copy(alpha=.8f),RoundedCornerShape(4.dp)).padding(5.dp))
+                            }
+                            Text(title.name,maxLines=2,overflow=TextOverflow.Ellipsis,color=Color.White,fontWeight=FontWeight.SemiBold,fontSize=14.sp,modifier=Modifier.padding(top=6.dp))
+                            Text(title.genres.ifBlank { if(title.type=="tv") "TV Series" else "Movie" },color=Color.LightGray,maxLines=1,fontSize=11.sp)
+                            Text(title.year+"   ★ "+title.rating,color=Gold,fontSize=11.sp)
                         }
                     }
+                    if(loading) item(span={GridItemSpan(maxLineSpan)}) { Box(Modifier.fillMaxWidth().padding(20.dp),contentAlignment=Alignment.Center){ CircularProgressIndicator(color=Gold) } }
+                    if(error.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { Column {
+                        Text(error,color=Color.LightGray)
+                        TextButton(onClick={ page++ }) { Text("Retry") }
+                    } }
                 }
-            } catch (_: Exception) {
-                // Network failure never blocks installed versions.
-            } finally { conn?.disconnect() }
-        }.start()
-    }
-
-    private fun openUpdatePage(link: String) {
-        try {
-            if (!safeApkUpdateUrl(link)) return
-            val uri = Uri.parse(link)
-            startActivity(Intent(Intent.ACTION_VIEW, uri))
-        } catch (_: Exception) { }
-    }
-
-    private fun handleUrl(url: String): Boolean {
-        if (url.startsWith("flixleo-player://")) {
-            val page = runCatching { Uri.parse(browser.url) }.getOrNull()
-            if (page?.scheme == "https" && page.host == "flixleo.cyou") {
-                val stream = Uri.parse(url).getQueryParameter("url")
-                val source = stream?.let { runCatching { Uri.parse(it) }.getOrNull() }
-                if (source?.scheme == "https" && !source.host.isNullOrBlank()) {
-                    startActivity(Intent(this, NativePlayerActivity::class.java).putExtra("stream_url", stream))
-                } else Toast.makeText(this, "Invalid stream", Toast.LENGTH_SHORT).show()
             }
-            return true
         }
-        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return true
-        if (uri.scheme == "https" && uri.host.equals("flixleo.cyou", ignoreCase = true)) return false
-        if (uri.scheme == "https" || uri.scheme == "http" || uri.scheme == "mailto") {
-            return try { startActivity(Intent(Intent.ACTION_VIEW, uri)); true }
-            catch (_: Exception) { true }
-        }
-        return true
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == fileRequestCode) {
-            fileCallback?.onReceiveValue(if (resultCode == RESULT_OK) WebChromeClient.FileChooserParams.parseResult(resultCode, data) else null)
-            fileCallback = null
-        }
-    }
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (fullscreenView != null) {
-            browser.webChromeClient?.onHideCustomView()
-        } else if (browser.canGoBack()) browser.goBack()
-        else super.onBackPressed()
-    }
-    override fun onSaveInstanceState(outState: Bundle) {
-        browser.saveState(outState)
-        super.onSaveInstanceState(outState)
-    }
-    override fun onDestroy() {
-        browser.destroy()
-        super.onDestroy()
     }
 }
