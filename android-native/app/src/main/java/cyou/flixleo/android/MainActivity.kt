@@ -92,6 +92,8 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     val watchlist: Set<String> get() { localRevision; return store.watched }
     val history: List<ResumeEntry> get() { localRevision; return store.history }
     val favorites: Set<String> get() { localRevision; return store.favorites }
+    val favoriteGenres: Set<String> get() { localRevision; return store.favoriteGenres }
+    val favoriteArtists: Set<String> get() { localRevision; return store.favoriteArtists }
     fun entryKey(title: FlixTitle): String = title.id +
         (if (title.season >= 0 && title.episode >= 0) ":s${title.season}e${title.episode}" else "")
     fun notify(text: String) { message = text }
@@ -285,6 +287,25 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         localRevision++
         if (account != null) saveProfile()
     }
+    fun toggleGenre(value: String) {
+        val next = store.favoriteGenres.toMutableSet()
+        if (!next.add(value)) next.remove(value)
+        store.setFavoriteGenres(next)
+        localRevision++
+        if (account != null) saveProfile()
+    }
+    fun addArtist(value: String) {
+        val next = store.favoriteArtists.toMutableSet()
+        if (value.isNotBlank()) next.add(value.trim().take(80))
+        store.setFavoriteArtists(next)
+        localRevision++
+        if (account != null) saveProfile()
+    }
+    fun removeArtist(value: String) {
+        store.setFavoriteArtists(store.favoriteArtists - value)
+        localRevision++
+        if (account != null) saveProfile()
+    }
     fun refreshSession() = scope.launch {
         val current = account ?: return@launch
         if (current.expiresAt > System.currentTimeMillis() / 1000 + 120) return@launch
@@ -305,6 +326,16 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             account = Session.from(api.call("/api/native/auth/login", "POST",
                 JSONObject().put("email", email.trim()).put("password", password)))
             store.saveSession(account)
+            account?.user?.optJSONObject("user_metadata")?.let { metadata ->
+                fun optSet(key: String): Set<String> {
+                    val list = metadata.optJSONArray(key) ?: return emptySet()
+                    return (0 until list.length()).mapNotNull { i -> list.optString(i).takeIf(String::isNotBlank) }.toSet()
+                }
+                store.setFavorites(store.favorites + optSet("favorite_languages"))
+                store.setFavoriteGenres(store.favoriteGenres + optSet("favorite_genres"))
+                store.setFavoriteArtists(store.favoriteArtists + optSet("favorite_artists"))
+                localRevision++
+            }
             showAuth = false
             message = "Signed in"
             syncOnLogin()
@@ -371,7 +402,9 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         val active = account ?: return@launch
         try {
             val data = api.call("/api/native/account", "PUT", JSONObject()
-                .put("favorite_languages", JSONArray(store.favorites.toList())), active.accessToken)
+                .put("favorite_languages", JSONArray(store.favorites.toList()))
+                .put("favorite_genres", JSONArray(store.favoriteGenres.toList()))
+                .put("favorite_artists", JSONArray(store.favoriteArtists.toList())), active.accessToken)
             account = active.copy(user = data.optJSONObject("user") ?: active.user)
             store.saveSession(account)
         } catch (_: Exception) { message = "Could not update profile choices" }
