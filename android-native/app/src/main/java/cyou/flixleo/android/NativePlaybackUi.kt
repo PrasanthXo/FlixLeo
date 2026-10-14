@@ -85,7 +85,9 @@ fun NativePlaybackOverlay(
     }
     BoxWithConstraints(modifier.fillMaxSize()) {
         val bigVideoHeight = maxWidth * 9 / 16
-        val bigScroll = rememberScrollState()
+        // Reset the expanded scroll offset on every transition back from mini/fullscreen.
+        // Otherwise reopening Big would instantly minimize again at the previous offset.
+        val bigScroll = key(currentMode) { rememberScrollState() }
         val cutoffPx = with(LocalDensity.current) { (bigVideoHeight - 32.dp).roundToPx() }
         LaunchedEffect(bigScroll.value, currentMode) {
             if (currentMode == PlayerMode.BIG && bigScroll.value >= cutoffPx) {
