@@ -178,7 +178,7 @@ export default function App() {
     (currentTab === 'series' || tmdbCategory !== 'all');
   const isMoreAvailable = currentTab === 'movies' ? movieHasMore : tvHasMore;
   const initialListLoading = currentTab === 'movies' ? isLoadingTmdb : isLoadingTv;
-  const liveFeedReady = currentTab === 'series' ? tvShows.length > 0 : isTmdbLive && tmdbMovies.length > 0;
+  const liveFeedReady = currentTab === 'series' ? tvShows.length > 0 : tmdbMovies.length > 0;
 
   useEffect(() => {
     if (!tabCanLoadMore || !isMoreAvailable || !liveFeedReady || initialListLoading || loadingMore || loadMoreError) return;
@@ -191,7 +191,21 @@ export default function App() {
       }
     }, { rootMargin: '450px 0px' });
     observer.observe(node);
-    return () => observer.disconnect();
+    const checkBottom = () => {
+      if (loadingNextRef.current || !node.isConnected) return;
+      if (node.getBoundingClientRect().top <= window.innerHeight + 650) {
+        loadingNextRef.current = true;
+        setLoadingMore(true);
+      }
+    };
+    window.addEventListener('scroll', checkBottom, { passive: true });
+    window.addEventListener('resize', checkBottom);
+    checkBottom();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', checkBottom);
+      window.removeEventListener('resize', checkBottom);
+    };
   }, [tabCanLoadMore, isMoreAvailable, liveFeedReady, initialListLoading, loadingMore, loadMoreError, currentTab]);
 
   useEffect(() => {
@@ -246,7 +260,7 @@ export default function App() {
 
   // Persisted native-video resume entries, newest first.
   const [recentPlayed, setRecentPlayed] = useState<MediaItem[]>([]);
-  const [continueWatching, setContinueWatching] = useState<{ media: MediaItem; progress: number; duration: number; updatedAt: number }[]>([]);
+  const [continueWatching, setContinueWatching] = useState<{ media: MediaItem; mirrorId?: string; progress: number; duration: number; updatedAt: number }[]>([]);
   const refreshContinueWatching = React.useCallback(() => {
     try {
       const entries = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
@@ -1016,7 +1030,7 @@ export default function App() {
                       // Older stored series have no episode identity; never pretend the title is an episode.
                       setDetailMedia(entry.media);
                     } else {
-                      handlePlayMedia(entry.media);
+                      handlePlayMedia(entry.media, entry.mirrorId);
                     }
                   }}
                   className={isTvDisplay ? "tv6-resume-tile" : "group text-left w-40 sm:w-48 shrink-0 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500 focus-visible:outline-2 focus-visible:outline-amber-400"}
@@ -1052,7 +1066,7 @@ export default function App() {
                         ? <p className="text-xs font-bold text-amber-300">Season {entry.media.playbackSeason} · Episode {entry.media.playbackEpisode}</p>
                         : <p className="text-xs font-bold text-amber-300">Select season & episode</p>
                     )}
-                    <p className="text-xs text-slate-400">{entry.progress >= 5 ? `${Math.floor(entry.progress / 60)} min watched` : 'Recently opened · start playback'}</p>
+                    <p className="text-xs text-slate-400">{entry.duration > 0 && entry.progress >= 5 ? `${Math.max(0, Math.ceil((entry.duration - entry.progress) / 60))} min remaining` : entry.progress >= 5 ? `${Math.floor(entry.progress / 60)} min watched` : 'Recently opened · start playback'}</p>
                   </div>
                 </button>
                 {!isTvDisplay && <PosterOptions media={entry.media} onOpen={setDetailMedia} isBookmarked={watchlistIds.includes(entry.media.id)} onToggleBookmark={toggleBookmark} />}
