@@ -86,7 +86,7 @@ router.get('/api/gateway/v1/check/:appId', async (req: Request, res: Response) =
         notices: [], ready: Boolean(windowsRelease), reason: windowsRelease ? 'published_windows_release' : 'policy_missing' });
     }
     const notices = await supabase('app_update_notices?app_id=eq.' + encodeURIComponent(appId) +
-      '&active=eq.true&select=id,title,body,severity,created_at.desc&order=created_at.desc&limit=10');
+      '&active=eq.true&select=id,title,body,severity,created_at&order=created_at.desc&limit=10');
     return res.json({ policy: promoteWindowsRelease(sanitizePolicy(data[0], version), version, windowsRelease),
       notices: notices || [], ready: true });
   } catch {
