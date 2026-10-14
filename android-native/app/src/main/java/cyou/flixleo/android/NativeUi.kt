@@ -1149,7 +1149,16 @@ private fun AccountDialog(state: FlixState) {
                     Checkbox(agreed, onCheckedChange = { agreed = it })
                     Text("I agree to the Terms & Privacy Policy", fontSize = 11.sp)
                 }
-                TextButton(onClick = { state.showSignup = !state.showSignup }) {
+                if (state.authError.isNotBlank()) {
+                    Text(state.authError, fontSize = 12.sp,
+                        color = Color(0xFFFDA4AF),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF42202B)).padding(11.dp))
+                }
+                TextButton(onClick = {
+                    state.showSignup = !state.showSignup
+                    state.authError = ""
+                }) {
                     Text(if (state.showSignup) "Already registered? Sign in" else "New user? Sign up")
                 }
                 TextButton(onClick = { state.emailAction(email, "resend") }) { Text("Resend verification email") }
@@ -1159,8 +1168,17 @@ private fun AccountDialog(state: FlixState) {
         confirmButton = {
             Button(enabled = !state.accountBusy && (!state.showSignup || agreed),
                 onClick = {
-                    if (state.showSignup) state.signUp(email, password)
-                    else state.signIn(email, password)
+                    state.authError = when {
+                        !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() ->
+                            "Enter a valid email address."
+                        password.isBlank() || (state.showSignup && password.length < 8) ->
+                            "Password must be at least 8 characters for signup."
+                        else -> ""
+                    }
+                    if (state.authError.isEmpty()) {
+                        if (state.showSignup) state.signUp(email, password)
+                        else state.signIn(email, password)
+                    }
                 }) { Text(if (state.accountBusy) "Please wait…" else if (state.showSignup) "Create account" else "Sign in") }
         },
         dismissButton = { TextButton(onClick = { state.showAuth = false }) { Text("Cancel") } }
