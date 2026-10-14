@@ -78,7 +78,7 @@ fun NativePlaybackOverlay(
     BackHandler(enabled = currentMode != PlayerMode.CLOSED && !player.inPictureInPicture) {
         when (currentMode) {
             PlayerMode.FULLSCREEN -> player.leaveFullscreen()
-            PlayerMode.BIG -> player.setMode(PlayerMode.MINI)
+            PlayerMode.BIG -> player.transitionTo(PlayerMode.MINI)
             PlayerMode.MINI -> state.closePlayback()
             PlayerMode.CLOSED -> Unit
         }
@@ -93,7 +93,7 @@ fun NativePlaybackOverlay(
             if (currentMode == PlayerMode.BIG && bigScroll.value >= cutoffPx) {
                 // The expanded movie video has left the scroll viewport.
                 // Keep its existing native VLC engine alive in the mini player.
-                player.setMode(PlayerMode.MINI)
+                player.transitionTo(PlayerMode.MINI)
             }
         }
 
@@ -114,12 +114,12 @@ fun NativePlaybackOverlay(
                     }
                     Spacer(Modifier.height(13.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        OutlinedButton(onClick = { player.setMode(PlayerMode.MINI) }) {
+                        OutlinedButton(onClick = { player.transitionTo(PlayerMode.MINI) }) {
                             Icon(Icons.Default.PictureInPictureAlt, null)
                             Spacer(Modifier.width(6.dp))
                             Text("Mini player")
                         }
-                        OutlinedButton(onClick = { player.setMode(PlayerMode.FULLSCREEN) }) {
+                        OutlinedButton(onClick = { player.transitionTo(PlayerMode.FULLSCREEN) }) {
                             Icon(Icons.Default.Fullscreen, null)
                             Spacer(Modifier.width(6.dp))
                             Text("Fullscreen")
@@ -199,7 +199,7 @@ private fun NativeVideoSurface(
                 onTap = { player.controlsVisible = !player.controlsVisible },
                 onDoubleTap = {
                     if (mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
-                    else player.setMode(PlayerMode.FULLSCREEN)
+                    else player.transitionTo(PlayerMode.FULLSCREEN)
                 }
             )
         })
@@ -230,10 +230,10 @@ private fun NativeVideoSurface(
                             color = Color.LightGray, fontSize = 10.sp)
                     }
                     MiniIcon(Icons.Default.OpenInFull, "Expand big player") {
-                        player.setMode(PlayerMode.BIG)
+                        player.transitionTo(PlayerMode.BIG)
                     }
                     MiniIcon(Icons.Default.Fullscreen, "Fullscreen") {
-                        player.setMode(PlayerMode.FULLSCREEN)
+                        player.transitionTo(PlayerMode.FULLSCREEN)
                     }
                     MiniIcon(Icons.Default.Close, "Close and stop playback") {
                         state.closePlayback()
@@ -246,7 +246,7 @@ private fun NativeVideoSurface(
                     verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = {
                         if (mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
-                        else player.setMode(PlayerMode.MINI)
+                        else player.transitionTo(PlayerMode.MINI)
                     }) {
                         Icon(Icons.Default.ArrowBack,
                             contentDescription = if (mode == PlayerMode.FULLSCREEN) "Exit fullscreen" else "Minimize player",
@@ -257,14 +257,14 @@ private fun NativeVideoSurface(
                         modifier = Modifier.weight(1f))
                     IconButton(onClick = {
                         if (mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
-                        else player.setMode(PlayerMode.MINI)
+                        else player.transitionTo(PlayerMode.MINI)
                     }) {
                         Icon(Icons.Default.PictureInPictureAlt, contentDescription = "Mini player",
                             tint = Color.White)
                     }
                     IconButton(onClick = {
                         if (mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
-                        else player.setMode(PlayerMode.FULLSCREEN)
+                        else player.transitionTo(PlayerMode.FULLSCREEN)
                     }) {
                         Icon(if (mode == PlayerMode.FULLSCREEN) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                             contentDescription = "Toggle fullscreen", tint = Color.White)
@@ -306,7 +306,7 @@ private fun NativeVideoSurface(
                         PlayerIcon(if (mode == PlayerMode.FULLSCREEN) Icons.Default.FullscreenExit
                             else Icons.Default.Fullscreen, "Toggle fullscreen") {
                             if (mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
-                            else player.setMode(PlayerMode.FULLSCREEN)
+                            else player.transitionTo(PlayerMode.FULLSCREEN)
                         }
                     }
                 }
