@@ -1,7 +1,7 @@
 {
   "name": "flixleo",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -10,7 +10,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "desktop": "electron desktop/main.cjs",
-    "desktop:dist": "node desktop/build-icon.cjs && electron-builder --win nsis --x64 --publish never"
+    "desktop:dist": "node desktop/build-icon.cjs && electron-builder --win portable --x64 --publish never"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -55,7 +55,7 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "portable",
           "arch": [
             "x64"
           ]
@@ -80,7 +80,10 @@
         ]
       }
     ],
-    "forceCodeSigning": false
+    "forceCodeSigning": false,
+    "portable": {
+      "artifactName": "FlixLeo-Portable-${version}-${arch}.${ext}"
+    }
   },
   "main": "desktop/main.cjs",
   "author": "FlixLeo"
