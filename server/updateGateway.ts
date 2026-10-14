@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { timingSafeEqual } from 'node:crypto';
+import { getLatestWindowsInstaller } from './windowsDownload';
 
 /** Multi-application update/notice gateway backed by Supabase REST.
  * Run the SQL migration before use. GATEWAY_ADMIN_TOKEN and
@@ -51,6 +52,20 @@ function sanitizePolicy(row: any, clientVersion: number) {
     maintenanceMessage: row.maintenance_message || ''
   };
 }
+// Public GitHub releases back the FlixLeo Windows update gate even when the
+// Supabase admin policy has not yet been updated. No other app is affected.
+function promoteWindowsRelease(policy: any, version: number,
+  release: {url:string;version:string;versionCode:number} | null) {
+  if (!release || release.versionCode < Number(policy.latestVersionCode || 0)) return policy;
+  return {
+    ...policy,
+    latestVersionCode: release.versionCode,
+    latestVersionName: release.version,
+    updateUrl: release.url,
+    updateAvailable: release.versionCode > version,
+    notes: policy.notes || 'FlixLeo Windows installer update available.'
+  };
+}
 router.get('/api/gateway/v1/health', (_req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({ ok: true, databaseConfigured: Boolean(storeUrl() && storeKey()),
@@ -63,15 +78,23 @@ router.get('/api/gateway/v1/check/:appId', async (req: Request, res: Response) =
   if (!allowedApps.has(appId) || !Number.isSafeInteger(version) || version < 0) {
     return res.status(400).json({ error: 'Invalid app or versionCode' });
   }
+  const windowsRelease = appId === 'flixleo-windows' ? await getLatestWindowsInstaller() : null;
   try {
     const data = await supabase('app_update_policies?app_id=eq.' + encodeURIComponent(appId) + '&select=*&limit=1');
-    if (!Array.isArray(data) || !data.length) return res.json({ policy: safeDefaultPolicy(appId, version), notices: [], ready: false, reason: 'policy_missing' });
+    if (!Array.isArray(data) || !data.length) {
+      return res.json({ policy: promoteWindowsRelease(safeDefaultPolicy(appId, version), version, windowsRelease),
+        notices: [], ready: Boolean(windowsRelease), reason: windowsRelease ? 'published_windows_release' : 'policy_missing' });
+    }
     const notices = await supabase('app_update_notices?app_id=eq.' + encodeURIComponent(appId) +
-      '&active=eq.true&select=id,title,body,severity,created_at&order=created_at.desc&limit=10');
-    return res.json({ policy: sanitizePolicy(data[0], version), notices: notices || [], ready: true });
+      '&active=eq.true&select=id,title,body,severity,created_at.desc&order=created_at.desc&limit=10');
+    return res.json({ policy: promoteWindowsRelease(sanitizePolicy(data[0], version), version, windowsRelease),
+      notices: notices || [], ready: true });
   } catch {
-    // Installed clients must continue to work if Supabase is temporarily offline.
-    return res.json({ policy: safeDefaultPolicy(appId, version), notices: [], ready: false, reason: 'gateway_unavailable' });
+    // A published Windows installer can still be offered as an optional update
+    // if the admin database is down. Other apps retain the original safe fallback.
+    return res.json({ policy: promoteWindowsRelease(safeDefaultPolicy(appId, version), version, windowsRelease),
+      notices: [], ready: Boolean(windowsRelease),
+      reason: windowsRelease ? 'published_windows_release' : 'gateway_unavailable' });
   }
 });
 router.get('/api/gateway/v1/admin/apps', async (req: Request, res: Response) => {
