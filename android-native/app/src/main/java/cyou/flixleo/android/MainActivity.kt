@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
         video = InlineVlcController(this)
         state = FlixState(FlixStore(applicationContext), FlixApi(), scope)
         state.onPlay = { title, stream ->
+            state.dismissUpcoming()
             if (video.mode != PlayerMode.CLOSED) video.stop()
             currentPlayback = title to stream
             val resume = state.store.history.find { it.key == state.entryKey(title) }?.progress ?: 0.0
@@ -66,7 +67,7 @@ class MainActivity : ComponentActivity() {
                 state.localRevision++
                 state.uploadCloud()
                 if (finished.first.type == "tv" && finished.first.episode > 0) {
-                    state.playNextEpisode(finished.first)
+                    state.playNextEpisode(finished.first, finished.second)
                 }
             }
         }
@@ -83,6 +84,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun closePlayback() {
+        state.dismissUpcoming()
         video.stop()
         currentPlayback = null
         state.playbackStreams = emptyList()
@@ -478,18 +480,60 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         } ?: playingTitle ?: return
         onPlay(title, stream)
     }
-    fun playNextEpisode(title: FlixTitle) = scope.launch {
+    var upcomingEpisode by mutableStateOf<FlixTitle?>(null)
+        private set
+    var upcomingName by mutableStateOf("")
+        private set
+    var upcomingCountdown by mutableIntStateOf(0)
+        private set
+    private var upcomingStream: FlixStream? = null
+    private var upcomingSources: List<FlixStream> = emptyList()
+    private var upcomingJob: Job? = null
+
+    fun dismissUpcoming() {
+        upcomingJob?.cancel()
+        upcomingEpisode = null
+        upcomingCountdown = 0
+        upcomingStream = null
+        upcomingSources = emptyList()
+    }
+    fun playUpcomingNow() {
+        val item = upcomingEpisode ?: return
+        val source = upcomingStream ?: return
+        val options = upcomingSources
+        dismissUpcoming()
+        streams = options
+        playbackStreams = options
+        selected = item
+        play(source)
+    }
+    fun playNextEpisode(title: FlixTitle, previous: FlixStream) = scope.launch {
+        dismissUpcoming()
         try {
-            val all = api.episodes(title)
+            val all = api.episodes(title).sortedWith(compareBy({ it.season }, { it.number }))
             val next = all.firstOrNull { it.season > title.season ||
                 (it.season == title.season && it.number > title.episode) } ?: return@launch
             val item = title.episodeAt(next.season, next.number)
             val sources = api.streamOptions(item)
-            if (sources.isNotEmpty()) {
-                selected = item; chosenSeason = next.season; chosenEpisode = next.number
-                streams = sources
-                play(sources.first())
-            } else message = "Next episode has no streams"
+            if (sources.isEmpty()) { message = "Next episode has no streams"; return@launch }
+            // Preserve the previous server when a matching identifier is returned;
+            // otherwise use the nearest matching quality rather than assuming 4K.
+            val chosen = sources.firstOrNull { it.id == previous.id }
+                ?: sources.firstOrNull { it.name == previous.name && it.quality == previous.quality }
+                ?: sources.firstOrNull { it.quality == previous.quality }
+                ?: sources.first()
+            upcomingEpisode = item
+            upcomingName = next.title.ifBlank { "Episode ${next.number}" }
+            upcomingStream = chosen
+            upcomingSources = sources
+            upcomingCountdown = 10
+            upcomingJob = scope.launch {
+                while (upcomingCountdown > 0) {
+                    delay(1000)
+                    upcomingCountdown--
+                }
+                playUpcomingNow()
+            }
         } catch (_: Exception) { message = "Could not load the next episode" }
     }
     fun toggleWatch(title: FlixTitle) {
