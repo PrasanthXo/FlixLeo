@@ -19,6 +19,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Native Continue Watching entries include poster, episode and playback metadata.
+// Express's default JSON limit (100 KB) rejects larger sync requests with HTTP 413.
+// Apply a bounded higher limit only to the authenticated native data endpoint.
+app.use('/api/native/data', express.json({ limit: '2mb' }));
 app.use(express.json());
 app.use(updateGateway);
 app.use(nativeMobileApi);
