@@ -52,7 +52,9 @@ export function serveAppLanding(req:Request,res:Response,next:()=>void){
   // Include iPadOS desktop-mode Safari (Macintosh + Mobile).
   const agent=String(req.headers['user-agent']||'');
   const appleMobile=/iPhone|iPad|iPod/i.test(agent)||(/Macintosh/i.test(agent)&&/Mobile\//i.test(agent));
-  if(appleMobile)return next();
+  // TV browsers (including LG webOS, Samsung Tizen and Android TV) open the streaming app directly.
+  const television=/\b(?:webOS|web0S|NetCast|Tizen|SmartTV|Smart-TV|HbbTV|GoogleTV|Google TV|Android TV|AppleTV|Apple TV|Roku|AFT[A-Z0-9]+|BRAVIA|Viera|DTV)\b/i.test(agent);
+  if(appleMobile||television)return next();
   if((host==='flixleo.cyou'||host==='www.flixleo.cyou')&&req.path==='/'&&!['code','token_hash','type','error','error_code','access_token','refresh_token','tv_pair'].some(k=>Object.prototype.hasOwnProperty.call(req.query,k))){
     res.setHeader('Cache-Control','public, max-age=60');
     return res.sendFile(path.resolve(__dirname,'../dist/landing.html'),err=>{
