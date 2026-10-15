@@ -1079,13 +1079,42 @@ private fun ProfileScreen(state: FlixState) {
             }
         }
         item {
+            Surface(color = Card, shape = RoundedCornerShape(17.dp),
+                modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = Gold)
+                        Spacer(Modifier.width(10.dp))
+                        Text("About FlixLeo", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text("FlixLeo is an independent movie and series discovery and playback app.",
+                        color = Muted, fontSize = 12.sp)
+                    Text("Created by Santh Creatives · Independent app creator",
+                        color = Color.White, fontSize = 12.sp)
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val version = remember {
+                        runCatching {
+                            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                        }.getOrNull() ?: "Unknown"
+                    }
+                    Text("Version $version", color = Muted, fontSize = 12.sp)
+                    TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/privacy.html") }) {
+                        Text("Privacy Policy")
+                    }
+                    TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/terms.html") }) {
+                        Text("Terms & Conditions")
+                    }
+                }
+            }
+        }
+        item {
             Column(Modifier.fillMaxWidth().padding(top = 9.dp),
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(painterResource(R.drawable.flixleo_brand), contentDescription = null,
                     modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)))
                 Spacer(Modifier.height(5.dp))
                 Text("FlixLeo · Native Android", fontSize = 12.sp, color = Muted)
-                Text("Movies & TV series powered by TMDB", fontSize = 10.sp, color = Muted)
             }
         }
     }
