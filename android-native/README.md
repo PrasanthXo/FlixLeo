@@ -59,3 +59,7 @@ This Android debug build includes native Movies and Series end-of-list paginatio
 ## Continue Watching sync debug rebuild — 2026-10-15
 
 Trigger CI assembleDebug after commits 87ac946 and 31ef0e5. Includes restoring cloud history after re-login and on startup without overwriting the saved cloud copy before recovery. CI produces an ephemeral debug-signed APK; do not replace an existing differently signed installation without first resolving certificate compatibility.
+
+## Remaining-time and Up Next debug APK rebuild — 2026-10-15
+
+Trigger GitHub Actions Android debug APK after commits 1570042, 1fd2d20, 6cd24a3 and ad9ff36. Includes Continue Watching remaining-time label and end-of-episode Up Next countdown. Debug APK signing may not match older installed certificates; preserve user app data until signed release upgrades are configured.
