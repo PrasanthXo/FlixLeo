@@ -134,6 +134,33 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
                 if (player.mode != PlayerMode.CLOSED) {
                     NativePlaybackOverlay(player, state, modifier = Modifier.fillMaxSize())
                 }
+                state.upcomingEpisode?.let { next ->
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .86f)),
+                        contentAlignment = Alignment.Center) {
+                        Column(Modifier.fillMaxWidth().padding(18.dp)
+                            .clip(RoundedCornerShape(24.dp)).background(Card).padding(18.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("UP NEXT · ${state.upcomingCountdown}s", color = Gold,
+                                fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Spacer(Modifier.height(12.dp))
+                            AsyncImage(next.poster, state.upcomingName,
+                                modifier = Modifier.width(135.dp).height(180.dp)
+                                    .clip(RoundedCornerShape(15.dp)),
+                                contentScale = ContentScale.Crop)
+                            Spacer(Modifier.height(12.dp))
+                            Text(state.upcomingName, color = Color.White,
+                                fontWeight = FontWeight.Black, fontSize = 18.sp,
+                                maxLines = 2, textAlign = TextAlign.Center)
+                            Text("Season ${next.season} · Episode ${next.episode}",
+                                color = Muted, fontSize = 12.sp)
+                            Spacer(Modifier.height(16.dp))
+                            Button(onClick = { state.playUpcomingNow() },
+                                modifier = Modifier.fillMaxWidth()) { Text("Play now") }
+                            OutlinedButton(onClick = { state.dismissUpcoming() },
+                                modifier = Modifier.fillMaxWidth()) { Text("Cancel autoplay") }
+                        }
+                    }
+                }
                 if (state.loading && player.mode == PlayerMode.CLOSED) LinearProgressIndicator(
                     Modifier.fillMaxWidth().align(Alignment.TopCenter), color = Gold)
                 if (state.message.isNotBlank() && player.mode != PlayerMode.FULLSCREEN) {
