@@ -10,11 +10,29 @@ android {
         applicationId = "cyou.flixleo.android"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.5.0-native"
+        versionCode = (project.findProperty("flixleoVersionCode")?.toString()?.toIntOrNull() ?: 6)
+        versionName = project.findProperty("flixleoVersionName")?.toString() ?: "1.5.0-native"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
-    buildTypes { release { isMinifyEnabled = false } }
+    signingConfigs {
+        create("flixleoRelease") {
+            val keystore = System.getenv("FLIXLEO_KEYSTORE_PATH")
+            if (!keystore.isNullOrBlank()) {
+                storeFile = file(keystore)
+                storePassword = System.getenv("FLIXLEO_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("FLIXLEO_KEY_ALIAS")
+                keyPassword = System.getenv("FLIXLEO_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            if (!System.getenv("FLIXLEO_KEYSTORE_PATH").isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("flixleoRelease")
+            }
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
