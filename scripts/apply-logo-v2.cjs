@@ -3,9 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const sharp = require('sharp');
 const root = path.resolve(__dirname, '..');
-const icon = path.join(root,'branding','flixleo-icon-v2.png');
+const icon = fs.existsSync(path.join(root,'branding','flixleo-icon-v2.png')) ? path.join(root,'branding','flixleo-icon-v2.png') : path.join(root,'branding','flixleo-icon-v2.svg');
 async function main() {
- if (!fs.existsSync(icon)) throw Error('Upload branding/flixleo-icon-v2.png first.');
+ if (!fs.existsSync(icon)) throw Error('Upload branding/flixleo-icon-v2.png or branding/flixleo-icon-v2.svg first.');
  const targets = [
   ['public/flixleo-icon-v2.png',512], ['public/favicon-32.png',32],
   ['public/apple-touch-icon.png',180],['public/pwa-192.png',192],
