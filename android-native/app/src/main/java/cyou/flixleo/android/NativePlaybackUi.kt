@@ -88,14 +88,8 @@ fun NativePlaybackOverlay(
         // Reset the expanded scroll offset on every transition back from mini/fullscreen.
         // Otherwise reopening Big would instantly minimize again at the previous offset.
         val bigScroll = key(currentMode) { rememberScrollState() }
-        val cutoffPx = with(LocalDensity.current) { (bigVideoHeight - 32.dp).roundToPx() }
-        LaunchedEffect(bigScroll.value, currentMode) {
-            if (currentMode == PlayerMode.BIG && bigScroll.value >= cutoffPx) {
-                // The expanded movie video has left the scroll viewport.
-                // Keep its existing native VLC engine alive in the mini player.
-                player.transitionTo(PlayerMode.MINI)
-            }
-        }
+        // Browsing quality/server options must never force mini mode.
+        // Mini is available from the explicit button or when navigating away.
 
         if (currentMode == PlayerMode.BIG) {
             Column(Modifier.fillMaxSize().background(BackgroundPlayer)
@@ -145,7 +139,7 @@ fun NativePlaybackOverlay(
                             }
                         }
                     }
-                    Text("Scroll down to keep watching in the mini player.",
+                    Text("Scroll to browse all available servers. Tap Mini player to minimize.",
                         color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 22.dp))
                     Spacer(Modifier.height(160.dp))
                 }
