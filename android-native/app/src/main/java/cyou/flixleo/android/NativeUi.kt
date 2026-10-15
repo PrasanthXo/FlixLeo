@@ -554,6 +554,16 @@ private fun HomeScreen(state: FlixState) {
                                 color = Color.White, fontSize = 12.sp)
                             if (entry.title.episode > 0) Text("S${entry.title.season} · E${entry.title.episode}",
                                 fontSize = 11.sp, color = Gold)
+                            val remainingSeconds = (entry.duration - entry.progress).coerceAtLeast(0.0).toLong()
+                            val remainingLabel = when {
+                                entry.duration <= 0.0 -> "Resume playback"
+                                remainingSeconds >= 3600L ->
+                                    "${remainingSeconds / 3600}h ${(remainingSeconds % 3600) / 60}m remaining"
+                                else -> "${remainingSeconds / 60}m ${remainingSeconds % 60}s remaining"
+                            }
+                            Text("Continue Play · $remainingLabel",
+                                color = Muted, fontSize = 10.sp,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
