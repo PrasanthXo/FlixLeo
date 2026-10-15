@@ -35,15 +35,30 @@ router.get('/api/download/release-notes',async(req:Request,res:Response)=>{
 });
 router.get('/api/download/android',async(_req:Request,res:Response)=>{
   res.setHeader('Cache-Control','no-store');
-  try{
-    const items=await releases();
-    for(const r of items)for(const asset of r.assets){
-      if(/\.apk$/i.test(asset.name)&&asset.size>8_000_000&&/^https:\/\/github\.com\/PrasanthXo\/FlixLeo\/releases\/download\//i.test(asset.url)){
-        return res.redirect(302,asset.url);
-      }
-    }
-  }catch{}
-  return res.status(503).type('text/plain').send('The Android APK is not currently available in a published release.');
+  let items:Release[];
+  try {
+    items=await releases();
+  } catch(error) {
+    console.error('[Android download] Public GitHub release discovery failed:',error);
+    return res.status(503).type('text/plain').send(
+      'Android downloads are temporarily unavailable: the public release service could not be reached. Please retry shortly.'
+    );
+  }
+  const candidates=items.flatMap(r=>r.assets.map(asset=>({asset,tag:r.tag})))
+    .filter(({asset,tag})=>/^android-v1\.5\.\d+$/.test(tag) &&
+      /^FlixLeo-Android-v1\.5\.\d+-signed\.apk$/i.test(asset.name) &&
+      asset.size>8_000_000 &&
+      /^https:\/\/github\.com\/PrasanthXo\/FlixLeo\/releases\/download\//i.test(asset.url))
+    .sort((a,b)=>{
+      const av=Number(a.tag.split('.').pop())||0;
+      const bv=Number(b.tag.split('.').pop())||0;
+      return bv-av;
+    });
+  if(candidates.length) return res.redirect(302,candidates[0].asset.url);
+  console.warn('[Android download] No verified public signed Android release; private GitHub releases cannot be downloaded anonymously.');
+  return res.status(503).type('text/plain').send(
+    'No public signed Android APK has been published yet. The private signed release must be published to PrasanthXo/FlixLeo Releases before this download works.'
+  );
 });
 export function serveAppLanding(req:Request,res:Response,next:()=>void){
   // Only the apex is the download landing; web.flixleo.cyou remains the SPA.
