@@ -1074,10 +1074,10 @@ private fun ProfileScreen(state: FlixState) {
                     fontSize = 11.sp, color = Muted)
                 Text("Version ${BuildConfig.VERSION_NAME} · Code ${BuildConfig.VERSION_CODE}",
                     fontSize = 11.sp, color = Gold)
-                TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/privacy") }) {
+                TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/privacy.html") }) {
                     Text("Privacy Policy")
                 }
-                TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/terms") }) {
+                TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/terms.html") }) {
                     Text("Terms & Conditions")
                 }
             }
@@ -1205,8 +1205,8 @@ private fun AccountDialog(state: FlixState) {
                     Column {
                         Text("I agree to the Terms & Conditions and Privacy Policy", fontSize = 11.sp)
                         Row {
-                            TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/terms") }) { Text("Terms") }
-                            TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/privacy") }) { Text("Privacy") }
+                            TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/terms.html") }) { Text("Terms") }
+                            TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/privacy.html") }) { Text("Privacy") }
                         }
                     }
                 }
