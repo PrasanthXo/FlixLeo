@@ -549,7 +549,7 @@ private fun HomeScreen(state: FlixState) {
         items(sections.filter { it.first != "Spotlight" }) { (heading, data) ->
             PosterRow(heading, data, state)
         }
-        item { Text("Movie and series metadata by TMDB · Stream availability depends on providers.",
+        item { Text("Stream availability depends on providers.",
             color = Muted, fontSize = 10.sp, modifier = Modifier.padding(20.dp)) }
     }
 }
@@ -733,7 +733,7 @@ private fun DetailSheet(state: FlixState) {
                     Text(title.rating + " / 10", fontSize = 16.sp, fontWeight = FontWeight.Bold,
                         color = Color.White)
                     Spacer(Modifier.width(8.dp))
-                    Text("TMDB score", color = Muted, fontSize = 11.sp)
+                    Text("Rating", color = Muted, fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.height(7.dp))
@@ -1067,7 +1067,19 @@ private fun ProfileScreen(state: FlixState) {
                     modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)))
                 Spacer(Modifier.height(5.dp))
                 Text("FlixLeo · Native Android", fontSize = 12.sp, color = Muted)
-                Text("Movies & TV series powered by TMDB", fontSize = 10.sp, color = Muted)
+                Text("Santh Creatives · Independent app creator", fontSize = 11.sp, color = Muted)
+                Spacer(Modifier.height(8.dp))
+                Text("About FlixLeo", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("FlixLeo is an independent entertainment discovery and playback app created by Santh Creatives.",
+                    fontSize = 11.sp, color = Muted)
+                Text("Version ${BuildConfig.VERSION_NAME} · Code ${BuildConfig.VERSION_CODE}",
+                    fontSize = 11.sp, color = Gold)
+                TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/privacy") }) {
+                    Text("Privacy Policy")
+                }
+                TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/terms") }) {
+                    Text("Terms & Conditions")
+                }
             }
         }
     }
@@ -1190,7 +1202,13 @@ private fun AccountDialog(state: FlixState) {
                     visualTransformation = PasswordVisualTransformation())
                 if (state.showSignup) Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(agreed, onCheckedChange = { agreed = it })
-                    Text("I agree to the Terms & Privacy Policy", fontSize = 11.sp)
+                    Column {
+                        Text("I agree to the Terms & Conditions and Privacy Policy", fontSize = 11.sp)
+                        Row {
+                            TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/terms") }) { Text("Terms") }
+                            TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/privacy") }) { Text("Privacy") }
+                        }
+                    }
                 }
                 if (state.authError.isNotBlank()) {
                     Text(state.authError, fontSize = 12.sp,
