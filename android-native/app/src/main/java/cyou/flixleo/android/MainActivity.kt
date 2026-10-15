@@ -570,7 +570,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             showOnboarding = store.needsSignupOnboarding(
                 account?.user?.optString("email").orEmpty()
             )
-            syncOnLogin(showNotice = false)
+            syncOnLogin(showNotice = true)
             pendingWatchlistTitle?.let { title ->
                 pendingWatchlistTitle = null
                 if (!store.watched.contains(title.id)) toggleWatch(title)
@@ -619,6 +619,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     fun signOut() = scope.launch {
         val active = account
         account = null
+        cloudRestoredForUser = null
         store.saveSession(null)
         if (active != null) try {
             api.call("/api/native/auth/logout", "POST", JSONObject(), active.accessToken)
@@ -630,9 +631,14 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         store.clearSignupOnboarding()
         if (save) saveProfile()
     }
+    private var cloudRestoredForUser: String? = null
+    private val cloudSyncMutex = kotlinx.coroutines.sync.Mutex()
     private suspend fun syncOnLogin(showNotice: Boolean = false) {
-        val current = account ?: return
+        cloudSyncMutex.lock()
         try {
+            refreshSession().join()
+            val current = account ?: return
+            val userId = current.user.optString("id")
             val cloud = api.remoteHistory(current.accessToken).optJSONObject("payload")
             val mergedIds = store.watched + (cloud?.optJSONArray("watchlist")?.let {
                 (0 until it.length()).mapNotNull { index -> it.optString(index).takeIf(String::isNotBlank) }
@@ -644,10 +650,11 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             store.setWatchlist(mergedIds.toSet())
             store.setHistory(histories)
             localRevision++
+            cloudRestoredForUser = userId
             api.sync(current.accessToken, mergedIds, histories)
         } catch (_: Exception) {
-            if (showNotice) message = "Your account is signed in. Sync will retry automatically."
-        }
+            if (showNotice) message = "Your account is signed in. Continue Watching sync will retry."
+        } finally { cloudSyncMutex.unlock() }
     }
     fun uploadCloud() {
         cloudJob?.cancel()
@@ -655,8 +662,12 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             delay(1300)
             refreshSession().join()
             val active = account ?: return@launch
-            try { api.sync(active.accessToken, store.watched, store.history) }
-            catch (_: Exception) { /* local data is always kept */ }
+            cloudSyncMutex.lock()
+            try {
+                if (cloudRestoredForUser != active.user.optString("id")) return@launch
+                api.sync(active.accessToken, store.watched, store.history)
+            } catch (_: Exception) { /* local data is always kept; retry later */ }
+            finally { cloudSyncMutex.unlock() }
         }
     }
     fun saveProfile() = scope.launch {
