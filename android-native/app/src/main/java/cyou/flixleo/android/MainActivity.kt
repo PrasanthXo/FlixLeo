@@ -205,7 +205,8 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                     }
                 }
             } catch (_: Exception) { /* offline must not lock native app */ }
-            refreshSession()
+            refreshSession().join()
+            if (account != null) syncOnLogin(showNotice = false)
         }
     }
     fun refreshOnForeground() {
