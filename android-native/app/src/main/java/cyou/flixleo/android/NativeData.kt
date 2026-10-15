@@ -136,10 +136,9 @@ class FlixStore(private val context: Context) {
     // Watchlist and completed playback are deliberately separate.
     val completed: Set<String> get() = prefs.getStringSet("completed_playback", emptySet()) ?: emptySet()
     fun isWatched(title: FlixTitle): Boolean {
-        val prefix = title.id + ":s"
-        return if (title.type == "tv" && title.episode < 1)
-            completed.any { it.startsWith(prefix) }
-        else completed.contains(title.id + if (title.season >= 0 && title.episode >= 0)
+        // An episode being completed must not label the entire series as finished.
+        if (title.type == "tv" && title.episode < 1) return false
+        return completed.contains(title.id + if (title.season >= 0 && title.episode >= 0)
             ":s${title.season}e${title.episode}" else "")
     }
     fun markWatched(title: FlixTitle) {
