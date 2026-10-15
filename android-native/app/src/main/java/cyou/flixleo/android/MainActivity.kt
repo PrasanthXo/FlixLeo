@@ -238,31 +238,42 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     fun entryKey(title: FlixTitle): String = title.id +
         (if (title.season >= 0 && title.episode >= 0) ":s${title.season}e${title.episode}" else "")
     fun notify(text: String) { message = text }
+    private var lastUpdateCheckAt = 0L
+    private fun checkAndroidUpdate() = scope.launch {
+        val code = BuildConfig.VERSION_CODE
+        try {
+            val result = api.call("/api/gateway/v1/check/flixleo-android?versionCode=$code")
+            if (!result.optBoolean("ready")) return@launch
+            val policy = result.optJSONObject("policy") ?: return@launch
+            val newer = policy.optInt("latestVersionCode", code) > code
+            val link = policy.optString("updateUrl")
+            val directApk = link.startsWith("https://") &&
+                runCatching { Uri.parse(link).path?.endsWith(".apk", true) == true }.getOrDefault(false)
+            if (newer && directApk) {
+                updateNotice = policy
+                updateForced = policy.optBoolean("forceUpdate") &&
+                    code < policy.optInt("minVersionCode", 0)
+            } else {
+                updateNotice = null
+                updateForced = false
+            }
+        } catch (_: Exception) {
+            // Do not accidentally lock users out when the update service is unavailable.
+        }
+    }
     fun initialize() {
         splashStartedAt = System.currentTimeMillis()
         refresh()
-        scope.launch {
-            try {
-                val code = 6
-                val result = api.call("/api/gateway/v1/check/flixleo-android?versionCode=$code")
-                if (result.optBoolean("ready")) {
-                    val policy = result.optJSONObject("policy")
-                    if (policy != null) {
-                        val newer = policy.optInt("latestVersionCode", code) > code
-                        val link = policy.optString("updateUrl")
-                        if (newer && link.startsWith("https://") && link.substringBefore('?').endsWith(".apk", true)) {
-                            updateNotice = policy
-                            updateForced = policy.optBoolean("forceUpdate") &&
-                                code < policy.optInt("minVersionCode", 0)
-                        }
-                    }
-                }
-            } catch (_: Exception) { /* offline must not lock native app */ }
-            refreshSession()
-        }
+        lastUpdateCheckAt = System.currentTimeMillis()
+        checkAndroidUpdate()
+        scope.launch { refreshSession() }
     }
     fun refreshOnForeground() {
         val now = System.currentTimeMillis()
+        if (now - lastUpdateCheckAt > 60_000L) {
+            lastUpdateCheckAt = now
+            checkAndroidUpdate()
+        }
         // Refresh catalogue automatically after a short background interval.
         if (now - lastCatalogRefreshAt > 2 * 60_000L) refresh()
         if (account != null && now - lastCloudPullAt > 2 * 60_000L) {
