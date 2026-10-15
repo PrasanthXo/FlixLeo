@@ -136,6 +136,33 @@ class FlixStore(private val context: Context) {
     val history: List<ResumeEntry> get() = runCatching {
         JSONArray(prefs.getString("history", "[]")).objects().mapNotNull(ResumeEntry::from)
     }.getOrDefault(emptyList())
+    // Keep cached playback and preferences scoped to the signed-in account.
+    // Legacy data is adopted once for the first account, without discarding it.
+    fun activateUser(userId: String) {
+        if (userId.isBlank()) return
+        val previous = prefs.getString("local_data_owner", null)
+        if (previous == userId) return
+        val keys = listOf("watchlist", "history", "favorite_languages", "favorite_genres", "favorite_artists")
+        val editor = prefs.edit()
+        if (!previous.isNullOrBlank()) {
+            keys.forEach { name ->
+                val value = prefs.getString(name, null)
+                val set = prefs.getStringSet(name, null)
+                when {
+                    value != null -> editor.putString("account_${previous}_$name", value)
+                    set != null -> editor.putStringSet("account_${previous}_$name", set.toSet())
+                }
+                editor.remove(name)
+            }
+            keys.forEach { name ->
+                val savedString = prefs.getString("account_${userId}_$name", null)
+                val savedSet = prefs.getStringSet("account_${userId}_$name", null)
+                if (savedString != null) editor.putString(name, savedString)
+                else if (savedSet != null) editor.putStringSet(name, savedSet.toSet())
+            }
+        }
+        editor.putString("local_data_owner", userId).commit()
+    }
     // A preference survey is only prompted after signup in THIS app, never for guests.
     fun markSignup(email: String) =
         prefs.edit().putString("pending_onboarding_email", email.trim().lowercase()).apply()
