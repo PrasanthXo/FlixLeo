@@ -4,6 +4,7 @@ on:
     paths:
       - 'branding/flixleo-icon-v2.png'
       - 'branding/flixleo-icon-v2.svg'
+      - '.github/workflows/apply-logo-v2.yml'
   workflow_dispatch:
 permissions:
   contents: write
