@@ -126,7 +126,7 @@ fun NativePlaybackOverlay(
                         }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 17.dp), color = Color.DarkGray)
-                    Text("Select quality & server", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Video quality", fontWeight = FontWeight.Bold, color = Color.White)
                     Spacer(Modifier.height(8.dp))
                     if (state.playbackStreams.isEmpty()) Text("No streams available", color = Color.LightGray)
                     state.playbackStreams.forEach { stream ->
@@ -140,8 +140,7 @@ fun NativePlaybackOverlay(
                                 Column(Modifier.weight(1f)) {
                                     Text(stream.quality + if (stream.size.isNotBlank()) " · " + stream.size else "",
                                         color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    Text(stream.name, color = Color.LightGray, fontSize = 11.sp,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    // Hide add-on/provider names: only quality and size are shown.
                                 }
                             }
                         }

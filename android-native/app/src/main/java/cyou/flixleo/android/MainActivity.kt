@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
             currentPlayback?.let { (title, stream) ->
                 if (pos > 0) {
                     state.store.remember(title, pos / 1000.0, length / 1000.0, stream.id)
+                    if (length > 0 && pos.toDouble() / length >= 0.95) state.store.markWatched(title)
                     state.localRevision++
                     if (System.currentTimeMillis() - lastCloudSync > 65000) {
                         lastCloudSync = System.currentTimeMillis()
@@ -61,6 +62,7 @@ class MainActivity : ComponentActivity() {
             video.stop(notifyProgress = false)
             currentPlayback = null
             if (finished != null) {
+                state.store.markWatched(finished.first)
                 state.store.remember(finished.first, 0.0,
                     completedDuration / 1000.0, finished.second.id, ended = true)
                 state.localRevision++
@@ -143,15 +145,73 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var selectedChannel by mutableStateOf<LiveChannel?>(null)
     var movies by mutableStateOf<List<FlixTitle>>(emptyList())
     var series by mutableStateOf<List<FlixTitle>>(emptyList())
+    var moviesPage by mutableIntStateOf(1)
+    var seriesPage by mutableIntStateOf(1)
+    var moviesMore by mutableStateOf(true)
+    var seriesMore by mutableStateOf(true)
+    var paging by mutableStateOf(false)
+    var pagingError by mutableStateOf("")
+    private var catalogGeneration = 0
+    fun loadNextPage(tv: Boolean) {
+        if (paging || loading || !(if (tv) seriesMore else moviesMore)) return
+        scope.launch {
+            paging = true; pagingError = ""
+            val page = (if (tv) seriesPage else moviesPage) + 1
+            val generation = catalogGeneration
+            try {
+                val next = api.titles(if (tv) "/api/tmdb/tv/trending?page=$page" else "/api/tmdb/trending?page=$page")
+                if (generation != catalogGeneration) return@launch
+                if (tv) {
+                    series = (series + next).distinctBy { it.id }
+                    seriesPage = page
+                    seriesMore = next.isNotEmpty() && page < 500
+                } else {
+                    movies = (movies + next).distinctBy { it.id }
+                    moviesPage = page
+                    moviesMore = next.isNotEmpty() && page < 500
+                }
+            } catch (_: Exception) {
+                if (generation == catalogGeneration) pagingError = "Couldn't load more titles. Tap to retry."
+            }
+            finally { if (generation == catalogGeneration) paging = false }
+        }
+    }
+    fun resume(entry: ResumeEntry) = scope.launch {
+        val title = entry.title
+        if (title.type == "tv" && (title.season < 1 || title.episode < 1)) {
+            open(title); return@launch
+        }
+        detailsLoading = true
+        try {
+            val available = api.streamOptions(title)
+            val saved = available.firstOrNull { it.id == entry.mirror }
+            if (saved == null) {
+                message = "Saved server unavailable. Choose another server to continue."
+                open(title)
+                return@launch
+            }
+            selected = title
+            streams = available
+            play(saved)
+        } catch (_: Exception) { message = "Unable to resume. Try again." }
+        finally { detailsLoading = false }
+    }
     var search by mutableStateOf("")
     var searchResults by mutableStateOf<List<FlixTitle>>(emptyList())
     var searchLoading by mutableStateOf(false)
+    var searchError by mutableStateOf("")
+    var showSplash by mutableStateOf(true)
+        private set
+    private var splashStartedAt = System.currentTimeMillis()
+    private var firstRefreshCompleted = false
+    private var pendingWatchlistTitle: FlixTitle? = null
     var home by mutableStateOf<List<Pair<String, List<FlixTitle>>>>(emptyList())
     var localRevision by mutableIntStateOf(0)
     var account by mutableStateOf<Session?>(store.readSession())
     var accountBusy by mutableStateOf(false)
     var showAuth by mutableStateOf(false)
     var showSignup by mutableStateOf(false)
+    var authError by mutableStateOf("")
     var showOnboarding by mutableStateOf(false)
     var streamsChecked by mutableStateOf(false)
     private var lastCatalogRefreshAt = 0L
@@ -178,30 +238,42 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     fun entryKey(title: FlixTitle): String = title.id +
         (if (title.season >= 0 && title.episode >= 0) ":s${title.season}e${title.episode}" else "")
     fun notify(text: String) { message = text }
-    fun initialize() {
-        refresh()
-        scope.launch {
-            try {
-                val code = 5
-                val result = api.call("/api/gateway/v1/check/flixleo-android?versionCode=$code")
-                if (result.optBoolean("ready")) {
-                    val policy = result.optJSONObject("policy")
-                    if (policy != null) {
-                        val newer = policy.optInt("latestVersionCode", code) > code
-                        val link = policy.optString("updateUrl")
-                        if (newer && link.startsWith("https://") && link.substringBefore('?').endsWith(".apk", true)) {
-                            updateNotice = policy
-                            updateForced = policy.optBoolean("forceUpdate") &&
-                                code < policy.optInt("minVersionCode", 0)
-                        }
-                    }
-                }
-            } catch (_: Exception) { /* offline must not lock native app */ }
-            refreshSession()
+    private var lastUpdateCheckAt = 0L
+    private fun checkAndroidUpdate() = scope.launch {
+        val code = BuildConfig.VERSION_CODE
+        try {
+            val result = api.call("/api/gateway/v1/check/flixleo-android?versionCode=$code")
+            if (!result.optBoolean("ready")) return@launch
+            val policy = result.optJSONObject("policy") ?: return@launch
+            val newer = policy.optInt("latestVersionCode", code) > code
+            val link = policy.optString("updateUrl")
+            val directApk = link.startsWith("https://") &&
+                runCatching { Uri.parse(link).path?.endsWith(".apk", true) == true }.getOrDefault(false)
+            if (newer && directApk) {
+                updateNotice = policy
+                updateForced = policy.optBoolean("forceUpdate") &&
+                    code < policy.optInt("minVersionCode", 0)
+            } else {
+                updateNotice = null
+                updateForced = false
+            }
+        } catch (_: Exception) {
+            // Do not accidentally lock users out when the update service is unavailable.
         }
+    }
+    fun initialize() {
+        splashStartedAt = System.currentTimeMillis()
+        refresh()
+        lastUpdateCheckAt = System.currentTimeMillis()
+        checkAndroidUpdate()
+        scope.launch { refreshSession() }
     }
     fun refreshOnForeground() {
         val now = System.currentTimeMillis()
+        if (now - lastUpdateCheckAt > 60_000L) {
+            lastUpdateCheckAt = now
+            checkAndroidUpdate()
+        }
         // Refresh catalogue automatically after a short background interval.
         if (now - lastCatalogRefreshAt > 2 * 60_000L) refresh()
         if (account != null && now - lastCloudPullAt > 2 * 60_000L) {
@@ -216,6 +288,9 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         lastCatalogRefreshAt = System.currentTimeMillis()
         scope.launch {
             loading = true
+            catalogGeneration++
+            paging = false; pagingError = ""
+            moviesPage = 1; seriesPage = 1; moviesMore = true; seriesMore = true
             try {
                 supervisorScope {
                     val trend = async { runCatching { api.titles("/api/tmdb/trending") }.getOrDefault(emptyList()) }
@@ -271,7 +346,15 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                     if (home.isEmpty()) message = "Catalogue temporarily unavailable. Retry when connected."
                 }
             } catch (e: Exception) { message = e.localizedMessage ?: "Could not load catalogue" }
-            finally { loading = false }
+            finally {
+                loading = false
+                if (!firstRefreshCompleted) {
+                    firstRefreshCompleted = true
+                    val elapsed = System.currentTimeMillis() - splashStartedAt
+                    delay((1550L - elapsed).coerceAtLeast(0L))
+                    showSplash = false
+                }
+            }
         }
     }
     fun changeTab(section: String) {
@@ -288,18 +371,42 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     fun performSearch(text: String) {
         search = text
         searchJob?.cancel()
+        searchError = ""
         if (text.isBlank()) { searchResults = emptyList(); searchLoading = false; return }
         searchJob = scope.launch {
-            delay(350)
+            delay(400) // debounce keyboard input; cancellation is expected, NOT a server error.
             searchLoading = true
             try {
-                supervisorScope {
-                    val a = async { runCatching { api.titles("/api/tmdb/search?q=" + Uri.encode(text)) }.getOrDefault(emptyList()) }
-                    val b = async { runCatching { api.titles("/api/tmdb/tv/search?q=" + Uri.encode(text)) }.getOrDefault(emptyList()) }
-                    searchResults = (a.await() + b.await()).distinctBy { it.id }
+                val (movieResult, tvResult) = supervisorScope {
+                    val movie = async { runCatching { api.titles("/api/tmdb/search?q=" + Uri.encode(text)) } }
+                    val tv = async { runCatching { api.titles("/api/tmdb/tv/search?q=" + Uri.encode(text)) } }
+                    movie.await() to tv.await()
                 }
-            } catch (_: Exception) { message = "Search service unavailable" }
-            finally { searchLoading = false }
+                ensureActive()
+                // Still allow useful results from cached Home data if TMDB is offline.
+                val local = (movies + series + home.flatMap { it.second }).distinctBy { it.id }
+                    .filter {
+                        it.title.contains(text, ignoreCase = true) ||
+                        it.cast.any { name -> name.contains(text, ignoreCase = true) }
+                    }.take(40)
+                searchResults = (
+                    movieResult.getOrDefault(emptyList()) +
+                    tvResult.getOrDefault(emptyList()) + local
+                ).distinctBy { it.id }
+                searchError = if (movieResult.isFailure && tvResult.isFailure &&
+                    searchResults.isEmpty()) "Search is temporarily offline. Check your connection and retry."
+                    else ""
+            } catch (_: CancellationException) {
+                // A new keystroke cancels the previous request. Never show a popup.
+                return@launch
+            } catch (_: Exception) {
+                searchResults = (movies + series).distinctBy { it.id }
+                    .filter { it.title.contains(text, ignoreCase = true) }
+                searchError = if (searchResults.isEmpty())
+                    "Search is temporarily offline. Try again shortly." else ""
+            } finally {
+                if (isActive) searchLoading = false
+            }
         }
     }
     fun open(title: FlixTitle) {
@@ -402,6 +509,13 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         } catch (_: Exception) { message = "Could not load the next episode" }
     }
     fun toggleWatch(title: FlixTitle) {
+        if (account == null) {
+            pendingWatchlistTitle = title
+            showSignup = false
+            showAuth = true
+            message = "Sign in or create an account to use your Watchlist."
+            return
+        }
         val ids = store.watched
         if (!ids.add(title.id)) ids.remove(title.id)
         store.setWatchlist(ids)
@@ -449,6 +563,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         } finally { refreshing.set(false) }
     }
     fun signIn(email: String, password: String) = scope.launch {
+        authError = ""
         accountBusy = true
         try {
             account = Session.from(api.call("/api/native/auth/login", "POST",
@@ -465,15 +580,26 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                 localRevision++
             }
             showAuth = false
+            authError = ""
             message = "Signed in"
             showOnboarding = store.needsSignupOnboarding(
                 account?.user?.optString("email").orEmpty()
             )
             syncOnLogin(showNotice = false)
-        } catch (e: Exception) { message = e.localizedMessage ?: "Sign-in failed" }
+            pendingWatchlistTitle?.let { title ->
+                pendingWatchlistTitle = null
+                if (!store.watched.contains(title.id)) toggleWatch(title)
+            }
+        } catch (e: Exception) {
+            val detail = e.localizedMessage.orEmpty()
+            authError = if ("HTTP 404" in detail)
+                "Android sign-in service is not deployed yet. Please retry after the backend update."
+                else detail.ifBlank { "Sign-in failed" }
+        }
         finally { accountBusy = false }
     }
     fun signUp(email: String, password: String) = scope.launch {
+        authError = ""
         accountBusy = true
         try {
             val result = api.call("/api/native/auth/signup", "POST",
@@ -482,16 +608,27 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             message = result.optString("message", "Verify your email before signing in")
             showSignup = false
             showAuth = false
-        } catch (e: Exception) { message = e.localizedMessage ?: "Could not sign up" }
+        } catch (e: Exception) {
+            val detail = e.localizedMessage.orEmpty()
+            authError = if ("HTTP 404" in detail)
+                "Android sign-in service is not deployed yet. Please retry after the backend update."
+                else detail.ifBlank { "Could not sign up" }
+        }
         finally { accountBusy = false }
     }
     fun emailAction(email: String, action: String) = scope.launch {
+        authError = ""
         accountBusy = true
         try {
             val path = if (action == "recover") "recover" else "resend"
             val result = api.call("/api/native/auth/$path", "POST", JSONObject().put("email", email.trim()))
             message = result.optString("message", "Check your email")
-        } catch (e: Exception) { message = e.localizedMessage ?: "Could not send email" }
+        } catch (e: Exception) {
+            val detail = e.localizedMessage.orEmpty()
+            authError = if ("HTTP 404" in detail)
+                "Android sign-in service is not deployed yet. Please retry after the backend update."
+                else detail.ifBlank { "Could not send email" }
+        }
         finally { accountBusy = false }
     }
     fun signOut() = scope.launch {
