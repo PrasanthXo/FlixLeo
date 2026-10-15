@@ -66,6 +66,47 @@ function promoteWindowsRelease(policy: any, version: number,
     notes: policy.notes || 'FlixLeo Windows installer update available.'
   };
 }
+
+type AndroidRelease = { url: string; version: string; versionCode: number };
+let androidReleaseCache: { expires: number; release: AndroidRelease | null } | null = null;
+async function getLatestPublicSignedAndroid(): Promise<AndroidRelease | null> {
+  if (androidReleaseCache && Date.now() < androidReleaseCache.expires) return androidReleaseCache.release;
+  let release: AndroidRelease | null = null;
+  try {
+    const response = await fetch('https://api.github.com/repos/PrasanthXo/FlixLeo/releases?per_page=30', {
+      headers: { 'User-Agent': 'FlixLeo-Android-Update-Gateway', Accept: 'application/vnd.github+json' },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (response.ok) {
+      const releases: any = await response.json();
+      for (const item of Array.isArray(releases) ? releases : []) {
+        if (item.draft || item.prerelease) continue;
+        const match = /^android-v1\\.5\\.(\\d+)$/.exec(String(item.tag_name || ''));
+        if (!match) continue;
+        const asset = (Array.isArray(item.assets) ? item.assets : []).find((a: any) =>
+          /^FlixLeo-Android-v1\\.5\\.\\d+-signed\\.apk$/i.test(String(a.name || '')) &&
+          Number(a.size) > 8_000_000 && a.state === 'uploaded' &&
+          /^https:\\/\\/github\\.com\\/PrasanthXo\\/FlixLeo\\/releases\\/download\\//i.test(String(a.browser_download_url || '')));
+        if (!asset) continue;
+        const candidate = { url: String(asset.browser_download_url),
+          version: '1.5.' + match[1], versionCode: 1000 + Number(match[1]) };
+        if (!release || candidate.versionCode > release.versionCode) release = candidate;
+      }
+    }
+  } catch { /* Retain non-forcing fallback when GitHub cannot be reached. */ }
+  androidReleaseCache = { expires: Date.now() + 120000, release };
+  return release;
+}
+function promoteAndroidRelease(policy: any, installedVersion: number, release: AndroidRelease | null) {
+  if (!release || release.versionCode < Number(policy.latestVersionCode || 0)) return policy;
+  return { ...policy, latestVersionCode: release.versionCode,
+    latestVersionName: release.version, updateUrl: release.url,
+    updateAvailable: release.versionCode > installedVersion,
+    // Release discovery cannot mandate a forced update. Preserve any valid administrator policy.
+    forceUpdate: Boolean(policy.forceUpdate) && installedVersion < Number(policy.minVersionCode || 0),
+    notes: policy.notes || 'FlixLeo Android update available.' };
+}
+
 router.get('/api/gateway/v1/health', (_req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({ ok: true, databaseConfigured: Boolean(storeUrl() && storeKey()),
@@ -79,22 +120,25 @@ router.get('/api/gateway/v1/check/:appId', async (req: Request, res: Response) =
     return res.status(400).json({ error: 'Invalid app or versionCode' });
   }
   const windowsRelease = appId === 'flixleo-windows' ? await getLatestWindowsInstaller() : null;
+  const androidRelease = appId === 'flixleo-android' ? await getLatestPublicSignedAndroid() : null;
+  const promote = (policy: any) => promoteAndroidRelease(promoteWindowsRelease(policy, version, windowsRelease), version, androidRelease);
+  const publicReleaseReady = Boolean(windowsRelease || androidRelease);
   try {
     const data = await supabase('app_update_policies?app_id=eq.' + encodeURIComponent(appId) + '&select=*&limit=1');
     if (!Array.isArray(data) || !data.length) {
-      return res.json({ policy: promoteWindowsRelease(safeDefaultPolicy(appId, version), version, windowsRelease),
-        notices: [], ready: Boolean(windowsRelease), reason: windowsRelease ? 'published_windows_release' : 'policy_missing' });
+      return res.json({ policy: promote(safeDefaultPolicy(appId, version)),
+        notices: [], ready: publicReleaseReady, reason: publicReleaseReady ? 'published_release' : 'policy_missing' });
     }
     const notices = await supabase('app_update_notices?app_id=eq.' + encodeURIComponent(appId) +
       '&active=eq.true&select=id,title,body,severity,created_at&order=created_at.desc&limit=10');
-    return res.json({ policy: promoteWindowsRelease(sanitizePolicy(data[0], version), version, windowsRelease),
+    return res.json({ policy: promote(sanitizePolicy(data[0], version)),
       notices: notices || [], ready: true });
   } catch {
     // A published Windows installer can still be offered as an optional update
     // if the admin database is down. Other apps retain the original safe fallback.
     return res.json({ policy: promoteWindowsRelease(safeDefaultPolicy(appId, version), version, windowsRelease),
-      notices: [], ready: Boolean(windowsRelease),
-      reason: windowsRelease ? 'published_windows_release' : 'gateway_unavailable' });
+      notices: [], ready: publicReleaseReady,
+      reason: publicReleaseReady ? 'published_release' : 'gateway_unavailable' });
   }
 });
 router.get('/api/gateway/v1/admin/apps', async (req: Request, res: Response) => {
