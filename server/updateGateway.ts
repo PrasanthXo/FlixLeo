@@ -81,12 +81,12 @@ async function getLatestPublicSignedAndroid(): Promise<AndroidRelease | null> {
       const releases: any = await response.json();
       for (const item of Array.isArray(releases) ? releases : []) {
         if (item.draft || item.prerelease) continue;
-        const match = /^android-v1\\.5\\.(\\d+)$/.exec(String(item.tag_name || ''));
+        const match = /^android-v1\.5\.(\d+)$/.exec(String(item.tag_name || ''));
         if (!match) continue;
         const asset = (Array.isArray(item.assets) ? item.assets : []).find((a: any) =>
-          /^FlixLeo-Android-v1\\.5\\.\\d+-signed\\.apk$/i.test(String(a.name || '')) &&
+          /^FlixLeo-Android-v1\.5\.\d+-signed\.apk$/i.test(String(a.name || '')) &&
           Number(a.size) > 8_000_000 && a.state === 'uploaded' &&
-          /^https:\\/\\/github\\.com\\/PrasanthXo\\/FlixLeo\\/releases\\/download\\//i.test(String(a.browser_download_url || '')));
+          /^https:\/\/github\.com\/PrasanthXo\/FlixLeo\/releases\/download\//i.test(String(a.browser_download_url || '')));
         if (!asset) continue;
         const candidate = { url: String(asset.browser_download_url),
           version: '1.5.' + match[1], versionCode: 1000 + Number(match[1]) };
@@ -136,7 +136,7 @@ router.get('/api/gateway/v1/check/:appId', async (req: Request, res: Response) =
   } catch {
     // A published Windows installer can still be offered as an optional update
     // if the admin database is down. Other apps retain the original safe fallback.
-    return res.json({ policy: promoteWindowsRelease(safeDefaultPolicy(appId, version), version, windowsRelease),
+    return res.json({ policy: promote(safeDefaultPolicy(appId, version)),
       notices: [], ready: publicReleaseReady,
       reason: publicReleaseReady ? 'published_release' : 'gateway_unavailable' });
   }
