@@ -63,3 +63,7 @@ Trigger CI assembleDebug after commits 87ac946 and 31ef0e5. Includes restoring c
 ## Remaining-time and Up Next debug APK rebuild — 2026-10-15
 
 Trigger GitHub Actions Android debug APK after commits 1570042, 1fd2d20, 6cd24a3 and ad9ff36. Includes Continue Watching remaining-time label and end-of-episode Up Next countdown. Debug APK signing may not match older installed certificates; preserve user app data until signed release upgrades are configured.
+
+## Player scrolling and movie resume APK build — 2026-10-15
+
+Trigger CI Android debug APK including commits f96c747 (one-tap Continue Watching resume for movies and series) and aaf27f4 (keep big player open while browsing all servers). This workflow produces a debug-signed artifact; signing compatibility with previously installed builds is not guaranteed.
