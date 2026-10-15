@@ -179,11 +179,13 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     private var cloudJob: Job? = null
     private val refreshing = AtomicBoolean(false)
 
-    val watchlist: Set<String> get() { localRevision; return store.watched }
-    val history: List<ResumeEntry> get() { localRevision; return store.history }
-    val favorites: Set<String> get() { localRevision; return store.favorites }
-    val favoriteGenres: Set<String> get() { localRevision; return store.favoriteGenres }
-    val favoriteArtists: Set<String> get() { localRevision; return store.favoriteArtists }
+    // Private account data must never remain visible in signed-out/guest mode.
+    // Leave the encrypted local backup intact for the same user's next login.
+    val watchlist: Set<String> get() { localRevision; return if (account == null) emptySet() else store.watched }
+    val history: List<ResumeEntry> get() { localRevision; return if (account == null) emptyList() else store.history }
+    val favorites: Set<String> get() { localRevision; return if (account == null) emptySet() else store.favorites }
+    val favoriteGenres: Set<String> get() { localRevision; return if (account == null) emptySet() else store.favoriteGenres }
+    val favoriteArtists: Set<String> get() { localRevision; return if (account == null) emptySet() else store.favoriteArtists }
     fun entryKey(title: FlixTitle): String = title.id +
         (if (title.season >= 0 && title.episode >= 0) ":s${title.season}e${title.episode}" else "")
     fun notify(text: String) { message = text }
@@ -693,9 +695,19 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     }
     fun signOut() = scope.launch {
         val active = account
+        // Stop playing the former user's content and hide account-only UI now.
+        cloudJob?.cancel()
+        closePlayback()
         account = null
         cloudRestoredForUser = null
+        approvedTvs = emptyList()
+        selected = null
+        playbackStreams = emptyList()
+        showOnboarding = false
         store.saveSession(null)
+        localRevision++
+        // Preserve encrypted local watch progress until the user signs in again.
+        // Do not clear the cloud record or the saved local history on logout.
         if (active != null) try {
             api.call("/api/native/auth/logout", "POST", JSONObject(), active.accessToken)
         } catch (_: Exception) { }
