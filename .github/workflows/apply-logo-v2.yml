@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -21,5 +24,5 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add public index.html src/components/Header/Navbar.tsx android-native/app/src/main/res/drawable/flixleo_brand.png desktop/brand-icon.png
-          git diff --cached --quiet || (git commit -m 'Apply Logo 2.0 across FlixLeo branding and icons' && git push)
+          git add -A public index.html src/components/Header/Navbar.tsx android-native/app/src/main/res/drawable desktop/brand-icon.png
+          git diff --cached --quiet || (git commit -m 'Apply Logo 2.0 across FlixLeo branding and icons' && git push origin HEAD:main)
