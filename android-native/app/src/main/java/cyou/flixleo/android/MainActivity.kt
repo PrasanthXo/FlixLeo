@@ -491,8 +491,10 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             account = Session.from(result)
             store.saveSession(account)
         } catch (_: Exception) {
-            account = null
-            store.saveSession(null)
+            // A failed refresh is not a logout. Network outages, sleeping backends,
+            // timeouts and temporary auth-service errors must not erase the saved
+            // refresh token or the user's locally saved library.
+            // Retry the refresh the next time the app returns to foreground.
         } finally { refreshing.set(false) }
     }
     fun signIn(email: String, password: String) = scope.launch {
