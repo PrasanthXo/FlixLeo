@@ -64,7 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => onSelectTab('browse')}
           className="flex items-center gap-2 text-left text-base sm:text-lg font-extrabold tracking-tight text-white whitespace-nowrap shrink-0 hover:opacity-90 transition-opacity"
         >
-          <img src="/flixleo-icon-v2.png" alt="" aria-hidden="true" className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-cover" />
+          <img src="/flixleo-logo.svg" alt="" aria-hidden="true" className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-cover" />
           <span>FlixLeo</span>
         </button>
 
