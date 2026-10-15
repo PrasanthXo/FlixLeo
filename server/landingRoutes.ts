@@ -33,32 +33,31 @@ router.get('/api/download/release-notes',async(req:Request,res:Response)=>{
     return res.json({releases:selected.slice(0,5).map(({name,tag,date,notes})=>({name,tag,date,notes}))});
   }catch{return res.status(503).json({releases:[],error:'Release notes unavailable'});}
 });
+// Never route users to a private, debug, undersized or stale APK.
 router.get('/api/download/android',async(_req:Request,res:Response)=>{
   res.setHeader('Cache-Control','no-store');
   let items:Release[];
   try {
-    items=await releases();
+    // Bypass the 5-minute release-notes cache for APK downloads. Fresh public
+    // releases must become installable immediately after the publishing job.
+    cache = null;
+    items = await releases();
   } catch(error) {
-    console.error('[Android download] Public GitHub release discovery failed:',error);
-    return res.status(503).type('text/plain').send(
-      'Android downloads are temporarily unavailable: the public release service could not be reached. Please retry shortly.'
-    );
+    console.error('Android download: public GitHub Releases lookup failed',error);
+    return res.status(503).type('text/plain').send('Unable to check Android releases right now. Please try again shortly.');
   }
-  const candidates=items.flatMap(r=>r.assets.map(asset=>({asset,tag:r.tag})))
-    .filter(({asset,tag})=>/^android-v1\.5\.\d+$/.test(tag) &&
-      /^FlixLeo-Android-v1\.5\.\d+-signed\.apk$/i.test(asset.name) &&
-      asset.size>8_000_000 &&
-      /^https:\/\/github\.com\/PrasanthXo\/FlixLeo\/releases\/download\//i.test(asset.url))
-    .sort((a,b)=>{
-      const av=Number(a.tag.split('.').pop())||0;
-      const bv=Number(b.tag.split('.').pop())||0;
-      return bv-av;
-    });
-  if(candidates.length) return res.redirect(302,candidates[0].asset.url);
-  console.warn('[Android download] No verified public signed Android release; private GitHub releases cannot be downloaded anonymously.');
-  return res.status(503).type('text/plain').send(
-    'No public signed Android APK has been published yet. The private signed release must be published to PrasanthXo/FlixLeo Releases before this download works.'
-  );
+  const candidates=items.flatMap(r=>{
+    const m=/^android-v1\.5\.(\d+)$/.exec(r.tag);
+    if(!m)return [];
+    return r.assets.filter(a=>
+      /^FlixLeo-Android-v1\.5\.\d+-signed\.apk$/i.test(a.name)&&
+      a.size>8_000_000&&
+      /^https:\/\/github\.com\/PrasanthXo\/FlixLeo\/releases\/download\//i.test(a.url)
+    ).map(a=>({url:a.url,version:Number(m[1])}));
+  }).sort((a,b)=>b.version-a.version);
+  if(candidates.length)return res.redirect(302,candidates[0].url);
+  console.warn('Android download: no valid public signed Android release asset',items.map(r=>({tag:r.tag,assets:r.assets.map(a=>a.name)})));
+  return res.status(503).type('text/plain').send('No publicly published signed Android APK found. Check the FlixLeo GitHub Releases publishing job.');
 });
 export function serveAppLanding(req:Request,res:Response,next:()=>void){
   // Only the apex is the download landing; web.flixleo.cyou remains the SPA.
