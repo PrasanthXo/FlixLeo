@@ -395,6 +395,36 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             }
         }
     }
+    fun continueWatching(entry: ResumeEntry) = scope.launch {
+        val target = entry.title
+        detailsLoading = true
+        streamsChecked = false
+        selected = target
+        chosenSeason = target.season
+        chosenEpisode = target.episode
+        try {
+            val options = api.streamOptions(target)
+            streams = options
+            playbackStreams = options
+            streamsChecked = true
+            if (options.isEmpty()) {
+                message = "Saved video source is unavailable. Try another server."
+                open(target)
+                return@launch
+            }
+            // The persisted mirror ID identifies the last used source; do not
+            // silently switch servers when that source can still be resolved.
+            val sameServer = options.firstOrNull { it.id == entry.mirror }
+            if (sameServer != null) {
+                play(sameServer)
+            } else {
+                message = "Previous server is unavailable. Select another server to resume."
+                open(target)
+            }
+        } catch (_: Exception) {
+            message = "Could not restore playback. Try again when connected."
+        } finally { detailsLoading = false }
+    }
     fun open(title: FlixTitle) {
         selected = title
         chosenSeason = if (title.season > 0) title.season else -1
