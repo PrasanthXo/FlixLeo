@@ -210,6 +210,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                 }
             } catch (_: Exception) { /* offline must not lock native app */ }
             refreshSession().join()
+            account?.user?.optString("id")?.let { store.activateUser(it); localRevision++ }
             if (account != null) syncOnLogin(showNotice = false)
         }
     }
@@ -628,9 +629,12 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         authError = ""
         accountBusy = true
         try {
-            account = Session.from(api.call("/api/native/auth/login", "POST",
+            val signedIn = Session.from(api.call("/api/native/auth/login", "POST",
                 JSONObject().put("email", email.trim()).put("password", password)))
+            store.activateUser(signedIn.user.optString("id"))
+            account = signedIn
             store.saveSession(account)
+            localRevision++
             account?.user?.optJSONObject("user_metadata")?.let { metadata ->
                 fun optSet(key: String): Set<String> {
                     val list = metadata.optJSONArray(key) ?: return emptySet()
