@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.os.Build
 import android.view.View
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -51,6 +52,19 @@ fun NativePlaybackOverlay(
     if (currentMode == PlayerMode.CLOSED) return
     val activity = LocalContext.current as Activity
     var lastNonPiP by remember { mutableStateOf(PlayerMode.BIG) }
+
+    // Keep the display awake only during active playback, including mini/fullscreen.
+    // Release the flag when paused, stopped, or when the player UI is disposed.
+    DisposableEffect(activity, player.playing, currentMode) {
+        if (player.playing && currentMode != PlayerMode.CLOSED) {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     LaunchedEffect(currentMode, player.inPictureInPicture) {
         if (currentMode == PlayerMode.FULLSCREEN && !player.inPictureInPicture) {
@@ -101,7 +115,7 @@ fun NativePlaybackOverlay(
                     Text(player.title, fontSize = 24.sp, fontWeight = FontWeight.Black,
                         color = Color.White, maxLines = 3)
                     Spacer(Modifier.height(7.dp))
-                    Text(player.quality + " · FlixLeo native VLC", color = Color.LightGray, fontSize = 13.sp)
+                    Text(player.quality, color = Color.LightGray, fontSize = 13.sp)
                     if (player.problem.isNotBlank()) {
                         Spacer(Modifier.height(7.dp))
                         Text(player.problem, color = Color(0xFFF87171), fontWeight = FontWeight.Bold)
