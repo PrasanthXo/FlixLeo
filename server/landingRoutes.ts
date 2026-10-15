@@ -48,6 +48,11 @@ router.get('/api/download/android',async(_req:Request,res:Response)=>{
 export function serveAppLanding(req:Request,res:Response,next:()=>void){
   // Only the apex is the download landing; web.flixleo.cyou remains the SPA.
   const host=String(req.headers.host||'').split(':')[0].toLowerCase();
+  // iPhone and iPad use the full web application directly at the apex.
+  // Include iPadOS desktop-mode Safari (Macintosh + Mobile).
+  const agent=String(req.headers['user-agent']||'');
+  const appleMobile=/iPhone|iPad|iPod/i.test(agent)||(/Macintosh/i.test(agent)&&/Mobile\//i.test(agent));
+  if(appleMobile)return next();
   if((host==='flixleo.cyou'||host==='www.flixleo.cyou')&&req.path==='/'&&!['code','token_hash','type','error','error_code','access_token','refresh_token','tv_pair'].some(k=>Object.prototype.hasOwnProperty.call(req.query,k))){
     res.setHeader('Cache-Control','public, max-age=60');
     return res.sendFile(path.resolve(__dirname,'../dist/landing.html'),err=>{
