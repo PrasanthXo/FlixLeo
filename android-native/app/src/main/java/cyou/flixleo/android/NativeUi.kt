@@ -163,6 +163,12 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
                 }
                 if (state.loading && player.mode == PlayerMode.CLOSED) LinearProgressIndicator(
                     Modifier.fillMaxWidth().align(Alignment.TopCenter), color = Gold)
+                LaunchedEffect(state.message) {
+                    if (state.message.isNotBlank()) {
+                        delay(5000)
+                        state.clearMessage()
+                    }
+                }
                 if (state.message.isNotBlank() && player.mode != PlayerMode.FULLSCREEN) {
                     Surface(
                         color = Color(0xFF3C2F17), shape = RoundedCornerShape(14.dp),
