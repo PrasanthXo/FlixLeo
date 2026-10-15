@@ -221,6 +221,10 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         }
     }
     fun refresh() {
+        moviePage = 1
+        seriesPage = 1
+        moviesHasMore = true
+        seriesHasMore = true
         lastCatalogRefreshAt = System.currentTimeMillis()
         scope.launch {
             loading = true
@@ -287,6 +291,52 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                     delay((1550L - elapsed).coerceAtLeast(0L))
                     showSplash = false
                 }
+            }
+        }
+    }
+    private var moviePage = 1
+    private var seriesPage = 1
+    var moviesLoadingMore by mutableStateOf(false)
+        private set
+    var seriesLoadingMore by mutableStateOf(false)
+        private set
+    var moviesHasMore by mutableStateOf(true)
+        private set
+    var seriesHasMore by mutableStateOf(true)
+        private set
+
+    fun loadMoreBrowse(tv: Boolean) {
+        if (tv) {
+            if (seriesLoadingMore || !seriesHasMore || loading) return
+            seriesLoadingMore = true
+        } else {
+            if (moviesLoadingMore || !moviesHasMore || loading) return
+            moviesLoadingMore = true
+        }
+        scope.launch {
+            try {
+                val page = (if (tv) seriesPage else moviePage) + 1
+                val route = if (tv) "/api/tmdb/tv/trending?page=$page" else "/api/tmdb/popular?page=$page"
+                val result = api.call(route)
+                val data = result.optJSONArray("items")
+                val incoming = if (data == null) emptyList() else (0 until data.length())
+                    .mapNotNull { data.optJSONObject(it) }.map(::FlixTitle)
+                val total = result.optInt("totalPages", page)
+                if (tv) {
+                    val existing = series.map { it.id }.toHashSet()
+                    series = series + incoming.filter { existing.add(it.id) }
+                    seriesPage = page
+                    seriesHasMore = incoming.isNotEmpty() && page < total
+                } else {
+                    val existing = movies.map { it.id }.toHashSet()
+                    movies = movies + incoming.filter { existing.add(it.id) }
+                    moviePage = page
+                    moviesHasMore = incoming.isNotEmpty() && page < total
+                }
+            } catch (_: Exception) {
+                // Keep the current catalogue and allow a retry on the next scroll.
+            } finally {
+                if (tv) seriesLoadingMore = false else moviesLoadingMore = false
             }
         }
     }
