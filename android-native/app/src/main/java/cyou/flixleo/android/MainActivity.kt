@@ -728,7 +728,8 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             cloudRestoredForUser = userId
             api.sync(current.accessToken, mergedIds, histories)
         } catch (_: Exception) {
-            if (showNotice) message = "Your account is signed in. Continue Watching sync will retry."
+            cloudRestoredForUser = null
+            if (showNotice) message = "Continue Watching cloud sync failed. Saved progress is kept on this device; it will retry."
         } finally { cloudSyncMutex.unlock() }
     }
     fun uploadCloud() {
@@ -736,13 +737,21 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         cloudJob = scope.launch {
             delay(1300)
             refreshSession().join()
-            val active = account ?: return@launch
+            var active = account ?: return@launch
+            // Do not drop offline watch progress when the first cloud pull fails.
+            // Pull and merge remote history before any PUT to avoid erasing it.
+            if (cloudRestoredForUser != active.user.optString("id")) {
+                syncOnLogin(showNotice = false)
+            }
+            active = account ?: return@launch
             cloudSyncMutex.lock()
             try {
                 if (cloudRestoredForUser != active.user.optString("id")) return@launch
                 api.sync(active.accessToken, store.watched, store.history)
-            } catch (_: Exception) { /* local data is always kept; retry later */ }
-            finally { cloudSyncMutex.unlock() }
+            } catch (_: Exception) {
+                // Leave local history intact. Retry on the next foreground sync.
+                cloudRestoredForUser = null
+            } finally { cloudSyncMutex.unlock() }
         }
     }
     fun saveProfile() = scope.launch {
