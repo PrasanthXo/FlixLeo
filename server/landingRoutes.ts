@@ -48,7 +48,7 @@ router.get('/api/download/android',async(_req:Request,res:Response)=>{
 export function serveAppLanding(req:Request,res:Response,next:()=>void){
   // Only the apex is the download landing; web.flixleo.cyou remains the SPA.
   const host=String(req.headers.host||'').split(':')[0].toLowerCase();
-  if((host==='flixleo.cyou'||host==='www.flixleo.cyou')&&req.path==='/'){
+  if((host==='flixleo.cyou'||host==='www.flixleo.cyou')&&req.path==='/'&&!['code','token_hash','type','error','error_code','access_token','refresh_token','tv_pair'].some(k=>Object.prototype.hasOwnProperty.call(req.query,k))){
     res.setHeader('Cache-Control','public, max-age=60');
     return res.sendFile(path.resolve(__dirname,'../dist/landing.html'),err=>{
       if(err&&!res.headersSent)res.status(503).send('Landing page not built yet.');
