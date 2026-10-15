@@ -290,7 +290,8 @@ private fun NativeVideoSurface(
                             valueRange = 0f..maxValue,
                             colors = SliderDefaults.colors(thumbColor = GoldPlayer, activeTrackColor = GoldPlayer),
                             modifier = Modifier.weight(1f).height(24.dp))
-                        Text(stamp(player.duration), color = Color.LightGray, fontSize = 10.sp)
+                        Text("-" + stamp((player.duration - player.position).coerceAtLeast(0L)),
+                            color = Color.LightGray, fontSize = 10.sp)
                     }
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.Center,
