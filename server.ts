@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import updateGateway from './server/updateGateway';
 import nativeMobileApi from './server/nativeMobileApi';
 import windowsDownload from './server/windowsDownload';
+import landingRoutes, { serveAppLanding } from './server/landingRoutes';
 import { installSubtitleGateway } from './server/subtitleGateway';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -22,6 +23,7 @@ app.use(express.json());
 app.use(updateGateway);
 app.use(nativeMobileApi);
 app.use(windowsDownload);
+app.use(landingRoutes);
 
 // Private FlixLeo admin API. Credentials must only be configured in Render.
 // Never use the public anon key for privileged Supabase Auth operations.
@@ -1158,6 +1160,7 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
 installSubtitleGateway(app, fetchFromTmdb);
 
 async function startServer() {
+  app.use(serveAppLanding);
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
