@@ -537,7 +537,7 @@ private fun HomeScreen(state: FlixState) {
                 LazyRow(contentPadding = PaddingValues(horizontal = 17.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(history, key = { it.key }) { entry ->
-                        Column(Modifier.width(165.dp).clickable { state.open(entry.title) }) {
+                        Column(Modifier.width(165.dp).clickable { state.continueWatching(entry) }) {
                             Box(Modifier.fillMaxWidth().height(99.dp)
                                 .clip(RoundedCornerShape(12.dp)).background(Card)) {
                                 AsyncImage(entry.title.backdrop.ifBlank { entry.title.poster },
