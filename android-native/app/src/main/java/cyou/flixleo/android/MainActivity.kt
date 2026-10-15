@@ -151,13 +151,16 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var seriesMore by mutableStateOf(true)
     var paging by mutableStateOf(false)
     var pagingError by mutableStateOf("")
+    private var catalogGeneration = 0
     fun loadNextPage(tv: Boolean) {
         if (paging || loading || !(if (tv) seriesMore else moviesMore)) return
         scope.launch {
             paging = true; pagingError = ""
             val page = (if (tv) seriesPage else moviesPage) + 1
+            val generation = catalogGeneration
             try {
                 val next = api.titles(if (tv) "/api/tmdb/tv/trending?page=$page" else "/api/tmdb/trending?page=$page")
+                if (generation != catalogGeneration) return@launch
                 if (tv) {
                     series = (series + next).distinctBy { it.id }
                     seriesPage = page
@@ -167,8 +170,10 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                     moviesPage = page
                     moviesMore = next.isNotEmpty() && page < 500
                 }
-            } catch (_: Exception) { pagingError = "Couldn't load more titles. Tap to retry." }
-            finally { paging = false }
+            } catch (_: Exception) {
+                if (generation == catalogGeneration) pagingError = "Couldn't load more titles. Tap to retry."
+            }
+            finally { if (generation == catalogGeneration) paging = false }
         }
     }
     fun resume(entry: ResumeEntry) = scope.launch {
@@ -272,6 +277,8 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         lastCatalogRefreshAt = System.currentTimeMillis()
         scope.launch {
             loading = true
+            catalogGeneration++
+            paging = false; pagingError = ""
             moviesPage = 1; seriesPage = 1; moviesMore = true; seriesMore = true
             try {
                 supervisorScope {
