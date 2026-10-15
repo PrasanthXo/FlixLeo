@@ -51,3 +51,7 @@ Android Studio source: open this `android-native/` folder. VersionCode 4 / v1.3.
 ## Session recovery rebuild — 2026-10-15
 
 Rebuild Android debug APK after the native session-recovery fix: temporary token refresh failures no longer delete the saved login session. Server-side refresh failures also distinguish temporary service outages from expired credentials. This CI build is debug-signed and is not a production signed release.
+
+## Infinite-scroll APK build — 2026-10-15
+
+This Android debug build includes native Movies and Series end-of-list pagination (commit d4be659), alongside the session recovery fix. Build with the existing GitHub Actions Android workflow. This is a CI debug-signed APK and may be incompatible with previously installed builds signed using another certificate; do not uninstall a user's existing app to force an update.
