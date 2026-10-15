@@ -7,10 +7,16 @@ const sharp = require('sharp');
 
 async function main() {
   const root = path.resolve(__dirname, '..');
-  const svg = fs.readFileSync(path.join(root, 'public', 'flixleo-logo.svg'), 'utf8');
-  const image = /data:image\/webp;base64,([A-Za-z0-9+/=]+)/i.exec(svg);
-  if (!image) throw new Error('Official FlixLeo brand image was not found.');
-  const source = Buffer.from(image[1], 'base64');
+  const iconV2 = path.join(root, 'public', 'flixleo-icon-v2.png');
+  let source;
+  if (fs.existsSync(iconV2)) {
+    source = fs.readFileSync(iconV2);
+  } else {
+    const svg = fs.readFileSync(path.join(root, 'public', 'flixleo-logo.svg'), 'utf8');
+    const image = /data:image\/webp;base64,([A-Za-z0-9+/=]+)/i.exec(svg);
+    if (!image) throw new Error('Official FlixLeo brand image was not found.');
+    source = Buffer.from(image[1], 'base64');
+  }
   const sizes = [16, 24, 32, 48, 64, 128, 256];
   const pngs = await Promise.all(sizes.map(size =>
     sharp(source).resize(size, size, { fit: 'contain' }).png().toBuffer()
