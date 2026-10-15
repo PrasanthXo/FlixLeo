@@ -7,6 +7,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,6 +35,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import coil.compose.AsyncImage
 import kotlin.math.absoluteValue
 import kotlin.math.abs
@@ -553,7 +556,20 @@ private fun HomeScreen(state: FlixState) {
 @Composable
 private fun BrowseScreen(state: FlixState, tv: Boolean) {
     val titles = if (tv) state.series else state.movies
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(14.dp)) {
+    val listState = rememberLazyListState()
+    val canLoad = if (tv) state.seriesHasMore else state.moviesHasMore
+    val loadingMore = if (tv) state.seriesLoadingMore else state.moviesLoadingMore
+    LaunchedEffect(listState, tv) {
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val total = layout.totalItemsCount
+            total > 5 && lastVisible >= total - 4
+        }.distinctUntilChanged().filter { it }.collect {
+            state.loadMoreBrowse(tv)
+        }
+    }
+    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(14.dp)) {
         item {
             Text(if (tv) "Series" else "Movies", fontSize = 29.sp, fontWeight = FontWeight.Black)
             Text("Discover your next watch", color = Muted, fontSize = 12.sp)
@@ -591,6 +607,15 @@ private fun BrowseScreen(state: FlixState, tv: Boolean) {
                 repeat(3 - group.size) { Spacer(Modifier.weight(1f)) }
             }
             Spacer(Modifier.height(14.dp))
+        }
+        if (loadingMore) item {
+            Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Gold, modifier = Modifier.size(26.dp))
+            }
+        }
+        if (!canLoad && titles.isNotEmpty()) item {
+            Text("You're all caught up", color = Muted, fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(15.dp), textAlign = TextAlign.Center)
         }
     }
 }
