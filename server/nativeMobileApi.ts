@@ -75,7 +75,7 @@ router.post('/api/native/auth/refresh', throttle, async (req, res) => {
   const refreshToken = String(req.body?.refresh_token || '');
   if (!/^[a-zA-Z0-9._-]{20,4096}$/.test(refreshToken)) return res.status(400).json({ error: 'Invalid refresh session.' });
   const session = await remote('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }) });
-  if (!session.ok) return res.status(401).json({ error: 'Session expired; sign in again.' });
+  if (!session.ok) return res.status(session.status === 400 || session.status === 401 ? 401 : 503).json({ error: session.status === 400 || session.status === 401 ? 'Session expired; sign in again.' : 'Authentication service temporarily unavailable. Please retry.' });
   const user = await identity(session.data.access_token);
   if (!user) return res.status(403).json({ error: 'Email verification required.' });
   return res.json({ session: { access_token: session.data.access_token, refresh_token: session.data.refresh_token, expires_in: session.data.expires_in }, user });
