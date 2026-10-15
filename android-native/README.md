@@ -47,3 +47,7 @@ Tap **Fullscreen** or double-tap the video for immersive landscape playback. Pla
 When Android is put into the background while playing, Android 8+ Picture-in-Picture is requested so the video may continue as an OS-level floating window. Returning to FlixLeo restores the previous view. Close or leave the in-app mini player to stop video and persist progress. On the end of a TV episode, FlixLeo saves completion and attempts the next episode.
 
 Android Studio source: open this `android-native/` folder. VersionCode 4 / v1.3.0-native is a **debug/test build**, not a production signed release. Test video compatibility, rotation, PiP, controls and continuity on a physical device before publishing. The website, iOS, TV web and Windows EXE are not changed by this player work.
+
+## Session recovery rebuild — 2026-10-15
+
+Rebuild Android debug APK after the native session-recovery fix: temporary token refresh failures no longer delete the saved login session. Server-side refresh failures also distinguish temporary service outages from expired credentials. This CI build is debug-signed and is not a production signed release.
