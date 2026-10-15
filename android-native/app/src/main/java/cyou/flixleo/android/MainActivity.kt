@@ -727,9 +727,15 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             localRevision++
             cloudRestoredForUser = userId
             api.sync(current.accessToken, mergedIds, histories)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             cloudRestoredForUser = null
-            if (showNotice) message = "Continue Watching cloud sync failed. Saved progress is kept on this device; it will retry."
+            // Surface the reason for failures on explicit sign-in, but never wipe
+            // locally saved viewing progress or repeatedly interrupt playback.
+            if (showNotice) {
+                val detail = e.localizedMessage?.take(140).orEmpty()
+                message = "Continue Watching sync unavailable" +
+                    if (detail.isBlank()) ". Will retry." else ": $detail"
+            }
         } finally { cloudSyncMutex.unlock() }
     }
     fun uploadCloud() {
