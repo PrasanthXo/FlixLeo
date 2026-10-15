@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'branding/flixleo-icon-v2.png'
+      - 'branding/flixleo-icon-v2.svg'
   workflow_dispatch:
 permissions:
   contents: write
