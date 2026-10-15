@@ -1342,7 +1342,9 @@ export default function App() {
             <span>Movies and Series</span>
           </div>
           <div className="flex items-center gap-3 text-slate-400">
-            <span>Your cinema, anywhere.</span>
+            <span>Santh Creatives · Independent app creator</span>
+            <a href="/terms.html" className="hover:text-amber-300">Terms &amp; Conditions</a>
+            <a href="/privacy.html" className="hover:text-amber-300">Privacy Policy</a>
           </div>
         </div>
       </footer>
