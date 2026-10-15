@@ -10,8 +10,8 @@ android {
         applicationId = "cyou.flixleo.android"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.5.0-native"
+        versionCode = 7
+        versionName = "1.5.1-native"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
     buildTypes { release { isMinifyEnabled = false } }
