@@ -6,6 +6,9 @@ const root = path.resolve(__dirname, '..');
 const icon = fs.existsSync(path.join(root,'branding','flixleo-icon-v2.png')) ? path.join(root,'branding','flixleo-icon-v2.png') : path.join(root,'branding','flixleo-icon-v2.svg');
 async function main() {
  if (!fs.existsSync(icon)) throw Error('Upload branding/flixleo-icon-v2.png or branding/flixleo-icon-v2.svg first.');
+ // Android drawable .webp and .png resolve to the same resource ID.
+ const legacy = path.join(root,'android-native/app/src/main/res/drawable/flixleo_brand.webp');
+ if (fs.existsSync(legacy)) fs.unlinkSync(legacy);
  const targets = [
   ['public/flixleo-icon-v2.png',512], ['public/favicon-32.png',32],
   ['public/apple-touch-icon.png',180],['public/pwa-192.png',192],
