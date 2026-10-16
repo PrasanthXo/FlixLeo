@@ -200,7 +200,10 @@ class InlineVlcController(context: Context) {
         surface = view
         val video = engine ?: return
         try {
-            video.attachViews(view, null, false, false)
+            // TextureView avoids SurfaceView compositor issues that can leave a
+            // grey/green video plane over otherwise working playback controls.
+            // Important for the shared Compose player during mode changes.
+            video.attachViews(view, null, false, true)
             attached = true
             if (pendingStart) {
                 pendingStart = false
