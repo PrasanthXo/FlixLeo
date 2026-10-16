@@ -54,7 +54,7 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
 
   const channelCategory = (channel: TamilChannel) => {
     const title = channel.name.toLowerCase();
-    if (/\\b(?:espn|star sports|sky sports|sony sports|ten sports|bein sports|eurosport|sports? tv|cricket tv|willow tv|f1 tv|nfl network|nba tv|fox sports|tnt sports|super sport|supersport|sport1|sport 1)\\b/i.test(title)) return 'Sports';
+    if (/\b(?:espn|star sports|sky sports|sony sports|ten sports|bein sports|eurosport|sports? tv|cricket tv|willow tv|f1 tv|nfl network|nba tv|fox sports|tnt sports|super sport|supersport|sport1|sport 1)\b/i.test(title)) return 'Sports';
     return compactCategory(channel.category);
   };
   const categories = ['All Categories', ...LIVE_CATEGORIES];
