@@ -26,6 +26,7 @@ class InlineVlcController(context: Context) {
     private var resumeMs = 0L
     private var lastSavedAt = 0L
     private var closing = false
+    private var playbackStarted = false
 
     var mode by mutableStateOf(PlayerMode.CLOSED)
         private set
@@ -88,6 +89,7 @@ class InlineVlcController(context: Context) {
         }
         stop(notifyProgress = true)
         closing = false
+        playbackStarted = false
         title = displayTitle
         quality = stream.quality
         position = 0
@@ -112,6 +114,7 @@ class InlineVlcController(context: Context) {
                     if (engine !== video || closing) return@post
                     when (event.type) {
                         MediaPlayer.Event.Playing -> {
+                            playbackStarted = true
                             playing = true
                             buffering = false
                             problem = ""
@@ -123,8 +126,20 @@ class InlineVlcController(context: Context) {
                         }
                         MediaPlayer.Event.Buffering -> buffering = true
                         MediaPlayer.Event.EndReached -> {
-                            // Save completion before the next TV episode is resolved.
-                            onCompleted()
+                            // A failed server or unsupported high-bitrate decoder can send
+                            // EndReached before a single frame is actually played.
+                            // Do not dismiss the player or mark the title watched.
+                            val elapsed = maxOf(position, runCatching { video.time }.getOrDefault(0L))
+                            val length = maxOf(duration, runCatching { video.length }.getOrDefault(0L))
+                            if (playbackStarted && length > 0L && elapsed >= length - 2500L &&
+                                elapsed >= 3000L) {
+                                onCompleted()
+                            } else {
+                                playing = false
+                                buffering = false
+                                problem = "This server stopped unexpectedly. Select another quality."
+                                onError(problem)
+                            }
                         }
                         MediaPlayer.Event.EncounteredError -> {
                             buffering = false
@@ -232,6 +247,7 @@ class InlineVlcController(context: Context) {
         if (notifyProgress && position > 0) onProgress(position, duration)
         handler.removeCallbacks(ticker)
         pendingStart = false
+        playbackStarted = false
         runCatching { engine?.setEventListener(null) }
         runCatching { engine?.stop() }
         if (attached) runCatching { engine?.detachViews() }
