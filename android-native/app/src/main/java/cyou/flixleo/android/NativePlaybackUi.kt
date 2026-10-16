@@ -323,6 +323,7 @@ private fun NativeVideoSurface(
                         PlayerIcon(Icons.Default.Audiotrack, "Choose audio language") { trackMenu = "audio" }
                         PlayerIcon(Icons.Default.Subtitles, "Choose subtitles") { trackMenu = "subtitle" }
                         PlayerIcon(Icons.Default.AspectRatio, "Change aspect ratio") { player.changeAspect() }
+                        PlayerIcon(Icons.Default.Settings, "Video decoder") { trackMenu = "decoder" }
                         PlayerIcon(if (mode == PlayerMode.FULLSCREEN) Icons.Default.FullscreenExit
                             else Icons.Default.Fullscreen, "Toggle fullscreen") {
                             if (mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
@@ -333,7 +334,32 @@ private fun NativeVideoSurface(
             }
         }
     }
-    if (trackMenu.isNotBlank()) {
+    if (trackMenu == "decoder") {
+        AlertDialog(
+            onDismissRequest = { trackMenu = "" },
+            title = { Text("Video decoding") },
+            text = {
+                Column {
+                    DecoderMode.entries.forEach { choice ->
+                        Row(Modifier.fillMaxWidth().clickable {
+                            player.chooseDecoder(choice)
+                            trackMenu = ""
+                        }.padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = player.decoderMode == choice, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(when (choice) {
+                                DecoderMode.AUTO -> "Auto (hardware, then software fallback)"
+                                DecoderMode.HARDWARE -> "Hardware decoding"
+                                DecoderMode.SOFTWARE -> "Software decoding"
+                            }, color = Color.White)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { trackMenu = "" }) { Text("Close") } }
+        )
+    }
+    if (trackMenu.isNotBlank() && trackMenu != "decoder") {
         val tracks = if (trackMenu == "audio") player.audioChoices() else player.subtitleChoices()
         val chosen = if (trackMenu == "audio") player.selectedAudio() else player.selectedSubtitle()
         AlertDialog(
