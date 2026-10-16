@@ -233,16 +233,14 @@ private fun NativeVideoSurface(
                 .size(if (compact) 36.dp else 60.dp)
                 .background(Color(0xDD0C1320), RoundedCornerShape(15.dp)),
                 contentAlignment = Alignment.Center) {
+                // Buffered percentage is not a reliable startup progress metric.
+                // Use an animated spinner during startup and stalls instead.
                 CircularProgressIndicator(
-                    progress = { player.bufferPercent.coerceIn(0, 100) / 100f },
                     modifier = Modifier.size(if (compact) 28.dp else 48.dp),
                     color = GoldPlayer,
                     trackColor = Color.DarkGray,
                     strokeWidth = if (compact) 2.dp else 3.dp
                 )
-                Text("${player.bufferPercent.coerceIn(0, 100)}%",
-                    color = Color.White, fontSize = if (compact) 8.sp else 12.sp,
-                    fontWeight = FontWeight.Bold)
             }
         }
         if (player.problem.isNotBlank() && mode != PlayerMode.MINI) {
