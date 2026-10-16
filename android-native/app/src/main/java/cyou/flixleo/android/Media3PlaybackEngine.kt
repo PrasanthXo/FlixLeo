@@ -60,7 +60,18 @@ internal class Media3PlaybackEngine(context: Context) {
         require(Uri.parse(url).scheme.equals("https", ignoreCase = true)) {
             "Only HTTPS media sources are supported"
         }
-        releasePlayer()
+        // Reuse ExoPlayer on server changes. Releasing the old decoder and
+        // creating a new one synchronously can block Android's main thread.
+        val current = player
+        if (current != null) {
+            val thisGeneration = generation
+            current.setMediaItem(MediaItem.fromUri(url))
+            onBuffering(true, 0)
+            current.prepare()
+            if (resumeMs > 0L) current.seekTo(resumeMs)
+            current.playWhenReady = true
+            return
+        }
         val thisGeneration = ++generation
         val renderers = DefaultRenderersFactory(applicationContext)
             .setEnableDecoderFallback(true)
