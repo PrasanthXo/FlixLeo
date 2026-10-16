@@ -763,7 +763,8 @@ private fun DetailSheet(state: FlixState) {
                 modifier = Modifier.fillMaxWidth().height(173.dp).clip(RoundedCornerShape(16.dp))
                     .background(Card), contentScale = ContentScale.Crop)
             Spacer(Modifier.height(10.dp))
-            Text(title.title, fontWeight = FontWeight.Black, fontSize = 24.sp)
+            Text(title.title, color = Color.White, fontWeight = FontWeight.Black, fontSize = 24.sp,
+                maxLines = 3, overflow = TextOverflow.Ellipsis)
             Text(listOf(title.year, title.language, title.type.uppercase()).filter { it.isNotBlank() }
                 .joinToString(" · "), color = Gold, fontSize = 12.sp)
             if (title.rating.isNotBlank()) {
