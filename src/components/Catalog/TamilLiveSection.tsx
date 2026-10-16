@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, RefreshCw, Tv2 } from 'lucide-react';
+import { Play, RefreshCw, Tv2, RadioTower, Signal } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
 type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; tvgId?: string; logo: string; url: string; alternateUrls?: string[]; privateProvider?: boolean };
@@ -100,11 +100,27 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
     onPlay(media, mirrors[0].id);
   }
   return <section className="mb-9 space-y-5" aria-label="Live TV IPTV channels">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h2 className="text-xl font-extrabold text-white sm:text-2xl">Live TV</h2>
-      <p className="text-sm text-slate-400">{channels.length} channels</p></div>
-      <button type="button" aria-label="Refresh live TV channels" onClick={() => setReload(v => v+1)}
-        className="rounded-xl border border-white/15 p-2 text-slate-200 hover:bg-white/10"><RefreshCw size={18}/></button>
+    <div className="relative overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-r from-[#101c31] via-[#172039] to-[#291b24] px-5 py-6 shadow-[0_18px_55px_rgba(0,0,0,0.23)] sm:px-7">
+      <div className="pointer-events-none absolute -right-14 -top-20 size-64 rounded-full bg-amber-400/10 blur-3xl" aria-hidden="true" />
+      <div className="relative flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="relative grid size-14 shrink-0 place-items-center rounded-2xl border border-amber-300/35 bg-gradient-to-br from-amber-400/25 to-rose-500/15 text-amber-300 shadow-lg shadow-amber-400/10">
+            <Tv2 size={30} strokeWidth={2.2} />
+            <span className="absolute -right-1 -top-1 size-3 rounded-full border-2 border-[#162036] bg-red-500 shadow-[0_0_12px_rgba(239,68,68,.7)]" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
+              Live <span className="bg-gradient-to-r from-amber-300 to-orange-400 bg-clip-text text-transparent">TV</span>
+              <Signal size={21} className="shrink-0 text-amber-300" aria-hidden="true" />
+            </h2>
+            <p className="mt-1 text-sm font-medium text-slate-300">{loading ? 'Tuning channels…' : channels.length + ' channels'}</p>
+          </div>
+        </div>
+        <button type="button" aria-label="Refresh live TV channels" onClick={() => setReload(v => v+1)}
+          className="relative grid size-11 shrink-0 place-items-center rounded-xl border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-amber-400">
+          <RefreshCw size={20} />
+        </button>
+      </div>
     </div>
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="space-y-1 text-sm text-slate-300">Category
@@ -118,7 +134,17 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
           className="w-full rounded-xl border border-white/15 bg-[#111b2c] p-3 text-white"/>
       </label>
     </div>
-    {loading && <p role="status" className="flex items-center gap-2 text-sm text-slate-300"><RefreshCw className="animate-spin" size={16}/>Loading live channels…</p>}
+    {loading && <div role="status" aria-label="Loading live channels" className="relative flex min-h-48 flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl border border-amber-400/15 bg-gradient-to-b from-[#111c32] to-[#0c1321] px-5 py-7 text-center">
+      <div className="relative grid size-24 place-items-center">
+        <div className="absolute inset-1 rounded-full border border-amber-400/20" />
+        <div className="absolute inset-0 animate-[spin_4s_linear_infinite] motion-reduce:animate-none rounded-full border-2 border-transparent border-t-amber-400 border-r-amber-400/50" />
+        <div className="absolute inset-3 animate-pulse rounded-full bg-amber-400/10 blur-lg" />
+        <RadioTower size={42} className="relative z-10 animate-[spin_5s_ease-in-out_infinite] text-amber-300 motion-reduce:animate-none" strokeWidth={1.8} aria-hidden="true" />
+      </div>
+      <p className="text-base font-bold text-white">Finding live channels</p>
+      <p className="text-xs text-slate-400">Tuning into available broadcasts…</p>
+      <div className="h-1 w-36 overflow-hidden rounded-full bg-white/10"><div className="h-full w-1/2 animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-amber-400 motion-reduce:animate-none" /></div>
+    </div>}
     {error && <p role="status" className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</p>}
     {!loading && !error && !shown.length && <p className="text-sm text-slate-400">No channels match your filters.</p>}
     {orderedGroups.map(([name, items]) => <div key={name} className="rounded-3xl border border-white/10 bg-[#0c1524] p-4 sm:p-5">
