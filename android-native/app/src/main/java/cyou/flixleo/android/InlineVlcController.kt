@@ -146,7 +146,9 @@ class InlineVlcController(context: Context) {
             onError("Only HTTPS video sources are supported")
             return
         }
-        stop(notifyProgress = !recovering)
+        // Keep the Compose video host mounted while changing server or decoder.
+        // A transient CLOSED state can dispose VLCVideoLayout before reattachment.
+        stop(notifyProgress = !recovering, keepSurfaceHost = true)
         closing = false
         recoveryUsed = recovering
         if (!recovering) softwareFallback = decoderMode == DecoderMode.SOFTWARE
@@ -231,6 +233,7 @@ class InlineVlcController(context: Context) {
             handler.removeCallbacks(ticker)
             handler.post(ticker)
         } catch (e: Exception) {
+            diagnose("player_initialization_failed_${e.javaClass.simpleName}")
             problem = e.localizedMessage ?: "Unable to start native playback"
             onError(problem)
             stop()
@@ -257,6 +260,7 @@ class InlineVlcController(context: Context) {
                 video.play()
             }
         } catch (e: Exception) {
+            diagnose("surface_attachment_failed_${e.javaClass.simpleName}")
             problem = "Video surface failed: ${e.localizedMessage ?: "unknown"}"
             onError(problem)
         }
@@ -314,7 +318,7 @@ class InlineVlcController(context: Context) {
             engine?.setScale(0f)
         }
     }
-    fun stop(notifyProgress: Boolean = true) {
+    fun stop(notifyProgress: Boolean = true, keepSurfaceHost: Boolean = false) {
         closing = true
         if (notifyProgress && position > 0) onProgress(position, duration)
         handler.removeCallbacks(ticker)
@@ -329,7 +333,7 @@ class InlineVlcController(context: Context) {
         runCatching { engine?.release() }
         engine = null
         // Keep LibVLC alive until controller release; only release the media player here.
-        mode = PlayerMode.CLOSED
+        if (!keepSurfaceHost) mode = PlayerMode.CLOSED
         position = 0L
         duration = 0L
         playing = false
