@@ -52,7 +52,7 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
   return <section className="mb-9 space-y-5" aria-label="Live TV IPTV channels">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="text-xl font-extrabold text-white sm:text-2xl">Live TV</h2>
-      <p className="text-sm text-slate-400">{channels.length} channels · Sri Lankan channels first · Categories A–Z</p></div>
+      <p className="text-sm text-slate-400">{channels.length} channels</p></div>
       <button type="button" aria-label="Refresh live TV channels" onClick={() => setReload(v => v+1)}
         className="rounded-xl border border-white/15 p-2 text-slate-200 hover:bg-white/10"><RefreshCw size={18}/></button>
     </div>
