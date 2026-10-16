@@ -37,6 +37,8 @@ class InlineVlcController(context: Context) {
         if (causes.any { it is javax.net.ssl.SSLException }) return "TLS connection failed"
         if (causes.any { it is java.net.ConnectException }) return "Connection refused"
         return when (error.errorCode) {
+            androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+                "Streaming server rejected the HTTP request (status unavailable)"
             androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ->
                 "Network connection failed"
             androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
