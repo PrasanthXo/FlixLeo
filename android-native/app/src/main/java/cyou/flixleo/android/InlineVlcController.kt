@@ -102,8 +102,9 @@ class InlineVlcController(context: Context) {
         controlsVisible = true
         mode = PlayerMode.BIG
         try {
-            val vlc = LibVLC(appContext, arrayListOf("--network-caching=1200", "--audio-time-stretch"))
-            libVlc = vlc
+            // Reuse the VLC library across server changes; repeated native library shutdown
+            // and recreation can race Android surface/decoder teardown and crash the app.
+            val vlc = libVlc ?: LibVLC(appContext, arrayListOf("--network-caching=1800", "--audio-time-stretch")).also { libVlc = it }
             val video = MediaPlayer(vlc)
             engine = video
             video.setEventListener { event ->
@@ -135,8 +136,10 @@ class InlineVlcController(context: Context) {
                 }
             }
             val media = Media(vlc, Uri.parse(stream.url))
-            media.setHWDecoderEnabled(true, false)
-            media.addOption(":network-caching=1200")
+            // Some Android hardware decoders produce green/macroblocked frames for
+            // certain sources. Prefer VLC's software decoder for stable rendering.
+            media.setHWDecoderEnabled(false, false)
+            media.addOption(":network-caching=1800")
             video.setMedia(media)
             media.release()
             pendingStart = true
@@ -235,8 +238,7 @@ class InlineVlcController(context: Context) {
         attached = false
         runCatching { engine?.release() }
         engine = null
-        runCatching { libVlc?.release() }
-        libVlc = null
+        // Keep LibVLC alive until controller release; only release the media player here.
         mode = PlayerMode.CLOSED
         position = 0L
         duration = 0L
@@ -246,5 +248,7 @@ class InlineVlcController(context: Context) {
     fun release() {
         stop(notifyProgress = false)
         surface = null
+        runCatching { libVlc?.release() }
+        libVlc = null
     }
 }
