@@ -653,6 +653,33 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             // Retry the refresh the next time the app returns to foreground.
         } finally { refreshing.set(false) }
     }
+    fun completeConfirmedEmailSignIn(access: String, refresh: String) = scope.launch {
+        accountBusy = true
+        authError = ""
+        try {
+            // The backend /account endpoint validates the JWT and requires email_confirmed_at.
+            val result = api.call("/api/native/account", "GET", null, access)
+            val user = result.getJSONObject("user")
+            val userId = user.getString("id")
+            val signedIn = Session(access, refresh, System.currentTimeMillis() / 1000 + 3600, user)
+            store.activateUser(userId)
+            account = signedIn
+            store.saveSession(signedIn)
+            localRevision++
+            showSignup = false
+            showAuth = false
+            tab = "Home"
+            message = "Mail confirmed. Welcome to FlixLeo!"
+            showOnboarding = store.needsSignupOnboarding(user.optString("email"))
+            syncOnLogin(showNotice = false)
+        } catch (_: Exception) {
+            showSignup = false
+            showAuth = true
+            authError = "Email confirmed. Please sign in to continue."
+        } finally {
+            accountBusy = false
+        }
+    }
     fun signIn(email: String, password: String) = scope.launch {
         authError = ""
         accountBusy = true
