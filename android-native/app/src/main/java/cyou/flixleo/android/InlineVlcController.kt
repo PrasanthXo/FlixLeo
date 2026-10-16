@@ -250,10 +250,10 @@ class InlineVlcController(context: Context) {
         surface = view
         val video = engine ?: return
         try {
-            // TextureView avoids SurfaceView compositor issues that can leave a
-            // grey/green video plane over otherwise working playback controls.
-            // Important for the shared Compose player during mode changes.
-            video.attachViews(view, null, false, true)
+            // Restore SurfaceView output used before the recent 4K regression.
+            // TextureView can add GPU composition overhead for high-bitrate HDR frames.
+            // Decoder selection remains configurable (Auto / Hardware / Software).
+            video.attachViews(view, null, false, false)
             attached = true
             if (pendingStart) {
                 pendingStart = false
