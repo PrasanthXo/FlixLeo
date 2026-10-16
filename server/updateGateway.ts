@@ -73,7 +73,7 @@ async function getLatestPublicSignedAndroid(): Promise<AndroidRelease | null> {
   if (androidReleaseCache && Date.now() < androidReleaseCache.expires) return androidReleaseCache.release;
   let release: AndroidRelease | null = null;
   try {
-    const response = await fetch('https://api.github.com/repos/PrasanthXo/FlixLeo/releases?per_page=30', {
+    const response = await fetch('https://api.github.com/repos/PrasanthXo/FlixLeo/releases?per_page=100', {
       headers: { 'User-Agent': 'FlixLeo-Android-Update-Gateway', Accept: 'application/vnd.github+json' },
       signal: AbortSignal.timeout(5000)
     });
@@ -101,8 +101,10 @@ async function getLatestPublicSignedAndroid(): Promise<AndroidRelease | null> {
   // Verified public signed release fallback. Older installed clients must still
   // discover a published update if GitHub's API times out or rate-limits Render.
   const verifiedFallback: AndroidRelease = {
-    version: '1.5.14', versionCode: 1014,
-    url: 'https://github.com/PrasanthXo/FlixLeo/releases/download/android-v1.5.14/FlixLeo-Android-v1.5.14-signed.apk'
+    // Release publication job verified this exact public signed asset is reachable.
+    // Keep offering it if GitHub's releases API is rate-limited or times out.
+    version: '1.6.15', versionCode: 100015,
+    url: 'https://github.com/PrasanthXo/FlixLeo/releases/download/android-v1.6.15/FlixLeo-Android-v1.6.15-signed.apk'
   };
   if (!release || release.versionCode < verifiedFallback.versionCode) release = verifiedFallback;
   androidReleaseCache = { expires: Date.now() + 120000, release };
