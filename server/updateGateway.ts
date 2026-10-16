@@ -94,6 +94,13 @@ async function getLatestPublicSignedAndroid(): Promise<AndroidRelease | null> {
       }
     }
   } catch { /* Retain non-forcing fallback when GitHub cannot be reached. */ }
+  // Verified public signed release fallback. Older installed clients must still
+  // discover a published update if GitHub's API times out or rate-limits Render.
+  const verifiedFallback: AndroidRelease = {
+    version: '1.5.14', versionCode: 1014,
+    url: 'https://github.com/PrasanthXo/FlixLeo/releases/download/android-v1.5.14/FlixLeo-Android-v1.5.14-signed.apk'
+  };
+  if (!release || release.versionCode < verifiedFallback.versionCode) release = verifiedFallback;
   androidReleaseCache = { expires: Date.now() + 120000, release };
   return release;
 }
