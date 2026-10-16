@@ -67,3 +67,8 @@ Trigger GitHub Actions Android debug APK after commits 1570042, 1fd2d20, 6cd24a3
 ## Player scrolling and movie resume APK build — 2026-10-15
 
 Trigger CI Android debug APK including commits f96c747 (one-tap Continue Watching resume for movies and series) and aaf27f4 (keep big player open while browsing all servers). This workflow produces a debug-signed artifact; signing compatibility with previously installed builds is not guaranteed.
+
+
+## Playback stability build (2026-10-16)
+
+The latest native build includes VLC server switching, guarded early end-of-stream handling, software decoder compatibility, and stream-specific buffering. Playback on physical devices still requires verification.
