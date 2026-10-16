@@ -104,8 +104,20 @@ router.post('/api/native/auth/resend', throttle, async (req, res) => {
 router.post('/api/native/auth/recover', throttle, async (req, res) => {
   const email = String(req.body?.email || '').trim();
   if (!/^.+@.+\..+$/.test(email)) return res.status(400).json({ error: 'Enter your email address.' });
-  await remote('/auth/v1/recover?redirect_to=' + encodeURIComponent('https://flixleo.cyou/?native_email_confirmed=1'), { method: 'POST', body: JSON.stringify({ email }) });
-  return res.json({ success: true, message: 'If registered, a password-reset email has been sent.' });
+  const result = await remote('/auth/v1/recover?redirect_to=' + encodeURIComponent('https://flixleo.cyou/native-reset-password'), { method: 'POST', body: JSON.stringify({ email }) });
+  if (!result.ok) return res.status(result.status === 429 ? 429 : result.status >= 500 ? 503 : 400).json({ error: message(result) });
+  return res.json({ success: true, message: 'If registered, a password-reset email has been requested.' });
+});
+// The reset form receives the recovery access token via browser URL fragment.
+// Supabase validates the bearer JWT before accepting the password update.
+router.post('/api/native/auth/reset-password', throttle, async (req, res) => {
+  const bearer = token(req);
+  const password = String(req.body?.password || '');
+  if (!bearer) return res.status(401).json({ error: 'Reset link is invalid. Request a fresh password reset email.' });
+  if (password.length < 8 || password.length > 256) return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
+  const result = await remote('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ password }) }, bearer);
+  if (!result.ok) return res.status(result.status === 401 ? 401 : 400).json({ error: message(result) });
+  return res.json({ success: true });
 });
 router.post('/api/native/auth/logout', async (req, res) => {
   const jwt = token(req);
