@@ -6,7 +6,8 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.Tracks
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -20,6 +21,7 @@ import androidx.media3.ui.PlayerView
  * production renderer until the shared player overlay and controls are bridged.
  * No URL, request headers, or authorization tokens are emitted to logs.
  */
+@androidx.annotation.OptIn(UnstableApi::class)
 internal class Media3PlaybackEngine(context: Context) {
     private val applicationContext = context.applicationContext
     private var player: ExoPlayer? = null
@@ -28,6 +30,8 @@ internal class Media3PlaybackEngine(context: Context) {
 
     var onBuffering: (Boolean, Int) -> Unit = { _, _ -> }
     var onPlaying: () -> Unit = {}
+    var onPaused: () -> Unit = {}
+    var onTrackChanged: () -> Unit = {}
     var onEnded: () -> Unit = {}
     var onFailed: (PlaybackException) -> Unit = {}
 
@@ -35,6 +39,7 @@ internal class Media3PlaybackEngine(context: Context) {
     val positionMs: Long get() = player?.currentPosition?.coerceAtLeast(0L) ?: 0L
     val durationMs: Long get() = player?.duration?.takeIf { it != C.TIME_UNSET && it > 0L } ?: 0L
     val canSeek: Boolean get() = player?.isCurrentMediaItemSeekable == true
+    val bufferedPercent: Int get() = player?.bufferedPercentage?.coerceIn(0, 100) ?: 0
 
     fun attach(view: PlayerView) {
         if (boundView === view) return
@@ -76,7 +81,11 @@ internal class Media3PlaybackEngine(context: Context) {
                 }
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (generation == thisGeneration && isPlaying) onPlaying()
+                if (generation != thisGeneration) return
+                if (isPlaying) onPlaying() else onPaused()
+            }
+            override fun onTracksChanged(tracks: Tracks) {
+                if (generation == thisGeneration) onTrackChanged()
             }
             override fun onPlayerError(error: PlaybackException) {
                 if (generation == thisGeneration) onFailed(error)
@@ -97,17 +106,50 @@ internal class Media3PlaybackEngine(context: Context) {
             ?.seekTo(positionMs.coerceAtLeast(0L))
     }
 
+    private data class TrackOption(
+        val id: Int, val group: Tracks.Group, val index: Int, val name: String
+    )
+    private fun options(type: Int): List<TrackOption> {
+        val groups = player?.currentTracks?.groups ?: return emptyList()
+        var next = 0
+        return groups.filter { it.type == type }.flatMap { group ->
+            (0 until group.length).filter { group.isTrackSupported(it) }.map { i ->
+                val format = group.getTrackFormat(i)
+                val label = format.label ?: format.language ?: "Track ${next + 1}"
+                TrackOption(next++, group, i, label)
+            }
+        }
+    }
     fun audioTracks(): List<AudioChoice> =
-        player?.currentTracks?.groups?.filter { it.type == C.TRACK_TYPE_AUDIO }
-            ?.flatMap { group ->
-                (0 until group.length).map { i ->
-                    AudioChoice(i, group.getTrackFormat(i).label ?: group.getTrackFormat(i).language ?: "Audio ${i + 1}")
-                }
-            } ?: emptyList()
-
-    fun subtitlesEnabled(enabled: Boolean) {
-        player?.trackSelectionParameters = player?.trackSelectionParameters?.buildUpon()
-            ?.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !enabled)?.build() ?: return
+        options(C.TRACK_TYPE_AUDIO).map { AudioChoice(it.id, it.name) }
+    fun subtitleTracks(): List<AudioChoice> =
+        listOf(AudioChoice(-1, "Off")) +
+            options(C.TRACK_TYPE_TEXT).map { AudioChoice(it.id, it.name) }
+    fun selectedAudio(): Int = options(C.TRACK_TYPE_AUDIO)
+        .firstOrNull { it.group.isTrackSelected(it.index) }?.id ?: -1
+    fun selectedSubtitle(): Int = options(C.TRACK_TYPE_TEXT)
+        .firstOrNull { it.group.isTrackSelected(it.index) }?.id ?: -1
+    fun chooseAudio(id: Int) = chooseTrack(C.TRACK_TYPE_AUDIO, id)
+    fun chooseSubtitle(id: Int) = chooseTrack(C.TRACK_TYPE_TEXT, id)
+    private fun chooseTrack(type: Int, id: Int) {
+        val active = player ?: return
+        val parameters = active.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(type, id == -1)
+            .clearOverridesOfType(type)
+        options(type).firstOrNull { it.id == id }?.let {
+            parameters.setOverrideForType(
+                androidx.media3.common.TrackSelectionOverride(it.group.mediaTrackGroup, listOf(it.index))
+            )
+        }
+        active.trackSelectionParameters = parameters.build()
+    }
+    fun setAspect(index: Int) {
+        boundView?.resizeMode = when (index) {
+            1 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+            2 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            3 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+            else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+        }
     }
 
     fun stop() { releasePlayer() }
