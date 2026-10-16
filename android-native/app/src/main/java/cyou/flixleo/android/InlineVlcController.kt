@@ -92,11 +92,9 @@ class InlineVlcController(context: Context) {
             retryTask = task
             handler.postDelayed(task, 700)
         } else {
-            problem = if (media3ErrorCode != null) {
-                "Playback failed (${media3FailureDetail ?: "Media3 error ${media3ErrorCode}"}, VLC: $reason). Try another server."
-            } else {
-                "Playback failed (VLC: $reason). Try another server."
-            }
+            // Keep detailed diagnostics in Logcat, not on the customer-facing player.
+            diagnose("final_failure_${media3ErrorCode ?: "vlc"}_${reason}")
+            problem = "Stream unavailable. Select another server."
             onError(problem)
         }
     }
