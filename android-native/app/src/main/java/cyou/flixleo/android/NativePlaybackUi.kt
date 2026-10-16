@@ -213,18 +213,18 @@ private fun NativeVideoSurface(
         if (player.buffering && !player.inPictureInPicture) {
             val compact = mode == PlayerMode.MINI
             Box(Modifier.align(Alignment.Center)
-                .size(if (compact) 54.dp else 96.dp)
-                .background(Color(0xDD0C1320), RoundedCornerShape(22.dp)),
+                .size(if (compact) 36.dp else 60.dp)
+                .background(Color(0xDD0C1320), RoundedCornerShape(15.dp)),
                 contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
                     progress = { player.bufferPercent.coerceIn(0, 100) / 100f },
-                    modifier = Modifier.size(if (compact) 42.dp else 76.dp),
+                    modifier = Modifier.size(if (compact) 28.dp else 48.dp),
                     color = GoldPlayer,
                     trackColor = Color.DarkGray,
-                    strokeWidth = if (compact) 3.dp else 5.dp
+                    strokeWidth = if (compact) 2.dp else 3.dp
                 )
                 Text("${player.bufferPercent.coerceIn(0, 100)}%",
-                    color = Color.White, fontSize = if (compact) 11.sp else 19.sp,
+                    color = Color.White, fontSize = if (compact) 8.sp else 12.sp,
                     fontWeight = FontWeight.Bold)
             }
         }
