@@ -25,6 +25,28 @@ class InlineVlcController(context: Context) {
         private set
     private var media3Failed = false
     private var media3ErrorCode: Int? = null
+    private var media3FailureDetail: String? = null
+    private fun classifyMedia3Failure(error: androidx.media3.common.PlaybackException): String {
+        val causes = generateSequence(error.cause) { it.cause }.take(8).toList()
+        val response = causes.filterIsInstance<
+            androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException
+        >().firstOrNull()
+        if (response != null) return "HTTP ${response.responseCode}"
+        if (causes.any { it is java.net.UnknownHostException }) return "DNS lookup failed"
+        if (causes.any { it is java.net.SocketTimeoutException }) return "Connection timed out"
+        if (causes.any { it is javax.net.ssl.SSLException }) return "TLS connection failed"
+        if (causes.any { it is java.net.ConnectException }) return "Connection refused"
+        return when (error.errorCode) {
+            androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ->
+                "Network connection failed"
+            androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
+                "Network connection timed out"
+            androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ->
+                "Video decoder failed"
+            else -> "Media3 error ${error.errorCode}"
+        }
+    }
+
     private var libVlc: LibVLC? = null
     private var engine: MediaPlayer? = null
     private var surface: VLCVideoLayout? = null
@@ -69,7 +91,7 @@ class InlineVlcController(context: Context) {
             handler.postDelayed(task, 700)
         } else {
             problem = if (media3ErrorCode != null) {
-                "Playback failed (Media3 error ${media3ErrorCode}, VLC: $reason). Try another server."
+                "Playback failed (${media3FailureDetail ?: "Media3 error ${media3ErrorCode}"}, VLC: $reason). Try another server."
             } else {
                 "Playback failed (VLC: $reason). Try another server."
             }
@@ -126,6 +148,7 @@ class InlineVlcController(context: Context) {
         media3.onFailed = { error ->
             if (!closing && usingMedia3) {
                 media3ErrorCode = error.errorCode
+                media3FailureDetail = classifyMedia3Failure(error)
                 diagnose("media3_error_${error.errorCode}")
                 val lastPosition = media3.positionMs.takeIf { it > 0L } ?: position
                 val previous = if (lastPosition > 0L) lastPosition / 1000.0 else resumeSeconds
@@ -216,7 +239,7 @@ class InlineVlcController(context: Context) {
         // A transient CLOSED state can dispose VLCVideoLayout before reattachment.
         stop(notifyProgress = !recovering, keepSurfaceHost = true)
         closing = false
-        if (!recovering) { media3Failed = false; media3ErrorCode = null }
+        if (!recovering) { media3Failed = false; media3ErrorCode = null; media3FailureDetail = null }
         recoveryUsed = recovering
         if (!recovering) softwareFallback = decoderMode == DecoderMode.SOFTWARE
         activeStream = stream
