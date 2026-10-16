@@ -24,6 +24,14 @@ function typeOf(release:Release):'android'|'windows'|null{
   if(release.assets.some(a=>/\.exe$/i.test(a.name)))return 'windows';
   return null;
 }
+// Supabase sends Android confirmation links here. Never send auth tokens to the app.
+// The backend still enforces confirmed-email status during native sign-in.
+router.get('/', (req: Request, res: Response, next) => {
+  if (req.query.native_email_confirmed !== '1') return next();
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");
+  return res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FlixLeo email verification</title><style>body{background:#0b101a;color:#fff;font:16px system-ui;min-height:95vh;display:grid;place-items:center;text-align:center}main{max-width:380px;padding:28px}a{background:#f6bd4f;color:#171717;border-radius:12px;display:inline-block;padding:14px 25px;font-weight:700;text-decoration:none}</style></head><body><main><h1 id="title">Confirming email…</h1><p id="detail">Returning to FlixLeo Android.</p><a id="open" href="flixleo://email-confirmed" style="display:none">Open FlixLeo app</a></main><script>(function(){var hash=new URLSearchParams(location.hash.slice(1));var query=new URLSearchParams(location.search);var error=hash.get('error')||query.get('error');var verified=!error&&(hash.has('access_token')||hash.get('type')==='signup'||query.has('code'));var title=document.getElementById('title');var detail=document.getElementById('detail');var link=document.getElementById('open');if(error){title.textContent='Confirmation failed';detail.textContent='The verification link may have expired. Request another email from the app.';return;}if(!verified){title.textContent='Open your verification email';detail.textContent='Follow the confirmation link to verify your email.';return;}title.textContent='Mail confirmed';detail.textContent='Your email is confirmed. Return to FlixLeo to sign in.';link.style.display='inline-block';location.replace('flixleo://email-confirmed');})();</script></body></html>`);
+});
 router.get('/api/download/release-notes',async(req:Request,res:Response)=>{
   res.setHeader('Cache-Control','public, max-age=300');
   const platform=String(req.query.platform||'');
