@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import java.util.concurrent.Executors
 import androidx.compose.runtime.*
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
@@ -20,6 +21,9 @@ data class AudioChoice(val id: Int, val label: String)
 class InlineVlcController(context: Context) {
     private val appContext = context.applicationContext
     private val handler = Handler(Looper.getMainLooper())
+    private val vlcTeardown = Executors.newSingleThreadExecutor { job ->
+        Thread(job, "FlixLeo-VLC-teardown").apply { isDaemon = true }
+    }
     private val media3 = Media3PlaybackEngine(appContext)
     var usingMedia3 by mutableStateOf(false)
         private set
@@ -237,7 +241,8 @@ class InlineVlcController(context: Context) {
         }
         // Keep the Compose video host mounted while changing server or decoder.
         // A transient CLOSED state can dispose VLCVideoLayout before reattachment.
-        stop(notifyProgress = !recovering, keepSurfaceHost = true)
+        stop(notifyProgress = !recovering, keepSurfaceHost = true,
+            preserveMedia3 = !recovering && usingMedia3 && decoderMode != DecoderMode.SOFTWARE)
         closing = false
         if (!recovering) { media3Failed = false; media3ErrorCode = null; media3FailureDetail = null }
         recoveryUsed = recovering
@@ -419,22 +424,30 @@ class InlineVlcController(context: Context) {
             engine?.setScale(0f)
         }
     }
-    fun stop(notifyProgress: Boolean = true, keepSurfaceHost: Boolean = false) {
+    fun stop(notifyProgress: Boolean = true, keepSurfaceHost: Boolean = false,
+             preserveMedia3: Boolean = false) {
         closing = true
         if (notifyProgress && position > 0) onProgress(position, duration)
         handler.removeCallbacks(ticker)
-        media3.stop()
+        if (!preserveMedia3) media3.stop()
         usingMedia3 = false
         retryTask?.let { handler.removeCallbacks(it) }
         retryTask = null
         pendingStart = false
         playbackStarted = false
-        runCatching { engine?.setEventListener(null) }
-        runCatching { engine?.stop() }
-        if (attached) runCatching { engine?.detachViews() }
-        attached = false
-        runCatching { engine?.release() }
+        // Detach the video surface on UI thread, but native stop/release may
+        // block for seconds while the remote server/decoder shuts down.
+        val oldEngine = engine
         engine = null
+        if (oldEngine != null) {
+            runCatching { oldEngine.setEventListener(null) }
+            if (attached) runCatching { oldEngine.detachViews() }
+            vlcTeardown.execute {
+                runCatching { oldEngine.stop() }
+                runCatching { oldEngine.release() }
+            }
+        }
+        attached = false
         // Keep LibVLC alive until controller release; only release the media player here.
         if (!keepSurfaceHost) mode = PlayerMode.CLOSED
         position = 0L
@@ -447,7 +460,9 @@ class InlineVlcController(context: Context) {
         stop(notifyProgress = false)
         media3.release()
         surface = null
-        runCatching { libVlc?.release() }
+        val previousLib = libVlc
         libVlc = null
+        vlcTeardown.execute { runCatching { previousLib?.release() } }
+        vlcTeardown.shutdown()
     }
 }
