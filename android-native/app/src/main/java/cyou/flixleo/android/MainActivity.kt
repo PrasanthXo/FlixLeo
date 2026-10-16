@@ -704,20 +704,25 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         }
         finally { accountBusy = false }
     }
+    var authSuccess by mutableStateOf("")
     fun emailAction(email: String, action: String) = scope.launch {
         authError = ""
+        authSuccess = ""
+        val address = email.trim()
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(address).matches()) {
+            authError = "Enter a valid email address."
+            return@launch
+        }
         accountBusy = true
         try {
             val path = if (action == "recover") "recover" else "resend"
-            val result = api.call("/api/native/auth/$path", "POST", JSONObject().put("email", email.trim()))
-            message = result.optString("message", "Check your email")
+            val result = api.call("/api/native/auth/$path", "POST",
+                JSONObject().put("email", address))
+            authSuccess = result.optString("message", "Email request accepted. Check your inbox and spam.")
+            message = authSuccess
         } catch (e: Exception) {
-            val detail = e.localizedMessage.orEmpty()
-            authError = if ("HTTP 404" in detail)
-                "Android sign-in service is not deployed yet. Please retry after the backend update."
-                else detail.ifBlank { "Could not send email" }
-        }
-        finally { accountBusy = false }
+            authError = e.localizedMessage?.takeIf { it.isNotBlank() } ?: "Email request failed. Try again."
+        } finally { accountBusy = false }
     }
     fun signOut() = scope.launch {
         val active = account
