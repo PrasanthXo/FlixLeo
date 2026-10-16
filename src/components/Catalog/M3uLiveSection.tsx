@@ -38,7 +38,7 @@ export function M3uLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirrorId
   const countryChannels = channels.filter(c => country === 'All Countries' || c.country === country);
   const categories = ['All Categories', ...new Set(countryChannels.map(c => c.category))].sort((a,b) => a === 'All Categories' ? -1 : b === 'All Categories' ? 1 : a.localeCompare(b));
   const visible = countryChannels.filter(c => (category === 'All Categories' || c.category === category) && c.name.toLowerCase().includes(query.toLowerCase().trim()));
-  const grouped = Object.entries(Object.groupBy ? Object.groupBy(visible, c => c.category) : visible.reduce<Record<string, Channel[]>>((acc,c) => { (acc[c.category] ||= []).push(c); return acc; }, {}));
+  const grouped = Object.entries(visible.reduce<Record<string, Channel[]>>((acc,c) => { (acc[c.category] ||= []).push(c); return acc; }, {}));
 
   const play = (channel: Channel) => {
     const mirror: StreamMirror = {
