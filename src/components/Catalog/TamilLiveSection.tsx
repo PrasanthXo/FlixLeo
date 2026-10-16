@@ -5,7 +5,7 @@ import type { MediaItem, StreamMirror } from '../../types/stream';
 type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; tvgId?: string; logo: string; url: string; alternateUrls?: string[]; privateProvider?: boolean };
 
 // Keep the Live TV browse menu compact while preserving every source channel.
-const LIVE_CATEGORIES = ['News', 'Sports', 'Entertainment', 'Movies & Series', 'Music', 'Kids', 'Documentary', 'Religious', 'Other'] as const;
+const LIVE_CATEGORIES = ['Sports', 'News', 'Entertainment', 'Movies & Series', 'Music', 'Kids', 'Documentary', 'Religious', 'Other'] as const;
 function compactCategory(raw: string): string {
   const category = (raw || '').toLowerCase();
   if (/news|current affairs|politic|business|finance|weather/.test(category)) return 'News';
@@ -52,27 +52,20 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
     return () => controller.abort();
   }, [reload]);
 
-  // Some providers omit tvg-country even for well-known Sri Lankan stations.
-  const sriLankanStations = /\\b(?:hiru(?:\\s+tv)?|sirasa|shakthi|sakthi|derana|rupavahini|nethra|itn|independent television network|vasantham|siyatha|swarnavahini|shree\\s+fm|charana|monara|tnl\\s*tv|channel\\s*eye|star\\s*tamil\\s*television|imai\\s*tv|ndtv\\s*lanka|supreme\\s*tv|art\\s*tv|tv\\s*1|ada\\s*derana)\\b/i;
-  const isLocal = (channel: TamilChannel) => /^(?:LK|LKA|Sri\\s*Lanka)$/i.test((channel.country || '').trim()) ||
-    /(?:^|[.])lk(?:[.]|$)/i.test(channel.tvgId || '') ||
-    /\\bsri\\s*lanka(?:n)?\\b|\\blanka\\b/i.test(channel.name) ||
-    sriLankanStations.test(channel.name);
+  const channelCategory = (channel: TamilChannel) => {
+    const title = channel.name.toLowerCase();
+    if (/\\b(?:espn|star sports|sky sports|sony sports|ten sports|bein sports|eurosport|sports? tv|cricket tv|willow tv|f1 tv|nfl network|nba tv|fox sports|tnt sports|super sport|supersport|sport1|sport 1)\\b/i.test(title)) return 'Sports';
+    return compactCategory(channel.category);
+  };
   const categories = ['All Categories', ...LIVE_CATEGORIES];
-  const shown = channels.filter(c => (category === 'All Categories' || compactCategory(c.category) === category) &&
-    c.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
-  const local = shown.filter(isLocal).sort((a,b) => a.name.localeCompare(b.name));
-  const other = shown.filter(c => !isLocal(c));
-  const byCategory = other.reduce<Record<string, TamilChannel[]>>((acc,c) => {
-    (acc[compactCategory(c.category)] ||= []).push(c);
+  const shown = channels.filter(ch => (category === 'All Categories' || channelCategory(ch) === category) &&
+    ch.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const byCategory = shown.reduce<Record<string, TamilChannel[]>>((acc,ch) => {
+    (acc[channelCategory(ch)] ||= []).push(ch);
     return acc;
   }, {});
-  const groups = LIVE_CATEGORIES.filter(name => byCategory[name]?.length)
+  const orderedGroups: Array<readonly [string, TamilChannel[]]> = LIVE_CATEGORIES.filter(name => byCategory[name]?.length)
     .map(name => [name, byCategory[name].sort((a,b) => a.name.localeCompare(b.name))] as const);
-  const orderedGroups: Array<readonly [string, TamilChannel[]]> = [
-    ...(local.length ? [['Sri Lankan Channels', local] as const] : []),
-    ...groups
-  ];
   async function play(channel: TamilChannel) {
     let primaryUrl = channel.url;
     if (channel.privateProvider) {
