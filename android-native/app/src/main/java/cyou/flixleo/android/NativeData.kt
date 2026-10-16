@@ -146,19 +146,18 @@ class FlixStore(private val context: Context) {
         val editor = prefs.edit()
         if (!previous.isNullOrBlank()) {
             keys.forEach { name ->
-                val value = prefs.getString(name, null)
-                val set = prefs.getStringSet(name, null)
-                when {
-                    value != null -> editor.putString("account_${previous}_$name", value)
-                    set != null -> editor.putStringSet("account_${previous}_$name", set.toSet())
+                // SharedPreferences getString throws ClassCastException for StringSet values.
+                when (val value = prefs.all[name]) {
+                    is String -> editor.putString("account_${previous}_$name", value)
+                    is Set<*> -> editor.putStringSet("account_${previous}_$name", value.filterIsInstance<String>().toSet())
                 }
                 editor.remove(name)
             }
             keys.forEach { name ->
-                val savedString = prefs.getString("account_${userId}_$name", null)
-                val savedSet = prefs.getStringSet("account_${userId}_$name", null)
-                if (savedString != null) editor.putString(name, savedString)
-                else if (savedSet != null) editor.putStringSet(name, savedSet.toSet())
+                when (val saved = prefs.all["account_${userId}_$name"]) {
+                    is String -> editor.putString(name, saved)
+                    is Set<*> -> editor.putStringSet(name, saved.filterIsInstance<String>().toSet())
+                }
             }
         }
         editor.putString("local_data_owner", userId).commit()
