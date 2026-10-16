@@ -8,7 +8,8 @@ const channelMap = new Map<string, PrivateChannel>();
 const mediaMap = new Map<string, { url: string; expires: number }>();
 let cacheUntil = 0;
 let loading: Promise<void> | null = null;
-const CAP = 25000;
+const CAP = 30000;
+const PER_SOURCE_CAP = 1100;
 const originList = () => {
   try {
     const parsed = JSON.parse(process.env.FLIXLEO_PRIVATE_IPTV_URLS_JSON || '[]');
@@ -43,7 +44,7 @@ function attr(info: string, key: string) {
 }
 function isLive(info: string, url: string) {
   const group = attr(info, 'group-title').toLowerCase();
-  if (/\b(vod|movie|film|cinema|series|season|episode|catch.?up|adult|xxx|24.?7 movies)\b/.test(group)) return false;
+  if (/\b(vod|on.?demand|series|season|episode|catch.?up|adult|xxx)\b/.test(group)) return false;
   if (/(?:\/movie\/|\/series\/|\/vod\/)/i.test(url)) return false;
   if (/\.(?:mp4|mkv|avi|mov)(?:[?#]|$)/i.test(url)) return false;
   return true;
@@ -77,6 +78,7 @@ async function refresh() {
     for (const item of result) {
       if (item.status !== 'fulfilled') continue;
       let info = '';
+      let sourceCount = 0;
       for (const raw of item.value.split(/\r?\n/)) {
         const line = raw.trim();
         if (line.startsWith('#EXTINF:')) { info = line; continue; }
@@ -96,7 +98,8 @@ async function refresh() {
         next.set(id, { id, name: name.slice(0, 120), url: line,
           category: genre, language,
           country, logo: logo.startsWith('https://') ? logo : '' });
-        if (next.size >= CAP) break;
+        sourceCount++;
+        if (next.size >= CAP || sourceCount >= PER_SOURCE_CAP) break;
       }
       if (next.size >= CAP) break;
     }
