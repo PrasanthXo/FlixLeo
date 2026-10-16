@@ -918,6 +918,56 @@ app.get('/api/stremio/audio-fix/:ticket', (req: Request, res: Response) => {
 const stremioProviderCooldown = new Map<string, number>();
 
 
+
+const TAMIL_IPTV_PLAYLIST = 'https://iptv-org.github.io/iptv/languages/tam.m3u';
+type TamilIptvChannel = { id: string; name: string; logo: string; category: string; language: string; url: string };
+let tamilIptvCache: { until: number; channels: TamilIptvChannel[] } | null = null;
+function tamilIptvAttr(line: string, key: string): string {
+  const m = line.match(new RegExp('(?:^|\\s)' + key + '="([^"]*)"', 'i'));
+  return (m?.[1] || '').trim().slice(0, 160);
+}
+function tamilIptvHttps(value: string): string {
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' && !u.username && !u.password ? u.toString() : '';
+  } catch { return ''; }
+}
+app.get('/api/live/tamil/channels', async (_req: Request, res: Response) => {
+  if (tamilIptvCache && tamilIptvCache.until > Date.now()) {
+    return res.json({ channels: tamilIptvCache.channels, language: 'Tamil' });
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 14000);
+  try {
+    const upstream = await fetch(TAMIL_IPTV_PLAYLIST, { signal: controller.signal });
+    if (!upstream.ok) throw new Error('Playlist not available');
+    if (Number(upstream.headers.get('content-length') || 0) > 3_000_000) throw new Error('Playlist too large');
+    const playlist = await upstream.text();
+    if (playlist.length > 3_000_000 || !playlist.trimStart().startsWith('#EXTM3U')) throw new Error('Invalid playlist');
+    const channels: TamilIptvChannel[] = [];
+    let info = '';
+    for (const raw of playlist.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (line.startsWith('#EXTINF:')) { info = line; continue; }
+      if (!info || !line || line.startsWith('#')) continue;
+      const url = tamilIptvHttps(line);
+      if (url) {
+        const name = (info.includes(',') ? info.slice(info.indexOf(',') + 1).trim() : '') || tamilIptvAttr(info, 'tvg-name') || 'Tamil Channel';
+        const category = tamilIptvAttr(info, 'group-title') || 'Other Channels';
+        channels.push({ id: String(channels.length), name: name.slice(0, 120), category, language: 'Tamil',
+          logo: tamilIptvHttps(tamilIptvAttr(info, 'tvg-logo')), url });
+      }
+      info = '';
+      if (channels.length >= 2000) break;
+    }
+    tamilIptvCache = { until: Date.now() + 15 * 60_000, channels };
+    res.json({ channels, language: 'Tamil' });
+  } catch {
+    if (tamilIptvCache) return res.json({ channels: tamilIptvCache.channels, language: 'Tamil', stale: true });
+    res.status(503).json({ channels: [], message: 'Tamil channels temporarily unavailable.' });
+  } finally { clearTimeout(timer); }
+});
+
 const PLAVIOHD_BASE = 'https://plaviohd.vercel.app';
 // PlavioHD is an additive built-in provider; existing Render add-ons remain intact.
 // Preserve the actual grouping announced by PlavioHD's Stremio manifest.
