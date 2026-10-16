@@ -196,11 +196,28 @@ private fun NativeVideoSurface(
     }
 
     Box(modifier) {
-        AndroidView(
-            factory = { view.also { player.attach(it) } },
-            update = { player.attach(it) },
-            modifier = Modifier.fillMaxSize()
-        )
+        if (player.usingMedia3) {
+            val media3View = remember(context) {
+                androidx.media3.ui.PlayerView(context).apply {
+                    useController = false
+                    setBackgroundColor(android.graphics.Color.BLACK)
+                }
+            }
+            DisposableEffect(media3View, player) {
+                onDispose { player.detachMedia3(media3View) }
+            }
+            AndroidView(
+                factory = { media3View.also { player.attachMedia3(it) } },
+                update = { player.attachMedia3(it) },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            AndroidView(
+                factory = { view.also { player.attach(it) } },
+                update = { player.attach(it) },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         Box(Modifier.matchParentSize().pointerInput(mode) {
             detectTapGestures(
                 onTap = { player.controlsVisible = !player.controlsVisible },
