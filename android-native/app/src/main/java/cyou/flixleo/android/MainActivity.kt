@@ -94,17 +94,11 @@ class MainActivity : ComponentActivity() {
     private fun handleEmailConfirmation(incoming: Intent?) {
         val uri = incoming?.data ?: return
         if (uri.scheme != "flixleo" || uri.host != "email-confirmed") return
-        // Remove intent tokens immediately so activity re-creation cannot replay them.
         incoming.data = null
-        val access = uri.getQueryParameter("access_token").orEmpty()
-        val refresh = uri.getQueryParameter("refresh_token").orEmpty()
-        val kind = uri.getQueryParameter("type").orEmpty()
-        if (kind != "signup" || access.isBlank() || refresh.isBlank()) {
-            state.showAuth = true
-            state.notify("Mail confirmed. Sign in to FlixLeo.")
-            return
-        }
-        state.completeConfirmedEmailSignIn(access, refresh)
+        state.showSignup = false
+        state.showAuth = true
+        state.authError = ""
+        state.notify("Mail confirmed. Sign in to FlixLeo.")
     }
     override fun onResume() {
         super.onResume()
@@ -652,33 +646,6 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             // refresh token or the user's locally saved library.
             // Retry the refresh the next time the app returns to foreground.
         } finally { refreshing.set(false) }
-    }
-    fun completeConfirmedEmailSignIn(access: String, refresh: String) = scope.launch {
-        accountBusy = true
-        authError = ""
-        try {
-            // The backend /account endpoint validates the JWT and requires email_confirmed_at.
-            val result = api.call("/api/native/account", "GET", null, access)
-            val user = result.getJSONObject("user")
-            val userId = user.getString("id")
-            val signedIn = Session(access, refresh, System.currentTimeMillis() / 1000 + 3600, user)
-            store.activateUser(userId)
-            account = signedIn
-            store.saveSession(signedIn)
-            localRevision++
-            showSignup = false
-            showAuth = false
-            tab = "Home"
-            message = "Mail confirmed. Welcome to FlixLeo!"
-            showOnboarding = store.needsSignupOnboarding(user.optString("email"))
-            syncOnLogin(showNotice = false)
-        } catch (_: Exception) {
-            showSignup = false
-            showAuth = true
-            authError = "Email confirmed. Please sign in to continue."
-        } finally {
-            accountBusy = false
-        }
     }
     fun signIn(email: String, password: String) = scope.launch {
         authError = ""
