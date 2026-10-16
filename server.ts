@@ -924,18 +924,28 @@ type PlavioLiveItem = { id: string; type: 'tv' | 'channel'; name: string; poster
 type PlavioLiveCatalog = { id: string; type: 'tv' | 'channel'; name: string; items: PlavioLiveItem[] };
 let cachedPlavioChannels: { expires: number; catalogs: PlavioLiveCatalog[] } | null = null;
 async function fetchPlavioJson(route: string, timeoutMs = 14000): Promise<any> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(PLAVIOHD_BASE + route, {
-      headers: { Accept: 'application/json' }, redirect: 'error', signal: controller.signal
-    });
-    if (!response.ok) throw new Error('PlavioHD returned HTTP ' + response.status);
-    if (Number(response.headers.get('content-length') || 0) > 1024 * 1024) throw new Error('Response too large');
-    const raw = await response.text();
-    if (raw.length > 1024 * 1024) throw new Error('Response too large');
-    return JSON.parse(raw);
-  } finally { clearTimeout(timeout); }
+  // Retry transient network/5xx failures once. Each attempt has its own abort deadline.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(PLAVIOHD_BASE + route, {
+        headers: { Accept: 'application/json' }, redirect: 'error', signal: controller.signal
+      });
+      if (!response.ok) {
+        const error = new Error('PlavioHD returned HTTP ' + response.status);
+        if (response.status < 500 || attempt === 1) throw error;
+        continue;
+      }
+      if (Number(response.headers.get('content-length') || 0) > 1024 * 1024) throw new Error('Response too large');
+      const raw = await response.text();
+      if (raw.length > 1024 * 1024) throw new Error('Response too large');
+      return JSON.parse(raw);
+    } catch (error) {
+      if (attempt === 1) throw error;
+    } finally { clearTimeout(timeout); }
+  }
+  throw new Error('PlavioHD unavailable');
 }
 function plavioSafePoster(candidate: unknown): string {
   if (typeof candidate !== 'string') return '';
@@ -945,6 +955,14 @@ function plavioSafePoster(candidate: unknown): string {
         url.hostname === 'localhost' || url.hostname.endsWith('.local') || url.hostname.endsWith('.internal')) return '';
     return url.href;
   } catch { return ''; }
+}
+// Preserve the last verified catalog during short provider outages (up to 30 minutes).
+function serveStalePlavioCatalog(res: Response): boolean {
+  if (!cachedPlavioChannels || cachedPlavioChannels.expires + 30 * 60_000 < Date.now() ||
+      cachedPlavioChannels.catalogs.length === 0) return false;
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ provider: 'PlavioHD', catalogs: cachedPlavioChannels.catalogs, stale: true });
+  return true;
 }
 // Only known catalog IDs are exposed; this is not an arbitrary upstream URL proxy.
 
@@ -965,10 +983,13 @@ app.get('/api/stremio/plavio/live/catalog', async (_req: Request, res: Response)
       return [{ type: entry.type, id: entry.id,
         name: String(entry.name || entry.id).trim().slice(0, 80) || 'Live TV' }];
     }).slice(0, 12);
-    if (!channelCatalogs.length) return res.json({
+    if (!channelCatalogs.length) {
+      if (serveStalePlavioCatalog(res)) return;
+      return res.json({
       provider: 'PlavioHD', catalogs: [],
       message: 'This add-on does not currently advertise a Live TV channel catalog.'
     });
+    }
     // Maintain manifest order; one failed channel type should not remove other types.
     const requests = await Promise.allSettled(channelCatalogs.map(async catalog =>
       fetchPlavioJson('/catalog/' + catalog.type + '/' + encodeURIComponent(catalog.id) + '.json', 12000)
@@ -993,11 +1014,14 @@ app.get('/api/stremio/plavio/live/catalog', async (_req: Request, res: Response)
       });
       return { ...catalog, items };
     }).filter(catalog => catalog.items.length > 0);
+    if (!catalogs.length && serveStalePlavioCatalog(res)) return;
     if (catalogs.length) cachedPlavioChannels = { expires: Date.now() + 60_000, catalogs };
     res.setHeader('Cache-Control', 'public, max-age=30');
     return res.json({ provider: 'PlavioHD', catalogs,
       ...(!catalogs.length ? { message: 'No Live TV channels are currently available.' } : {}) });
-  } catch {
+  } catch (error) {
+    console.warn('PlavioHD live catalog unavailable:', error instanceof Error ? error.message : 'unknown provider failure');
+    if (serveStalePlavioCatalog(res)) return;
     res.setHeader('Cache-Control', 'no-store');
     return res.status(502).json({ error: 'Live channels temporarily unavailable', catalogs: [] });
   }
