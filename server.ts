@@ -4,6 +4,7 @@ import nativeMobileApi from './server/nativeMobileApi';
 import windowsDownload from './server/windowsDownload';
 import landingRoutes, { serveAppLanding } from './server/landingRoutes';
 import { installSubtitleGateway } from './server/subtitleGateway';
+import { installPrivateIptv } from './server/privateIptv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -28,6 +29,7 @@ app.use(updateGateway);
 app.use(nativeMobileApi);
 app.use(windowsDownload);
 app.use(landingRoutes);
+installPrivateIptv(app);
 
 // Private FlixLeo admin API. Credentials must only be configured in Render.
 // Never use the public anon key for privileged Supabase Auth operations.
