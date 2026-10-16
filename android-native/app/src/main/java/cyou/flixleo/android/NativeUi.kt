@@ -188,7 +188,8 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
             ModalBottomSheet(onDismissRequest = {
                 state.selected = null; state.selectedChannel = null; state.streams = emptyList()
             }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = Color(0xFF111621), dragHandle = { BottomSheetDefaults.DragHandle(color = Muted) }) {
+                containerColor = Color(0xFF111621), contentColor = Color.White,
+                dragHandle = { BottomSheetDefaults.DragHandle(color = Muted) }) {
                 DetailSheet(state)
             }
         }
