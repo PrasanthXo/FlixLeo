@@ -924,7 +924,7 @@ type M3uChannel = { id: string; name: string; logo: string; category: string; co
 let m3uCache: { expires: number; channels: M3uChannel[] } | null = null;
 let m3uPending: Promise<M3uChannel[]> | null = null;
 function m3uAttribute(line: string, key: string): string {
-  const match = line.match(new RegExp('(?:^|\s)' + key + '="([^"]*)"', 'i'));
+  const match = line.match(new RegExp('(?:^|\\s)' + key + '="([^"]*)"', 'i'));
   return (match?.[1] || '').trim().slice(0, 120);
 }
 function m3uSafeUrl(raw: string): string {
