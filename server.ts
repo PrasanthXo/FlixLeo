@@ -920,6 +920,7 @@ const stremioProviderCooldown = new Map<string, number>();
 
 
 const IPTV_PLAYLISTS = [
+  { url: 'https://iptv-org.github.io/iptv/countries/lk.m3u', fallbackLanguage: 'Unknown' },
   { url: 'https://iptv-org.github.io/iptv/languages/tam.m3u', fallbackLanguage: 'Tamil' },
   { url: 'https://iptv-org.github.io/iptv/index.m3u', fallbackLanguage: 'Unknown' }
 ] as const;
@@ -975,7 +976,7 @@ async function iptvGetChannels(): Promise<IptvChannel[]> {
     const seenIds = new Set<string>();
     const seenNames = new Set<string>();
     const channels: IptvChannel[] = [];
-    // Tamil playlist takes precedence because it appears first in IPTV_PLAYLISTS.
+    // Sri Lankan channels take precedence, followed by Tamil and then worldwide listings.
     for (const response of result) {
       if (response.status !== 'fulfilled') continue;
       for (const channel of response.value) {
