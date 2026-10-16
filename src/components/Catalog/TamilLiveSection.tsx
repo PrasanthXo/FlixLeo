@@ -7,6 +7,7 @@ type TamilChannel = { id: string; name: string; category: string; language: stri
 export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirrorId?: string) => void }) {
   const [channels, setChannels] = React.useState<TamilChannel[]>([]);
   const [category, setCategory] = React.useState('All Categories');
+  const [language, setLanguage] = React.useState('All Languages');
   const [search, setSearch] = React.useState('');
   const [reload, setReload] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
@@ -18,50 +19,56 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
       .then(async r => { const data = await r.json(); if (!r.ok) throw Error(data.message || 'Playlist unavailable'); return data; })
       .then(data => { if (!controller.signal.aborted) {
         setChannels(Array.isArray(data.channels) ? data.channels : []);
-        if (!data.channels?.length) setError('No compatible Tamil channels found in the playlist.');
+        if (!data.channels?.length) setError('No compatible channels found in the playlists.');
       } })
-      .catch(() => { if (!controller.signal.aborted) setError('Tamil channels are temporarily unavailable.'); })
+      .catch(() => { if (!controller.signal.aborted) setError('Live TV channels are temporarily unavailable.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [reload]);
 
-  const categories = ['All Categories', ...Array.from(new Set(channels.map(c => c.category))).sort()];
-  const shown = channels.filter(c => (category === 'All Categories' || c.category === category) &&
+  const languages = ['All Languages', ...Array.from(new Set(channels.map(c => c.language))).sort()];
+  const categories = ['All Categories', ...Array.from(new Set(channels.filter(c => language === 'All Languages' || c.language === language).map(c => c.category))).sort()];
+  const shown = channels.filter(c => (language === 'All Languages' || c.language === language) && (category === 'All Categories' || c.category === category) &&
     c.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const groups = shown.reduce<Record<string, TamilChannel[]>>((acc,c) => { (acc[c.category] ||= []).push(c); return acc; }, {});
   function play(channel: TamilChannel) {
     const mirror: StreamMirror = {
-      id: 'tamil-iptv-' + channel.id, label: channel.name, url: channel.url,
+      id: 'iptv-' + channel.id, label: channel.name, url: channel.url,
       quality: 'Auto', source: 'custom', streamType: /\.m3u8(?:$|[?#])/i.test(channel.url) ? 'hls' : 'direct-video', isDirect: true
     };
     const media: MediaItem = {
-      id: 'tamil-iptv-' + channel.id, title: channel.name, type: 'movie', year: new Date().getFullYear(),
+      id: 'iptv-' + channel.id, title: channel.name, type: 'movie', year: new Date().getFullYear(),
       duration: 'Live', rating: 'Live', imdbRating: '', genres: ['Live TV', channel.category],
-      language: 'Tamil', overview: channel.name, posterUrl: channel.logo, backdropUrl: channel.logo,
+      language: channel.language, overview: channel.name, posterUrl: channel.logo, backdropUrl: channel.logo,
       primarySource: 'custom', availableSources: ['custom'], mirrors: [mirror]
     };
     onPlay(media, mirror.id);
   }
-  return <section className="mb-9 space-y-5" aria-label="Tamil IPTV channels">
+  return <section className="mb-9 space-y-5" aria-label="Live TV IPTV channels">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="text-xl font-extrabold text-white sm:text-2xl">Live TV</h2>
-      <p className="text-sm text-slate-400">Language: Tamil · {channels.length} channels</p></div>
-      <button type="button" aria-label="Refresh Tamil channels" onClick={() => setReload(v => v+1)}
+      <p className="text-sm text-slate-400">{channels.length} channels · Browse by language and category</p></div>
+      <button type="button" aria-label="Refresh live TV channels" onClick={() => setReload(v => v+1)}
         className="rounded-xl border border-white/15 p-2 text-slate-200 hover:bg-white/10"><RefreshCw size={18}/></button>
     </div>
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-3">
+      <label className="space-y-1 text-sm text-slate-300">Language
+        <select value={language} onChange={e => { setLanguage(e.target.value); setCategory('All Categories'); }} className="w-full rounded-xl border border-white/15 bg-[#111b2c] p-3 text-white">
+          {languages.map(l => <option key={l}>{l}</option>)}
+        </select>
+      </label>
       <label className="space-y-1 text-sm text-slate-300">Category
         <select value={category} onChange={e => setCategory(e.target.value)}
           className="w-full rounded-xl border border-white/15 bg-[#111b2c] p-3 text-white">
           {categories.map(c => <option key={c}>{c}</option>)}
         </select>
       </label>
-      <label className="space-y-1 text-sm text-slate-300">Search Tamil channels
+      <label className="space-y-1 text-sm text-slate-300">Search channels
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Channel name"
           className="w-full rounded-xl border border-white/15 bg-[#111b2c] p-3 text-white"/>
       </label>
     </div>
-    {loading && <p role="status" className="flex items-center gap-2 text-sm text-slate-300"><RefreshCw className="animate-spin" size={16}/>Loading Tamil channels…</p>}
+    {loading && <p role="status" className="flex items-center gap-2 text-sm text-slate-300"><RefreshCw className="animate-spin" size={16}/>Loading live channels…</p>}
     {error && <p role="status" className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</p>}
     {!loading && !error && !shown.length && <p className="text-sm text-slate-400">No channels match your filters.</p>}
     {Object.entries(groups).map(([name, items]) => <div key={name} className="rounded-3xl border border-white/10 bg-[#0c1524] p-4 sm:p-5">
@@ -77,7 +84,7 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
             <span className="absolute left-2 top-2 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">LIVE</span>
             <Play size={20} className="absolute bottom-2 right-2 rounded-full bg-amber-400 p-1 text-black"/>
           </div>
-          <div className="px-3 py-2.5"><p className="truncate text-sm font-semibold text-white">{c.name}</p><p className="text-xs text-slate-400">Tamil</p></div>
+          <div className="px-3 py-2.5"><p className="truncate text-sm font-semibold text-white">{c.name}</p><p className="truncate text-xs text-slate-400">{c.language}</p></div>
         </button>)}
       </div>
     </div>)}
