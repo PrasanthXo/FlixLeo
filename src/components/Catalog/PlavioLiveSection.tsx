@@ -126,6 +126,9 @@ export function PlavioLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirro
     }
   };
 
+  // Hide the entire optional add-on section when it has no real channel catalog.
+  if (!loading && catalogs.length === 0) return null;
+
   const visibleCatalogs = selectedType === 'all'
     ? catalogs : catalogs.filter(catalog => catalog.id === selectedType);
 
@@ -164,11 +167,6 @@ export function PlavioLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirro
       {loading && (
         <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-sm text-slate-300" role="status">
           <RefreshCw className="animate-spin text-amber-400" size={18} /> Loading channels…
-        </div>
-      )}
-      {!loading && catalogs.length === 0 && (
-        <div role="status" className="rounded-2xl border border-white/10 bg-slate-900/60 px-5 py-8 text-sm text-slate-300">
-          {error || 'No channels available.'}
         </div>
       )}
       {visibleCatalogs.map(catalog => (
