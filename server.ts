@@ -919,53 +919,82 @@ const stremioProviderCooldown = new Map<string, number>();
 
 
 
-const TAMIL_IPTV_PLAYLIST = 'https://iptv-org.github.io/iptv/languages/tam.m3u';
-type TamilIptvChannel = { id: string; name: string; logo: string; category: string; language: string; url: string };
-let tamilIptvCache: { until: number; channels: TamilIptvChannel[] } | null = null;
-function tamilIptvAttr(line: string, key: string): string {
-  const m = line.match(new RegExp('(?:^|\\s)' + key + '="([^"]*)"', 'i'));
-  return (m?.[1] || '').trim().slice(0, 160);
+const IPTV_PLAYLISTS = [
+  { url: 'https://iptv-org.github.io/iptv/languages/tam.m3u', fallbackLanguage: 'Tamil' },
+  { url: 'https://iptv-org.github.io/iptv/index.m3u', fallbackLanguage: 'Unknown' }
+] as const;
+type IptvChannel = { id: string; name: string; logo: string; category: string; language: string; url: string };
+let iptvCache: { until: number; channels: IptvChannel[] } | null = null;
+let iptvPending: Promise<IptvChannel[]> | null = null;
+function iptvAttribute(line: string, key: string): string {
+  const pattern = new RegExp('(?:^|\\s)' + key + '="([^"]*)"', 'i');
+  return (line.match(pattern)?.[1] || '').trim().slice(0, 160);
 }
-function tamilIptvHttps(value: string): string {
+function iptvHttps(raw: string): string {
   try {
-    const u = new URL(value);
-    return u.protocol === 'https:' && !u.username && !u.password ? u.toString() : '';
+    const url = new URL(raw.trim());
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : '';
   } catch { return ''; }
 }
-app.get('/api/live/tamil/channels', async (_req: Request, res: Response) => {
-  if (tamilIptvCache && tamilIptvCache.until > Date.now()) {
-    return res.json({ channels: tamilIptvCache.channels, language: 'Tamil' });
-  }
+async function iptvFetchPlaylist(url: string, fallbackLanguage: string): Promise<IptvChannel[]> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 14000);
+  const timeout = setTimeout(() => controller.abort(), 22000);
   try {
-    const upstream = await fetch(TAMIL_IPTV_PLAYLIST, { signal: controller.signal });
-    if (!upstream.ok) throw new Error('Playlist not available');
-    if (Number(upstream.headers.get('content-length') || 0) > 3_000_000) throw new Error('Playlist too large');
-    const playlist = await upstream.text();
-    if (playlist.length > 3_000_000 || !playlist.trimStart().startsWith('#EXTM3U')) throw new Error('Invalid playlist');
-    const channels: TamilIptvChannel[] = [];
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok || Number(response.headers.get('content-length') || 0) > 25_000_000) throw Error('Playlist unavailable');
+    const body = await response.text();
+    if (body.length > 25_000_000 || !body.trimStart().startsWith('#EXTM3U')) throw Error('Invalid playlist');
+    const channels: IptvChannel[] = [];
     let info = '';
-    for (const raw of playlist.split(/\r?\n/)) {
+    for (const raw of body.split(/\r?\n/)) {
       const line = raw.trim();
       if (line.startsWith('#EXTINF:')) { info = line; continue; }
       if (!info || !line || line.startsWith('#')) continue;
-      const url = tamilIptvHttps(line);
-      if (url) {
-        const name = (info.includes(',') ? info.slice(info.indexOf(',') + 1).trim() : '') || tamilIptvAttr(info, 'tvg-name') || 'Tamil Channel';
-        const category = tamilIptvAttr(info, 'group-title') || 'Other Channels';
-        channels.push({ id: String(channels.length), name: name.slice(0, 120), category, language: 'Tamil',
-          logo: tamilIptvHttps(tamilIptvAttr(info, 'tvg-logo')), url });
+      const streamUrl = iptvHttps(line);
+      if (streamUrl) {
+        const name = ((info.includes(',') ? info.slice(info.indexOf(',') + 1).trim() : '') || iptvAttribute(info, 'tvg-name') || 'Live Channel').slice(0, 120);
+        const category = iptvAttribute(info, 'group-title') || 'Other Channels';
+        const language = iptvAttribute(info, 'tvg-language') || fallbackLanguage;
+        channels.push({ id: '', name, logo: iptvHttps(iptvAttribute(info, 'tvg-logo')),
+          category, language, url: streamUrl });
       }
       info = '';
-      if (channels.length >= 2000) break;
+      if (channels.length >= 30000) break;
     }
-    tamilIptvCache = { until: Date.now() + 15 * 60_000, channels };
-    res.json({ channels, language: 'Tamil' });
+    return channels;
+  } finally { clearTimeout(timeout); }
+}
+async function iptvGetChannels(): Promise<IptvChannel[]> {
+  if (iptvCache && iptvCache.until > Date.now()) return iptvCache.channels;
+  if (iptvPending) return iptvPending;
+  iptvPending = (async () => {
+    const result = await Promise.allSettled(IPTV_PLAYLISTS.map(p => iptvFetchPlaylist(p.url, p.fallbackLanguage)));
+    const seen = new Set<string>();
+    const channels: IptvChannel[] = [];
+    for (const response of result) {
+      if (response.status !== 'fulfilled') continue;
+      for (const channel of response.value) {
+        const key = channel.url;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        channels.push({ ...channel, id: String(channels.length) });
+      }
+    }
+    if (!channels.length) throw Error('No playlists available');
+    iptvCache = { until: Date.now() + 15 * 60_000, channels };
+    return channels;
+  })();
+  try { return await iptvPending; } finally { iptvPending = null; }
+}
+app.get('/api/live/tamil/channels', async (_req: Request, res: Response) => {
+  try {
+    const channels = await iptvGetChannels();
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.json({ channels });
   } catch {
-    if (tamilIptvCache) return res.json({ channels: tamilIptvCache.channels, language: 'Tamil', stale: true });
-    res.status(503).json({ channels: [], message: 'Tamil channels temporarily unavailable.' });
-  } finally { clearTimeout(timer); }
+    if (iptvCache?.channels.length) return res.json({ channels: iptvCache.channels, stale: true });
+    res.status(503).json({ channels: [], message: 'Live TV playlists temporarily unavailable.' });
+  }
 });
 
 const PLAVIOHD_BASE = 'https://plaviohd.vercel.app';
