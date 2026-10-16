@@ -2,7 +2,7 @@ import React from 'react';
 import { Play, RefreshCw, Tv2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
-type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; tvgId?: string; logo: string; url: string; alternateUrls?: string[] };
+type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; tvgId?: string; logo: string; url: string; alternateUrls?: string[]; privateProvider?: boolean };
 
 // Keep the Live TV browse menu compact while preserving every source channel.
 const LIVE_CATEGORIES = ['News', 'Sports', 'Entertainment', 'Movies & Series', 'Music', 'Kids', 'Documentary', 'Religious', 'Other'] as const;
@@ -29,13 +29,25 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
   React.useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError('');
-    fetch('/api/live/tamil/channels', { signal: controller.signal })
-      .then(async r => { const data = await r.json(); if (!r.ok) throw Error(data.message || 'Playlist unavailable'); return data; })
-      .then(data => { if (!controller.signal.aborted) {
-        setChannels(Array.isArray(data.channels) ? data.channels : []);
-        if (!data.channels?.length) setError('No compatible channels found in the playlists.');
-      } })
-      .catch(() => { if (!controller.signal.aborted) setError('Live TV channels are temporarily unavailable.'); })
+    Promise.allSettled([
+      fetch('/api/live/tamil/channels', { signal: controller.signal }).then(async r => { if (!r.ok) throw Error('Public channels unavailable'); return r.json(); }),
+      fetch('/api/live/private/channels', { signal: controller.signal }).then(async r => { if (!r.ok) throw Error('Additional channels unavailable'); return r.json(); })
+    ]).then(results => {
+      if (controller.signal.aborted) return;
+      const publicChannels = results[0].status === 'fulfilled' && Array.isArray(results[0].value.channels) ? results[0].value.channels : [];
+      const privateChannels = results[1].status === 'fulfilled' && Array.isArray(results[1].value.channels)
+        ? results[1].value.channels.map((ch: TamilChannel) => ({ ...ch, id: 'private-' + ch.id, url: '', privateProvider: true })) : [];
+      // Private stream URLs remain server-side; deduplicate public results by metadata.
+      const names = new Set(publicChannels.map((ch: TamilChannel) => ch.name.trim().toLowerCase() + '|' + (ch.country || '').toLowerCase()));
+      const additional = privateChannels.filter((ch: TamilChannel) => {
+        const key = ch.name.trim().toLowerCase() + '|' + (ch.country || '').toLowerCase();
+        if (names.has(key)) return false;
+        names.add(key);
+        return true;
+      });
+      setChannels([...publicChannels, ...additional]);
+      if (!publicChannels.length && !additional.length) setError('No channels available from the configured sources.');
+    }).catch(() => { if (!controller.signal.aborted) setError('Live TV temporarily unavailable.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [reload]);
@@ -61,8 +73,18 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
     ...(local.length ? [['Sri Lankan Channels', local] as const] : []),
     ...groups
   ];
-  function play(channel: TamilChannel) {
-    const mirrors: StreamMirror[] = [channel.url, ...(channel.alternateUrls || [])].map((url, index) => ({
+  async function play(channel: TamilChannel) {
+    let primaryUrl = channel.url;
+    if (channel.privateProvider) {
+      try {
+        const response = await fetch('/api/live/private/channel/' + encodeURIComponent(channel.id.slice('private-'.length)));
+        if (!response.ok) throw Error('Channel not available');
+        const data = await response.json();
+        primaryUrl = data.url;
+        if (typeof primaryUrl !== 'string' || !primaryUrl.startsWith('/api/live/private/media/')) throw Error('Channel unavailable');
+      } catch { setError('This live channel is temporarily unavailable.'); return; }
+    }
+    const mirrors: StreamMirror[] = [primaryUrl, ...(channel.alternateUrls || [])].map((url, index) => ({
       id: 'iptv-' + channel.id + '-' + index,
       label: index === 0 ? channel.name : channel.name + ' · Backup ' + index,
       url, quality: 'Auto', source: 'custom',
@@ -103,7 +125,7 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
       <div className="mb-4 flex justify-between gap-3"><h3 className="text-lg font-bold text-white">{name}</h3>
         <span className="text-xs text-slate-400">{items.length} channels</span></div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {items.map(c => <button key={c.id} type="button" onClick={() => play(c)}
+        {items.map(c => <button key={c.id} type="button" onClick={() => void play(c)}
           className="group overflow-hidden rounded-2xl border border-white/10 bg-[#111e30] text-left hover:border-amber-400 focus-visible:outline-2 focus-visible:outline-amber-400">
           <div className="relative flex aspect-video items-center justify-center bg-gradient-to-br from-slate-700 to-black">
             <Tv2 size={28} className="text-slate-500"/>
