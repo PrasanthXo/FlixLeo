@@ -2,7 +2,7 @@ import React from 'react';
 import { Play, RefreshCw, Tv2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
-type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; logo: string; url: string };
+type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; logo: string; url: string; alternateUrls?: string[] };
 
 // Keep the Live TV browse menu compact while preserving every source channel.
 const LIVE_CATEGORIES = ['News', 'Sports', 'Entertainment', 'Movies & Series', 'Music', 'Kids', 'Documentary', 'Religious', 'Other'] as const;
@@ -58,17 +58,20 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
     ...groups
   ];
   function play(channel: TamilChannel) {
-    const mirror: StreamMirror = {
-      id: 'iptv-' + channel.id, label: channel.name, url: channel.url,
-      quality: 'Auto', source: 'custom', streamType: /\.m3u8(?:$|[?#])/i.test(channel.url) ? 'hls' : 'direct-video', isDirect: true
-    };
+    const mirrors: StreamMirror[] = [channel.url, ...(channel.alternateUrls || [])].map((url, index) => ({
+      id: 'iptv-' + channel.id + '-' + index,
+      label: index === 0 ? channel.name : channel.name + ' · Backup ' + index,
+      url, quality: 'Auto', source: 'custom',
+      streamType: /\\.m3u8(?:$|[?#])/i.test(url) ? 'hls' : 'direct-video',
+      isDirect: true
+    }));
     const media: MediaItem = {
       id: 'iptv-' + channel.id, title: channel.name, type: 'movie', year: new Date().getFullYear(),
       duration: 'Live', rating: 'Live', imdbRating: '', genres: ['Live TV', channel.category],
       language: channel.language, overview: channel.name, posterUrl: channel.logo, backdropUrl: channel.logo,
-      primarySource: 'custom', availableSources: ['custom'], mirrors: [mirror]
+      primarySource: 'custom', availableSources: ['custom'], mirrors
     };
-    onPlay(media, mirror.id);
+    onPlay(media, mirrors[0].id);
   }
   return <section className="mb-9 space-y-5" aria-label="Live TV IPTV channels">
     <div className="flex flex-wrap items-center justify-between gap-3">
