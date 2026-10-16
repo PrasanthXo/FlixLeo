@@ -631,9 +631,26 @@ private fun BrowseScreen(state: FlixState, tv: Boolean) {
                 group.forEach { title ->
                     Box(Modifier.weight(1f)) {
                         Column(Modifier.fillMaxWidth().clickable { state.open(title) }) {
-                            AsyncImage(title.poster, title.title, contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxWidth().height(161.dp)
-                                    .clip(RoundedCornerShape(12.dp)).background(Card))
+                            Box(Modifier.fillMaxWidth().height(161.dp)
+                                .clip(RoundedCornerShape(12.dp)).background(Card)) {
+                                AsyncImage(model = title.poster, contentDescription = title.title,
+                                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                                    listOf(Color.Transparent, Color(0xB9000000)), startY = 75f)))
+                                Text(if (tv) "SERIES" else "MOVIE",
+                                    fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Gold,
+                                    modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
+                                        .background(Color(0xD9111827), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 6.dp, vertical = 3.dp))
+                                title.genres.firstOrNull { it.isNotBlank() }?.let { genre ->
+                                    Text(genre, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                                        color = Color.White, maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.align(Alignment.BottomStart).padding(6.dp)
+                                            .background(Color(0xDD111827), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 7.dp, vertical = 4.dp))
+                                }
+                            }
                             Text(title.title, fontSize = 11.sp, color = Color.White,
                                 maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Row(verticalAlignment = Alignment.CenterVertically) {
