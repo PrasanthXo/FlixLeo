@@ -13,6 +13,7 @@ import org.videolan.libvlc.util.VLCVideoLayout
 
 /** All three player presentations share ONE libVLC instance and ONE video surface. */
 enum class PlayerMode { CLOSED, BIG, MINI, FULLSCREEN }
+enum class DecoderMode { AUTO, HARDWARE, SOFTWARE }
 
 data class AudioChoice(val id: Int, val label: String)
 
@@ -29,6 +30,9 @@ class InlineVlcController(context: Context) {
     private var closing = false
     private var playbackStarted = false
     private var recoveryUsed = false
+    var decoderMode by mutableStateOf(DecoderMode.AUTO)
+        private set
+    private var softwareFallback = false
     private var activeStream: FlixStream? = null
     private var activeResume = 0.0
     private var retryTask: Runnable? = null
@@ -47,6 +51,7 @@ class InlineVlcController(context: Context) {
         val stream = activeStream
         if (!recoveryUsed && stream != null && mode != PlayerMode.CLOSED) {
             recoveryUsed = true
+            if (decoderMode == DecoderMode.AUTO) softwareFallback = true
             problem = "Recovering video playback…"
             val saved = if (position > 0) position / 1000.0 else activeResume
             val task = Runnable { if (!closing) start(stream, title, saved, true) }
@@ -125,6 +130,17 @@ class InlineVlcController(context: Context) {
         }
     }
 
+    fun chooseDecoder(mode: DecoderMode) {
+        decoderMode = mode
+        softwareFallback = mode == DecoderMode.SOFTWARE
+        diagnose("decoder_selection_${mode.name}")
+        val stream = activeStream ?: return
+        if (this.mode != PlayerMode.CLOSED) {
+            val at = if (position > 0) position / 1000.0 else activeResume
+            start(stream, title, at)
+        }
+    }
+
     fun start(stream: FlixStream, displayTitle: String, resumeSeconds: Double = 0.0, recovering: Boolean = false) {
         if (Uri.parse(stream.url).scheme != "https") {
             onError("Only HTTPS video sources are supported")
@@ -133,6 +149,7 @@ class InlineVlcController(context: Context) {
         stop(notifyProgress = !recovering)
         closing = false
         recoveryUsed = recovering
+        if (!recovering) softwareFallback = decoderMode == DecoderMode.SOFTWARE
         activeStream = stream
         activeResume = resumeSeconds
         playbackStarted = false
@@ -154,11 +171,7 @@ class InlineVlcController(context: Context) {
             val cacheMs = networkCacheMs(stream)
             // Reuse the VLC library across server changes; repeated native library shutdown
             // and recreation can race Android surface/decoder teardown and crash the app.
-            val vlc = libVlc ?: LibVLC(appContext, arrayListOf(
-                "--audio-time-stretch",
-                // Avoid broken device-specific MediaCodec colour buffers.
-                "--avcodec-hw=none"
-            )).also { libVlc = it }
+            val vlc = libVlc ?: LibVLC(appContext, arrayListOf("--audio-time-stretch")).also { libVlc = it }
             val video = MediaPlayer(vlc)
             engine = video
             video.setEventListener { event ->
@@ -204,12 +217,11 @@ class InlineVlcController(context: Context) {
                 }
             }
             val media = Media(vlc, Uri.parse(stream.url))
-            // Some Android hardware decoders produce green/macroblocked frames for
-            // certain sources. Prefer VLC's software decoder for stable rendering.
-            media.setHWDecoderEnabled(false, false)
-            // Set the software decoder preference at media level as well; this prevents
-            // automatic hardware fallback on devices with green-frame MediaCodec bugs.
-            media.addOption(":avcodec-hw=none")
+            val software = decoderMode == DecoderMode.SOFTWARE ||
+                (decoderMode == DecoderMode.AUTO && softwareFallback)
+            media.setHWDecoderEnabled(!software, false)
+            if (software) media.addOption(":avcodec-hw=none")
+            diagnose(if (software) "software_decoder" else "hardware_decoder")
             media.addOption(":network-caching=$cacheMs")
             media.addOption(":http-reconnect=true")
             video.setMedia(media)
