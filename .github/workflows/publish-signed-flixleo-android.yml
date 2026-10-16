@@ -1,11 +1,7 @@
 name: Build and publish signed FlixLeo Android APK
+# Legacy workflow disabled: signing is managed by private FlixLeo-Android-Releases.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'android-native/app/src/main/java/cyou/flixleo/android/MainActivity.kt'
-      - '.github/workflows/publish-signed-flixleo-android.yml'
 permissions:
   contents: read
 jobs:
