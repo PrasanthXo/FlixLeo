@@ -28,7 +28,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         video = InlineVlcController(this)
-        state = FlixState(FlixStore(applicationContext), FlixApi(), scope)
+        @Suppress("DEPRECATION")
+        val packageInfo = packageManager.getPackageInfo(packageName, 0)
+        val installedVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode.toInt()
+        } else {
+            packageInfo.versionCode
+        }
+        state = FlixState(FlixStore(applicationContext), FlixApi(), scope, installedVersionCode)
         state.onPlay = { title, stream ->
             state.dismissUpcoming()
             if (video.mode != PlayerMode.CLOSED) video.stop()
@@ -146,7 +153,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
-class FlixState(val store: FlixStore, private val api: FlixApi, private val scope: CoroutineScope) {
+class FlixState(val store: FlixStore, private val api: FlixApi, private val scope: CoroutineScope, private val installedVersionCode: Int) {
     var tab by mutableStateOf("Home")
     var message by mutableStateOf("")
     var loading by mutableStateOf(false)
@@ -209,7 +216,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         refresh()
         scope.launch {
             try {
-                val code = 6
+                val code = installedVersionCode
                 val result = api.call("/api/gateway/v1/check/flixleo-android?versionCode=$code")
                 if (result.optBoolean("ready")) {
                     val policy = result.optJSONObject("policy")
