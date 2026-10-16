@@ -287,11 +287,20 @@ class FlixApi {
                 groups.getOrPut(category) { mutableListOf() }.add(station)
             }
         }
-        return priority.mapNotNull { name ->
+        val combined = priority.mapNotNull { name ->
             groups[name]?.takeIf { it.isNotEmpty() }?.let {
                 LiveCategory(name, it.sortedBy { channel -> channel.name.lowercase() })
             }
         }
+        val plavio = runCatching {
+            call("/api/stremio/plavio/live/catalog").optJSONArray("catalogs").objects().map { row ->
+                LiveCategory(row.optString("name"), row.optJSONArray("items").objects().map { item ->
+                    LiveChannel(item.optString("id"), item.optString("type", row.optString("type", "tv")),
+                        item.optString("name"), item.optString("poster"))
+                })
+            }.filter { it.channels.isNotEmpty() }
+        }.getOrDefault(emptyList())
+        return combined + plavio
     }
     suspend fun liveStreams(channel: LiveChannel): List<FlixStream> {
         if (channel.type == "iptv") {
@@ -304,7 +313,8 @@ class FlixApi {
                 record?.optString("url").orEmpty()
             }
             if (url.isBlank()) return emptyList()
-            val json = JSONObject().put("url", url).put("name", channel.name).put("quality", "Auto")
+            val playbackUrl = if (url.startsWith("/api/")) root + url else url
+            val json = JSONObject().put("url", playbackUrl).put("name", channel.name).put("quality", "Auto")
             return listOfNotNull(FlixStream.parse(0, json))
         }
         return call("/api/stremio/plavio/live/streams?id=" + Uri.encode(channel.id) +
