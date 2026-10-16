@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.compose.runtime.*
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
@@ -27,6 +28,35 @@ class InlineVlcController(context: Context) {
     private var lastSavedAt = 0L
     private var closing = false
     private var playbackStarted = false
+    private var recoveryUsed = false
+    private var activeStream: FlixStream? = null
+    private var activeResume = 0.0
+    private var retryTask: Runnable? = null
+    var bufferPercent by mutableIntStateOf(0)
+        private set
+
+    private fun diagnose(event: String) {
+        // Never log stream URLs or access tokens.
+        Log.w("FlixLeoPlayer", "$event quality=$quality posMs=$position")
+    }
+
+    private fun failWithRecovery(reason: String) {
+        diagnose(reason)
+        buffering = false
+        playing = false
+        val stream = activeStream
+        if (!recoveryUsed && stream != null && mode != PlayerMode.CLOSED) {
+            recoveryUsed = true
+            problem = "Recovering video playback…"
+            val saved = if (position > 0) position / 1000.0 else activeResume
+            val task = Runnable { if (!closing) start(stream, title, saved, true) }
+            retryTask = task
+            handler.postDelayed(task, 700)
+        } else {
+            problem = "Playback failed. Select another server."
+            onError(problem)
+        }
+    }
 
     var mode by mutableStateOf(PlayerMode.CLOSED)
         private set
@@ -95,13 +125,16 @@ class InlineVlcController(context: Context) {
         }
     }
 
-    fun start(stream: FlixStream, displayTitle: String, resumeSeconds: Double = 0.0) {
+    fun start(stream: FlixStream, displayTitle: String, resumeSeconds: Double = 0.0, recovering: Boolean = false) {
         if (Uri.parse(stream.url).scheme != "https") {
             onError("Only HTTPS video sources are supported")
             return
         }
-        stop(notifyProgress = true)
+        stop(notifyProgress = !recovering)
         closing = false
+        recoveryUsed = recovering
+        activeStream = stream
+        activeResume = resumeSeconds
         playbackStarted = false
         title = displayTitle
         quality = stream.quality
@@ -109,6 +142,7 @@ class InlineVlcController(context: Context) {
         duration = 0
         playing = false
         buffering = true
+        bufferPercent = 0
         canSeek = false
         problem = ""
         aspect = 0
@@ -142,7 +176,10 @@ class InlineVlcController(context: Context) {
                             playing = false
                             onProgress(position, duration)
                         }
-                        MediaPlayer.Event.Buffering -> buffering = true
+                        MediaPlayer.Event.Buffering -> {
+                            bufferPercent = event.buffering.toInt().coerceIn(0, 100)
+                            buffering = bufferPercent < 100
+                        }
                         MediaPlayer.Event.EndReached -> {
                             // A failed server or unsupported high-bitrate decoder can send
                             // EndReached before a single frame is actually played.
@@ -155,15 +192,13 @@ class InlineVlcController(context: Context) {
                             } else {
                                 playing = false
                                 buffering = false
-                                problem = "This server stopped unexpectedly. Select another quality."
-                                onError(problem)
+                                failWithRecovery("premature_end")
                             }
                         }
                         MediaPlayer.Event.EncounteredError -> {
                             buffering = false
                             playing = false
-                            problem = "This server could not play. Choose another quality."
-                            onError(problem)
+                            failWithRecovery("decoder_or_stream_error")
                         }
                     }
                 }
@@ -271,6 +306,8 @@ class InlineVlcController(context: Context) {
         closing = true
         if (notifyProgress && position > 0) onProgress(position, duration)
         handler.removeCallbacks(ticker)
+        retryTask?.let { handler.removeCallbacks(it) }
+        retryTask = null
         pendingStart = false
         playbackStarted = false
         runCatching { engine?.setEventListener(null) }
@@ -285,6 +322,7 @@ class InlineVlcController(context: Context) {
         duration = 0L
         playing = false
         buffering = false
+        bufferPercent = 0
     }
     fun release() {
         stop(notifyProgress = false)
