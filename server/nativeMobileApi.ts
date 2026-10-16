@@ -91,8 +91,15 @@ router.post('/api/native/auth/signup', throttle, async (req, res) => {
 router.post('/api/native/auth/resend', throttle, async (req, res) => {
   const email = String(req.body?.email || '').trim();
   if (!/^.+@.+\..+$/.test(email)) return res.status(400).json({ error: 'Enter your email address.' });
-  await remote('/auth/v1/resend?redirect_to=' + encodeURIComponent('https://flixleo.cyou/?native_email_confirmed=1'), { method: 'POST', body: JSON.stringify({ type: 'signup', email }) });
-  return res.json({ success: true, message: 'If eligible, a verification email has been sent.' });
+  const result = await remote('/auth/v1/resend?redirect_to=' + encodeURIComponent('https://flixleo.cyou/?native_email_confirmed=1'), { method: 'POST', body: JSON.stringify({ type: 'signup', email }) });
+  if (!result.ok) {
+    const detail = message(result);
+    // Surface SMTP misconfiguration, unauthorized addresses and rate limits instead
+    // of telling the Android user that an email was sent.
+    const status = result.status === 429 ? 429 : result.status >= 500 ? 503 : 400;
+    return res.status(status).json({ error: detail, code: result.status === 429 ? 'email_rate_limited' : 'email_delivery_failed' });
+  }
+  return res.json({ success: true, message: 'Verification email requested. Check your inbox and spam folder.' });
 });
 router.post('/api/native/auth/recover', throttle, async (req, res) => {
   const email = String(req.body?.email || '').trim();
