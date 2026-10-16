@@ -210,11 +210,23 @@ private fun NativeVideoSurface(
                 }
             )
         })
-        if (player.buffering && !player.playing && !player.inPictureInPicture) {
-            CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center).size(if (mode == PlayerMode.MINI) 22.dp else 40.dp),
-                color = GoldPlayer, strokeWidth = 3.dp
-            )
+        if (player.buffering && !player.inPictureInPicture) {
+            val compact = mode == PlayerMode.MINI
+            Box(Modifier.align(Alignment.Center)
+                .size(if (compact) 54.dp else 96.dp)
+                .background(Color(0xDD0C1320), RoundedCornerShape(22.dp)),
+                contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { player.bufferPercent.coerceIn(0, 100) / 100f },
+                    modifier = Modifier.size(if (compact) 42.dp else 76.dp),
+                    color = GoldPlayer,
+                    trackColor = Color.DarkGray,
+                    strokeWidth = if (compact) 3.dp else 5.dp
+                )
+                Text("${player.bufferPercent.coerceIn(0, 100)}%",
+                    color = Color.White, fontSize = if (compact) 11.sp else 19.sp,
+                    fontWeight = FontWeight.Bold)
+            }
         }
         if (player.problem.isNotBlank() && mode != PlayerMode.MINI) {
             Text(player.problem, color = Color(0xFFFF7777), fontSize = 12.sp,
