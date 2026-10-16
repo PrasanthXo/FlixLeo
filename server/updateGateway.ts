@@ -107,6 +107,20 @@ async function getLatestPublicSignedAndroid(): Promise<AndroidRelease | null> {
     url: 'https://github.com/PrasanthXo/FlixLeo/releases/download/android-v1.6.15/FlixLeo-Android-v1.6.15-signed.apk'
   };
   if (!release || release.versionCode < verifiedFallback.versionCode) release = verifiedFallback;
+  // Probe the public v1.6.16 asset directly. GitHub's paged Releases API can
+  // omit it or be rate limited even when the published APK itself is healthy.
+  // Never advertise a newer installer unless its anonymous URL is reachable.
+  const nextUrl = 'https://github.com/PrasanthXo/FlixLeo/releases/download/android-v1.6.16/FlixLeo-Android-v1.6.16-signed.apk';
+  if (release.versionCode < 100016) {
+    try {
+      const checked = await fetch(nextUrl, { method: 'HEAD', redirect: 'follow',
+        headers: { 'User-Agent': 'FlixLeo-Android-Update-Gateway' },
+        signal: AbortSignal.timeout(8000) });
+      if (checked.ok && !checked.url.includes('/login')) {
+        release = { version: '1.6.16', versionCode: 100016, url: nextUrl };
+      }
+    } catch { /* Do not advertise a possibly missing asset. */ }
+  }
   androidReleaseCache = { expires: Date.now() + 120000, release };
   return release;
 }
