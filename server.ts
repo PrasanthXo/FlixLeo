@@ -969,37 +969,13 @@ async function iptvGetChannels(): Promise<IptvChannel[]> {
   if (iptvCache && iptvCache.until > Date.now()) return iptvCache.channels;
   if (iptvPending) return iptvPending;
   iptvPending = (async () => {
-    // Load the user-supplied Sri Lanka playlist before global providers.
-    let uploadedLocal: IptvChannel[] = [];
-    try {
-      const { readFile } = await import('node:fs/promises');
-      const payload = await readFile(new URL('./server/data/sri-lanka-upload.m3u', import.meta.url), 'utf8');
-      let info = '';
-      for (const raw of payload.split(/\r?\n/)) {
-        const line = raw.trim();
-        if (line.startsWith('#EXTINF:')) { info = line; continue; }
-        if (!info || !line || line.startsWith('#')) continue;
-        const url = iptvHttps(line.replace(/([?&])checkedby:iptvcat[.]net(?=&|$)/gi, '$1').replace(/[?&]$/, ''));
-        if (url) {
-          uploadedLocal.push({ id: '', url,
-            name: ((info.includes(',') ? info.slice(info.indexOf(',') + 1).trim() : '') || 'Sri Lanka Channel').slice(0, 120),
-            logo: iptvHttps(iptvAttribute(info, 'tvg-logo')),
-            category: 'Entertainment', language: iptvAttribute(info, 'tvg-language') || 'Unknown',
-            country: 'LK' });
-        }
-        info = '';
-      }
-    } catch (error) { console.warn('Sri Lanka playlist unavailable:', error); }
     const result = await Promise.allSettled(IPTV_PLAYLISTS.map(p => iptvFetchPlaylist(p.url, p.fallbackLanguage)));
     const seen = new Set<string>();
     const channels: IptvChannel[] = [];
-    for (const channel of uploadedLocal) {
-      if (!seen.has(channel.url)) { seen.add(channel.url); channels.push({ ...channel, id: String(channels.length) }); }
-    }
     for (const response of result) {
       if (response.status !== 'fulfilled') continue;
       for (const channel of response.value) {
-        const key = channel.url.replace(/([?&])checkedby:iptvcat[.]net(?=&|$)/gi, '$1').replace(/[?&]$/, '');
+        const key = channel.url;
         if (seen.has(key)) continue;
         seen.add(key);
         channels.push({ ...channel, id: String(channels.length) });
