@@ -36,7 +36,7 @@ jobs:
         run: |
           # Logo 2.0 uses flixleo_brand.png; Android sees WebP and PNG as one resource.
           rm -f android-native/app/src/main/res/drawable/flixleo_brand.webp
-      # Trigger debug build for Media3 primary player + VLC fallback integration.
+      # Debug APK rebuild: Media3 HTTP/DNS/TLS playback diagnostics.
       - name: Build Android debug APK
         working-directory: android-native
         run: gradle --no-daemon :app:assembleDebug
