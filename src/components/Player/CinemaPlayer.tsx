@@ -45,6 +45,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const mirrors = (media.mirrors || []).filter(m => !/^https?:\/\/embed\.su(?:\/|$)/i.test(m.url));
   const [index, setIndex] = useState(() => Math.max(0, mirrors.findIndex(m => m.id === (initialMirrorId || (() => { try { const rows = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]'); const saved = Array.isArray(rows) ? rows.find((row: any) => row?.media && resumeKey(row.media) === resumeKey(media)) : undefined; return saved?.mirrorId && mirrors.some(m => m.id === saved.mirrorId) ? saved.mirrorId : undefined; } catch { return undefined; } })()))));
   const [tried, setTried] = useState<number[]>([]);
+  const isIptvLive = media.id.startsWith('iptv-');
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
   const [qualityLevels, setQualityLevels] = useState<{ level: number; height: number }[]>([]);
@@ -132,13 +133,13 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
       const next = mirrors.findIndex((_, i) => !attempted.has(i));
       setTried([...attempted]);
       if (next < 0) {
-        setError('No working server could be confirmed. Select a server below to retry.');
+        setError(isIptvLive ? 'This live channel could not play in your browser. Try a backup stream below; some IPTV streams require a native player.' : 'No working server could be confirmed. Select a server below to retry.');
         return current;
       }
       setError('Current server failed. Trying another available server…');
       return next;
     });
-  }, [mirrors, tried]);
+  }, [mirrors, tried, isIptvLive]);
 
   const switchServer = (next: number) => {
     if (!mirrors[next]) return;
@@ -164,18 +165,19 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
     let disposed = false;
     const timeout = window.setTimeout(() => {
       if (!disposed && video.readyState < 2) autoAdvance();
-    }, 16000);
+    }, isIptvLive ? 45000 : 16000);
     const videoFailure = () => { if (!disposed) autoAdvance(); };
+    let liveRecoveries = 0;
     const working = () => { setReady(true); setError(''); };
     video.addEventListener('error', videoFailure);
     video.addEventListener('playing', working);
     video.addEventListener('loadeddata', working);
     const url = active.url;
     if (active.streamType === 'hls' || /\.m3u8(?:\?|$)/i.test(url)) {
-      if (typeof (window as any).ManagedMediaSource !== 'undefined' && video.canPlayType('application/vnd.apple.mpegurl')) {
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
       } else if (Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true, capLevelToPlayerSize: true, startLevel: -1, maxBufferLength: 20, maxMaxBufferLength: 45, backBufferLength: 20, startFragPrefetch: true });
+        const hls = new Hls({ enableWorker: true, capLevelToPlayerSize: true, startLevel: -1, maxBufferLength: isIptvLive ? 12 : 20, maxMaxBufferLength: isIptvLive ? 25 : 45, backBufferLength: isIptvLive ? 6 : 20, liveSyncDurationCount: 3, startFragPrefetch: true });
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (disposed) return;
           setQualityLevels(hls.levels.map((level, i) => ({ level: i, height: level.height })).filter(level => level.height > 0).sort((a, b) => b.height - a.height));
@@ -184,7 +186,12 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
         hls.loadSource(url);
         hls.attachMedia(video);
         hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal && !disposed) videoFailure();
+          if (!data.fatal || disposed) return;
+          if (isIptvLive && liveRecoveries++ < 2) {
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) { hls.startLoad(); return; }
+            if (data.type === Hls.ErrorTypes.MEDIA_ERROR) { hls.recoverMediaError(); return; }
+          }
+          videoFailure();
         });
       } else {
         videoFailure();
