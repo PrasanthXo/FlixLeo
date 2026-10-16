@@ -51,7 +51,12 @@ class InlineVlcController(context: Context) {
         val stream = activeStream
         if (!recoveryUsed && stream != null && mode != PlayerMode.CLOSED) {
             recoveryUsed = true
-            if (decoderMode == DecoderMode.AUTO) softwareFallback = true
+            // A failed network request at 0:00 is not evidence of a decoder failure.
+            // Preserve hardware 4K decoding for startup retries; switch only after
+            // playback has actually started and the decoder subsequently fails.
+            if (decoderMode == DecoderMode.AUTO && (playbackStarted || position > 0L)) {
+                softwareFallback = true
+            }
             problem = "Recovering video playback…"
             val saved = if (position > 0) position / 1000.0 else activeResume
             val task = Runnable { if (!closing) start(stream, title, saved, true) }
