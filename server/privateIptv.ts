@@ -84,14 +84,18 @@ async function refresh() {
         if (!safeExternal(line) || !isLive(info, line)) { info = ''; continue; }
         const name = (info.includes(',') ? info.slice(info.indexOf(',') + 1).trim() : '') || attr(info, 'tvg-name') || 'Live TV';
         const tvgId = attr(info, 'tvg-id');
+        const genre = category(info);
+        const country = attr(info, 'tvg-country');
+        const language = attr(info, 'tvg-language') || 'Unknown';
+        const logo = attr(info, 'tvg-logo');
         const key = (tvgId ? 'id:' + tvgId.toLowerCase() : 'url:' + line);
         info = '';
         if (seen.has(key)) continue;
         seen.add(key);
         const id = randomBytes(14).toString('hex');
         next.set(id, { id, name: name.slice(0, 120), url: line,
-          category: category(info || raw), language: 'Unknown',
-          country: attr(raw, 'tvg-country'), logo: '' });
+          category: genre, language,
+          country, logo: logo.startsWith('https://') ? logo : '' });
         if (next.size >= CAP) break;
       }
       if (next.size >= CAP) break;
