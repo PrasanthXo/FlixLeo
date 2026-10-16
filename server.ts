@@ -924,13 +924,13 @@ type M3uChannel = { id: string; name: string; logo: string; category: string; co
 let m3uCache: { expires: number; channels: M3uChannel[] } | null = null;
 let m3uPending: Promise<M3uChannel[]> | null = null;
 function m3uAttribute(line: string, key: string): string {
-  const match = line.match(new RegExp('(?:^|\\s)' + key + '="([^"]*)"', 'i'));
+  const match = line.match(new RegExp('(?:^|\s)' + key + '="([^"]*)"', 'i'));
   return (match?.[1] || '').trim().slice(0, 120);
 }
 function m3uSafeUrl(raw: string): string {
   try {
     const u = new URL(raw.trim());
-    return (u.protocol === 'https:' && !u.username && !u.password && !/^(localhost|127\\.|0\\.|10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|169\\.254\\.)/i.test(u.hostname)) ? u.toString() : '';
+    return (u.protocol === 'https:' && !u.username && !u.password && !/^(localhost|127\.|0\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|169\.254\.)/i.test(u.hostname)) ? u.toString() : '';
   } catch { return ''; }
 }
 async function loadM3uChannels(): Promise<M3uChannel[]> {
@@ -948,7 +948,7 @@ async function loadM3uChannels(): Promise<M3uChannel[]> {
       if (Number(response.headers.get('content-length') || 0) > 8_000_000) throw new Error('Playlist too large');
       const payload = await response.text();
       if (payload.length > 8_000_000 || !payload.trimStart().startsWith('#EXTM3U')) throw new Error('Invalid M3U playlist');
-      const lines = payload.split(/\\r?\\n/);
+      const lines = payload.split(/\r?\n/);
       const channels: M3uChannel[] = [];
       let info = '';
       for (const raw of lines) {
