@@ -917,6 +917,73 @@ app.get('/api/stremio/audio-fix/:ticket', (req: Request, res: Response) => {
 // This cache is server-local and automatically expires.
 const stremioProviderCooldown = new Map<string, number>();
 
+
+/** Fixed-origin M3U catalog: no user-provided fetch URLs or arbitrary proxying. */
+const M3U_PLAYLIST_URL = 'https://tivimate.viulk.xyz/channels.m3u';
+type M3uChannel = { id: string; name: string; logo: string; category: string; country: string; url: string };
+let m3uCache: { expires: number; channels: M3uChannel[] } | null = null;
+let m3uPending: Promise<M3uChannel[]> | null = null;
+function m3uAttribute(line: string, key: string): string {
+  const match = line.match(new RegExp('(?:^|\\s)' + key + '="([^"]*)"', 'i'));
+  return (match?.[1] || '').trim().slice(0, 120);
+}
+function m3uSafeUrl(raw: string): string {
+  try {
+    const u = new URL(raw.trim());
+    return (u.protocol === 'https:' && !u.username && !u.password && !/^(localhost|127\\.|0\\.|10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|169\\.254\\.)/i.test(u.hostname)) ? u.toString() : '';
+  } catch { return ''; }
+}
+async function loadM3uChannels(): Promise<M3uChannel[]> {
+  if (m3uCache && m3uCache.expires > Date.now()) return m3uCache.channels;
+  if (m3uPending) return m3uPending;
+  m3uPending = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 16000);
+    try {
+      const response = await fetch(M3U_PLAYLIST_URL, {
+        headers: { Accept: 'audio/x-mpegurl, audio/mpegurl, text/plain, */*' },
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error('Playlist source returned HTTP ' + response.status);
+      if (Number(response.headers.get('content-length') || 0) > 8_000_000) throw new Error('Playlist too large');
+      const payload = await response.text();
+      if (payload.length > 8_000_000 || !payload.trimStart().startsWith('#EXTM3U')) throw new Error('Invalid M3U playlist');
+      const lines = payload.split(/\\r?\\n/);
+      const channels: M3uChannel[] = [];
+      let info = '';
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (line.startsWith('#EXTINF:')) { info = line; continue; }
+        if (!info || !line || line.startsWith('#')) continue;
+        const url = m3uSafeUrl(line);
+        if (url) {
+          const name = (info.slice(info.indexOf(',') + 1).trim() || m3uAttribute(info, 'tvg-name') || 'Live Channel').slice(0, 130);
+          const category = (m3uAttribute(info, 'group-title') || 'Other Channels').slice(0, 80);
+          const country = (m3uAttribute(info, 'tvg-country') || m3uAttribute(info, 'country') || 'Unknown Country').slice(0, 80);
+          const logo = m3uSafeUrl(m3uAttribute(info, 'tvg-logo'));
+          channels.push({ id: String(channels.length + 1), name, category, country, logo, url });
+        }
+        info = '';
+        if (channels.length >= 12000) break;
+      }
+      if (!channels.length) throw new Error('No supported HTTPS streams were found');
+      m3uCache = { expires: Date.now() + 10 * 60_000, channels };
+      return channels;
+    } finally { clearTimeout(timer); }
+  })();
+  try { return await m3uPending; } finally { m3uPending = null; }
+}
+app.get('/api/live/m3u/channels', async (_req: Request, res: Response) => {
+  try {
+    const channels = await loadM3uChannels();
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.json({ provider: 'M3U', channels });
+  } catch {
+    if (m3uCache?.channels.length) return res.json({ provider: 'M3U', channels: m3uCache.channels, stale: true });
+    res.status(503).json({ provider: 'M3U', channels: [], message: 'This playlist is currently unavailable.' });
+  }
+});
+
 const PLAVIOHD_BASE = 'https://plaviohd.vercel.app';
 // PlavioHD is an additive built-in provider; existing Render add-ons remain intact.
 // Preserve the actual grouping announced by PlavioHD's Stremio manifest.
