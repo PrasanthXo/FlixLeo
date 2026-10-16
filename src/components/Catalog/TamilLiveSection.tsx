@@ -4,6 +4,21 @@ import type { MediaItem, StreamMirror } from '../../types/stream';
 
 type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; logo: string; url: string };
 
+// Keep the Live TV browse menu compact while preserving every source channel.
+const LIVE_CATEGORIES = ['News', 'Sports', 'Entertainment', 'Movies & Series', 'Music', 'Kids', 'Documentary', 'Religious', 'Other'] as const;
+function compactCategory(raw: string): string {
+  const category = (raw || '').toLowerCase();
+  if (/news|current affairs|politic|business|finance|weather/.test(category)) return 'News';
+  if (/sport|football|cricket|soccer|racing/.test(category)) return 'Sports';
+  if (/movie|film|cinema|series|drama/.test(category)) return 'Movies & Series';
+  if (/music|radio|audio/.test(category)) return 'Music';
+  if (/kid|child|cartoon|animation|family/.test(category)) return 'Kids';
+  if (/document|education|science|travel|nature|history|culture/.test(category)) return 'Documentary';
+  if (/religion|spiritual|faith|devotion|worship/.test(category)) return 'Religious';
+  if (/entertain|general|lifestyle|comedy|variety|classic|comedy|shop/.test(category)) return 'Entertainment';
+  return 'Other';
+}
+
 export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirrorId?: string) => void }) {
   const [channels, setChannels] = React.useState<TamilChannel[]>([]);
   const [category, setCategory] = React.useState('All Categories');
@@ -27,15 +42,21 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
 
   const isLocal = (channel: TamilChannel) => /^(LK|LKA|Sri Lanka)$/i.test(channel.country || '') ||
     /(?:^|[.])lk(?:[.]|$)/i.test(channel.name);
-  const categories = ['All Categories', ...Array.from(new Set(channels.map(c => c.category))).sort((a,b) => a.localeCompare(b))];
-  const shown = channels.filter(c => (category === 'All Categories' || c.category === category) &&
+  const categories = ['All Categories', ...LIVE_CATEGORIES];
+  const shown = channels.filter(c => (category === 'All Categories' || compactCategory(c.category) === category) &&
     c.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const local = shown.filter(isLocal).sort((a,b) => a.name.localeCompare(b.name));
   const other = shown.filter(c => !isLocal(c));
-  const groups = Object.entries(other.reduce<Record<string, TamilChannel[]>>((acc,c) => { (acc[c.category] ||= []).push(c); return acc; }, {}))
-    .sort(([a],[b]) => a.localeCompare(b))
-    .map(([name,items]) => [name, items.sort((a,b) => a.name.localeCompare(b.name))] as const);
-  const orderedGroups: Array<readonly [string, TamilChannel[]]> = [...(local.length ? [['Sri Lankan Channels',local] as const] : []),...groups];
+  const byCategory = other.reduce<Record<string, TamilChannel[]>>((acc,c) => {
+    (acc[compactCategory(c.category)] ||= []).push(c);
+    return acc;
+  }, {});
+  const groups = LIVE_CATEGORIES.filter(name => byCategory[name]?.length)
+    .map(name => [name, byCategory[name].sort((a,b) => a.name.localeCompare(b.name))] as const);
+  const orderedGroups: Array<readonly [string, TamilChannel[]]> = [
+    ...(local.length ? [['Sri Lankan Channels', local] as const] : []),
+    ...groups
+  ];
   function play(channel: TamilChannel) {
     const mirror: StreamMirror = {
       id: 'iptv-' + channel.id, label: channel.name, url: channel.url,
