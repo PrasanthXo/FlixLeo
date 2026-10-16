@@ -254,17 +254,63 @@ class FlixApi {
                 }
             }
     }
-    suspend fun liveCategories(): List<LiveCategory> =
-        call("/api/stremio/plavio/live/catalog").optJSONArray("catalogs").objects().map { row ->
-            LiveCategory(row.optString("name"), row.optJSONArray("items").objects().map { item ->
-                LiveChannel(item.optString("id"), item.optString("type", row.optString("type", "tv")),
-                    item.optString("name"), item.optString("poster"))
-            })
-        }.filter { it.channels.isNotEmpty() }
-    suspend fun liveStreams(channel: LiveChannel): List<FlixStream> =
-        call("/api/stremio/plavio/live/streams?id=" + Uri.encode(channel.id) +
+    suspend fun liveCategories(): List<LiveCategory> {
+        val groups = linkedMapOf<String, MutableList<LiveChannel>>()
+        val priority = listOf("Sports", "News", "Entertainment", "Movies & Series", "Music",
+            "Kids", "Documentary", "Religious", "Other")
+        fun group(raw: String): String {
+            val g = raw.lowercase()
+            return when {
+                Regex("sport|cricket|football|soccer|racing").containsMatchIn(g) -> "Sports"
+                Regex("news|politic|business|finance|weather").containsMatchIn(g) -> "News"
+                Regex("movie|film|cinema|series|drama").containsMatchIn(g) -> "Movies & Series"
+                Regex("music|radio|audio").containsMatchIn(g) -> "Music"
+                Regex("kid|child|cartoon|animation|family").containsMatchIn(g) -> "Kids"
+                Regex("document|education|science|travel|nature|history").containsMatchIn(g) -> "Documentary"
+                Regex("religion|faith|spiritual|worship").containsMatchIn(g) -> "Religious"
+                Regex("entertain|general|comedy|variety|lifestyle").containsMatchIn(g) -> "Entertainment"
+                else -> "Other"
+            }
+        }
+        val known = mutableSetOf<String>()
+        for (endpoint in listOf("/api/live/tamil/channels", "/api/live/private/channels")) {
+            val catalog = runCatching { call(endpoint).optJSONArray("channels").objects() }.getOrDefault(emptyList())
+            for (item in catalog) {
+                val name = item.optString("name").trim()
+                val id = item.optString("id")
+                if (name.isEmpty() || id.isEmpty()) continue
+                val key = name.lowercase() + "|" + item.optString("country").lowercase()
+                if (!known.add(key)) continue
+                val origin = if (endpoint.contains("private")) "private:" else "iptv:"
+                val category = group(item.optString("category"))
+                val station = LiveChannel(origin + id, "iptv", name, item.optString("logo"))
+                groups.getOrPut(category) { mutableListOf() }.add(station)
+            }
+        }
+        return priority.mapNotNull { name ->
+            groups[name]?.takeIf { it.isNotEmpty() }?.let {
+                LiveCategory(name, it.sortedBy { channel -> channel.name.lowercase() })
+            }
+        }
+    }
+    suspend fun liveStreams(channel: LiveChannel): List<FlixStream> {
+        if (channel.type == "iptv") {
+            val id = channel.id
+            val url = if (id.startsWith("private:")) {
+                call("/api/live/private/channel/" + Uri.encode(id.removePrefix("private:"))).optString("url")
+            } else {
+                val record = call("/api/live/tamil/channels").optJSONArray("channels").objects()
+                    .firstOrNull { it.optString("id") == id.removePrefix("iptv:") }
+                record?.optString("url").orEmpty()
+            }
+            if (url.isBlank()) return emptyList()
+            val json = JSONObject().put("url", url).put("name", channel.name).put("quality", "Auto")
+            return listOfNotNull(FlixStream.parse(json, 0))
+        }
+        return call("/api/stremio/plavio/live/streams?id=" + Uri.encode(channel.id) +
                 "&type=" + Uri.encode(channel.type)).optJSONArray("streams").objects()
             .mapIndexedNotNull(FlixStream::parse).distinctBy { it.url }
+    }
     suspend fun episodes(title: FlixTitle): List<FlixEpisode> {
         val full = details(title)
         return full.json.optJSONArray("seasons").objects().flatMap { season ->
