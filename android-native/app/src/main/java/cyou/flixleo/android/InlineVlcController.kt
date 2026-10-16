@@ -227,7 +227,8 @@ class InlineVlcController(context: Context) {
         controlsVisible = true
         mode = PlayerMode.BIG
         try {
-            if (!recovering && !media3Failed) {
+            // Explicit Software mode retains VLC's CPU decoder; Auto and Hardware use Media3.
+            if (!recovering && !media3Failed && decoderMode != DecoderMode.SOFTWARE) {
                 startMedia3(stream, resumeSeconds)
                 handler.removeCallbacks(ticker)
                 handler.post(ticker)
