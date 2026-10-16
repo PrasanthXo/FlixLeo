@@ -922,9 +922,10 @@ const stremioProviderCooldown = new Map<string, number>();
 const IPTV_PLAYLISTS = [
   { url: 'https://iptv-org.github.io/iptv/countries/lk.m3u', fallbackLanguage: 'Unknown', fallbackCountry: 'LK' },
   { url: 'https://iptv-org.github.io/iptv/languages/tam.m3u', fallbackLanguage: 'Tamil', fallbackCountry: '' },
-  { url: 'https://iptv-org.github.io/iptv/index.m3u', fallbackLanguage: 'Unknown', fallbackCountry: '' }
+  { url: 'https://iptv-org.github.io/iptv/index.m3u', fallbackLanguage: 'Unknown', fallbackCountry: '' },
+  { url: 'https://tivimate.viulk.xyz/channels.m3u', fallbackLanguage: 'Unknown', fallbackCountry: '' }
 ] as const;
-type IptvChannel = { id: string; name: string; logo: string; category: string; language: string; country: string; tvgId: string; url: string };
+type IptvChannel = { id: string; name: string; logo: string; category: string; language: string; country: string; tvgId: string; url: string; alternateUrls?: string[] };
 let iptvCache: { until: number; channels: IptvChannel[] } | null = null;
 let iptvPending: Promise<IptvChannel[]> | null = null;
 function iptvAttribute(line: string, key: string): string {
@@ -973,27 +974,31 @@ async function iptvGetChannels(): Promise<IptvChannel[]> {
   iptvPending = (async () => {
     const result = await Promise.allSettled(IPTV_PLAYLISTS.map(p => iptvFetchPlaylist(p.url, p.fallbackLanguage, p.fallbackCountry)));
     const seenUrls = new Set<string>();
-    const seenIds = new Set<string>();
-    const seenNames = new Set<string>();
+    const identified = new Map<string, IptvChannel>();
     const channels: IptvChannel[] = [];
-    // Sri Lankan channels take precedence, followed by Tamil and then worldwide listings.
     for (const response of result) {
       if (response.status !== 'fulfilled') continue;
       for (const channel of response.value) {
         const urlKey = channel.url.replace(/#.*$/, '');
-        const idKey = channel.tvgId.toLowerCase();
-        const normalizedName = channel.name.toLowerCase()
-          .replace(/\\([^)]*(?:\\d{3,4}p|hd|sd|fhd|4k)[^)]*\\)/gi, '')
-          .replace(/\\b(?:hd|sd|fhd|4k|1080p|720p|480p|360p)\\b/gi, '')
-          .replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim();
-        const nameKey = normalizedName.length >= 4
-          ? normalizedName + '|' + (channel.country || channel.language).toLowerCase() : '';
-        if (seenUrls.has(urlKey) || (idKey && seenIds.has(idKey)) ||
-            (nameKey && seenNames.has(nameKey))) continue;
+        if (seenUrls.has(urlKey)) continue;
         seenUrls.add(urlKey);
-        if (idKey) seenIds.add(idKey);
-        if (nameKey) seenNames.add(nameKey);
-        channels.push({ ...channel, id: String(channels.length) });
+        const idKey = channel.tvgId.toLowerCase();
+        const nameKey = channel.name.toLowerCase()
+          .replace(/\([^)]*(?:\d{3,4}p|hd|sd|fhd|4k)[^)]*\)/gi, '')
+          .replace(/\b(?:hd|sd|fhd|4k|1080p|720p|480p|360p)\b/gi, '')
+          .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+        const identity = idKey ? 'id:' + idKey : nameKey.length >= 4
+          ? 'name:' + nameKey + '|' + (channel.country || channel.language).toLowerCase() : '';
+        const existing = identity ? identified.get(identity) : undefined;
+        if (existing) {
+          // Retain distinct compatible HTTPS alternatives for the same channel.
+          const urls = existing.alternateUrls ||= [];
+          if (existing.url !== channel.url && !urls.includes(channel.url) && urls.length < 5) urls.push(channel.url);
+          continue;
+        }
+        const saved = { ...channel, id: String(channels.length) };
+        channels.push(saved);
+        if (identity) identified.set(identity, saved);
       }
     }
     if (!channels.length) throw Error('No playlists available');
