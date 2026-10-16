@@ -38,7 +38,8 @@ class MainActivity : ComponentActivity() {
         state = FlixState(FlixStore(applicationContext), FlixApi(), scope, installedVersionCode)
         state.onPlay = { title, stream ->
             state.dismissUpcoming()
-            if (video.mode != PlayerMode.CLOSED) video.stop()
+            // InlineVlcController.start() performs the one required stop itself.
+            // Avoid double stop/detach/release during high-bitrate server changes.
             currentPlayback = title to stream
             val resume = state.store.history.find { it.key == state.entryKey(title) }?.progress ?: 0.0
             state.playingTitle = title
