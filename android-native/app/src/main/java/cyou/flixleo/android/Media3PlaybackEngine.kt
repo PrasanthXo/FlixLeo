@@ -10,6 +10,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.ui.PlayerView
@@ -17,8 +18,7 @@ import androidx.media3.ui.PlayerView
 /**
  * Isolated Media3 playback engine for FlixLeo.
  *
- * This is an additive integration stage: the existing VLC player remains the
- * production renderer until the shared player overlay and controls are bridged.
+ * Media3 is the primary engine, with the existing VLC engine retained as fallback.
  * No URL, request headers, or authorization tokens are emitted to logs.
  */
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -66,11 +66,22 @@ internal class Media3PlaybackEngine(context: Context) {
             .setEnableDecoderFallback(true)
         val dataSourceFactory = DefaultDataSource.Factory(applicationContext)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                30_000, // target minimum buffer during network variation
+                90_000, // cap retained ahead buffer to limit memory use
+                1_500,  // start after 1.5 seconds; no forced 30-second wait
+                3_000   // recover from stalls after 3 seconds are buffered
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
         val created = ExoPlayer.Builder(applicationContext, renderers)
+            .setLoadControl(loadControl)
             .setMediaSourceFactory(mediaSourceFactory)
             .build()
         player = created
         boundView?.player = created
+        onBuffering(true, 0)
         created.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (generation != thisGeneration) return
