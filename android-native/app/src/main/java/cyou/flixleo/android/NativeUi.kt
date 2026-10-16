@@ -1266,6 +1266,9 @@ private fun AccountDialog(state: FlixState) {
                     if (state.authError.isNotBlank()) {
                         Text(state.authError, color = Color(0xFFFDA4AF), fontSize = 12.sp)
                     }
+                    if (state.authSuccess.isNotBlank()) {
+                        Text(state.authSuccess, color = Color(0xFF86EFAC), fontSize = 12.sp)
+                    }
                 }
             },
             confirmButton = {
@@ -1276,7 +1279,7 @@ private fun AccountDialog(state: FlixState) {
                 }) { Text(if (state.accountBusy) "Sending…" else "Send reset link") }
             },
             dismissButton = {
-                TextButton(onClick = { showPasswordReset = false; state.authError = "" }) { Text("Back") }
+                TextButton(onClick = { showPasswordReset = false; state.authError = ""; state.authSuccess = "" }) { Text("Back") }
             }
         )
     } else AlertDialog(onDismissRequest = { state.showAuth = false },
@@ -1294,6 +1297,11 @@ private fun AccountDialog(state: FlixState) {
                     Checkbox(agreed, onCheckedChange = { agreed = it })
                     Text("I agree to the Terms & Privacy Policy", fontSize = 11.sp)
                 }
+                if (state.authSuccess.isNotBlank()) {
+                    Text(state.authSuccess, fontSize = 12.sp, color = Color(0xFF86EFAC),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF123727)).padding(11.dp))
+                }
                 if (state.authError.isNotBlank()) {
                     Text(state.authError, fontSize = 12.sp,
                         color = Color(0xFFFDA4AF),
@@ -1303,13 +1311,15 @@ private fun AccountDialog(state: FlixState) {
                 TextButton(onClick = {
                     state.showSignup = !state.showSignup
                     state.authError = ""
+                    state.authSuccess = ""
                 }) {
                     Text(if (state.showSignup) "Already registered? Sign in" else "New user? Sign up")
                 }
-                TextButton(onClick = { state.emailAction(email, "resend") }) { Text("Resend verification email") }
+                TextButton(enabled = !state.accountBusy, onClick = { state.emailAction(email, "resend") }) { Text("Resend verification email") }
                 TextButton(onClick = {
                     recoveryEmail = email
                     state.authError = ""
+                    state.authSuccess = ""
                     showPasswordReset = true
                 }) { Text("Forgot password?") }
             }
