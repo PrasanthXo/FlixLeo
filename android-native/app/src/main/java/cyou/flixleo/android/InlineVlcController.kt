@@ -24,6 +24,7 @@ class InlineVlcController(context: Context) {
     var usingMedia3 by mutableStateOf(false)
         private set
     private var media3Failed = false
+    private var media3ErrorCode: Int? = null
     private var libVlc: LibVLC? = null
     private var engine: MediaPlayer? = null
     private var surface: VLCVideoLayout? = null
@@ -67,7 +68,11 @@ class InlineVlcController(context: Context) {
             retryTask = task
             handler.postDelayed(task, 700)
         } else {
-            problem = "Playback failed. Select another server."
+            problem = if (media3ErrorCode != null) {
+                "Playback failed (Media3 error ${media3ErrorCode}, VLC: $reason). Try another server."
+            } else {
+                "Playback failed (VLC: $reason). Try another server."
+            }
             onError(problem)
         }
     }
@@ -120,6 +125,7 @@ class InlineVlcController(context: Context) {
         media3.onEnded = { if (!closing) onCompleted() }
         media3.onFailed = { error ->
             if (!closing && usingMedia3) {
+                media3ErrorCode = error.errorCode
                 diagnose("media3_error_${error.errorCode}")
                 val lastPosition = media3.positionMs.takeIf { it > 0L } ?: position
                 val previous = if (lastPosition > 0L) lastPosition / 1000.0 else resumeSeconds
@@ -210,7 +216,7 @@ class InlineVlcController(context: Context) {
         // A transient CLOSED state can dispose VLCVideoLayout before reattachment.
         stop(notifyProgress = !recovering, keepSurfaceHost = true)
         closing = false
-        if (!recovering) media3Failed = false
+        if (!recovering) { media3Failed = false; media3ErrorCode = null }
         recoveryUsed = recovering
         if (!recovering) softwareFallback = decoderMode == DecoderMode.SOFTWARE
         activeStream = stream
