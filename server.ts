@@ -1080,7 +1080,15 @@ app.get('/api/stremio/streams', async (req: Request, res: Response) => {
       (type === 'series' && (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 1))) {
     return res.status(400).json({ error: 'Invalid title or episode', received: { type: String(type || ''), tmdb, season: Number.isFinite(season) ? season : null, episode: Number.isFinite(episode) ? episode : null } });
   }
-  const configured = [...new Set([...(process.env.STREMIO_ADDON_URLS || '').split(',').map(x => x.trim()).filter(Boolean), PLAVIOHD_BASE])].slice(0, 6);
+  // Use the requested configured HDHub add-on path, rather than a stale
+  // unconfigured HDHub root URL from Render's environment. Keep other add-ons.
+  const hdhubConfigured = 'https://hdhub.thevolecitor.qzz.io/eyJ0b3Jib3giOiJ1bnNldCIsInF1YWxpdGllcyI6IjIxNjBwLDEwODBwLDcyMHAiLCJzb3J0IjoiZGVzYyIsImNhdGFsb2dzIjoiIn0';
+  const envAddons = (process.env.STREMIO_ADDON_URLS || '').split(',').map(x => x.trim()).filter(Boolean)
+    .filter(value => {
+      try { return new URL(value).hostname !== 'hdhub.thevolecitor.qzz.io'; }
+      catch { return false; }
+    });
+  const configured = [...new Set([hdhubConfigured, ...envAddons, PLAVIOHD_BASE])].slice(0, 6);
   if (!configured.length) return res.json({ streams: [], configured: false, message: 'No add-ons configured on Render' });
   const providers = configured.flatMap(value => {
     try {
