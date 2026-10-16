@@ -1247,7 +1247,39 @@ private fun AccountDialog(state: FlixState) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var agreed by remember { mutableStateOf(false) }
-    AlertDialog(onDismissRequest = { state.showAuth = false },
+    var showPasswordReset by remember { mutableStateOf(false) }
+    var recoveryEmail by remember { mutableStateOf("") }
+    if (showPasswordReset) {
+        AlertDialog(
+            onDismissRequest = { if (!state.accountBusy) showPasswordReset = false },
+            title = { Text("Reset your password") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Enter your FlixLeo account email to receive a password reset link.")
+                    OutlinedTextField(
+                        value = recoveryEmail,
+                        onValueChange = { recoveryEmail = it },
+                        label = { Text("Email address") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    )
+                    if (state.authError.isNotBlank()) {
+                        Text(state.authError, color = Color(0xFFFDA4AF), fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(enabled = !state.accountBusy, onClick = {
+                    if (android.util.Patterns.EMAIL_ADDRESS.matcher(recoveryEmail.trim()).matches()) {
+                        state.emailAction(recoveryEmail.trim(), "recover")
+                    } else state.authError = "Enter a valid email address."
+                }) { Text(if (state.accountBusy) "Sending…" else "Send reset link") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPasswordReset = false; state.authError = "" }) { Text("Back") }
+            }
+        )
+    } else AlertDialog(onDismissRequest = { state.showAuth = false },
         title = { Text(if (state.showSignup) "Create FlixLeo account" else "Sign in to FlixLeo") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1275,7 +1307,11 @@ private fun AccountDialog(state: FlixState) {
                     Text(if (state.showSignup) "Already registered? Sign in" else "New user? Sign up")
                 }
                 TextButton(onClick = { state.emailAction(email, "resend") }) { Text("Resend verification email") }
-                TextButton(onClick = { state.emailAction(email, "recover") }) { Text("Forgot password?") }
+                TextButton(onClick = {
+                    recoveryEmail = email
+                    state.authError = ""
+                    showPasswordReset = true
+                }) { Text("Forgot password?") }
             }
         },
         confirmButton = {
