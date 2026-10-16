@@ -44,7 +44,7 @@ router.get('/api/download/android',async(_req:Request,res:Response)=>{
     items = await releases();
   } catch(error) {
     console.error('Android download: public GitHub Releases lookup failed',error);
-    return res.status(503).type('text/plain').send('Unable to check Android releases right now. Please try again shortly.');
+    return res.redirect(302,'https://github.com/PrasanthXo/FlixLeo/releases');
   }
   const candidates=items.flatMap(r=>{
     const m=/^android-v1\.5\.(\d+)$/.exec(r.tag);
@@ -57,7 +57,10 @@ router.get('/api/download/android',async(_req:Request,res:Response)=>{
   }).sort((a,b)=>b.version-a.version);
   if(candidates.length)return res.redirect(302,candidates[0].url);
   console.warn('Android download: no valid public signed Android release asset',items.map(r=>({tag:r.tag,assets:r.assets.map(a=>a.name)})));
-  return res.status(503).type('text/plain').send('No publicly published signed Android APK found. Check the FlixLeo GitHub Releases publishing job.');
+  // Never display an error page from an Android download button. If no public
+  // verified APK exists yet, let the visitor inspect public releases instead.
+  // Do not point at private release assets (anonymous users cannot download them).
+  return res.redirect(302,'https://github.com/PrasanthXo/FlixLeo/releases');
 });
 export function serveAppLanding(req:Request,res:Response,next:()=>void){
   // Only the apex is the download landing; web.flixleo.cyou remains the SPA.
