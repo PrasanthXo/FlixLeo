@@ -11,6 +11,7 @@ import { CinemaPlayer } from './components/Player/CinemaPlayer';
 import { HeroBanner } from './components/Catalog/HeroBanner';
 import { MobileHomeCollections } from './components/Catalog/MobileHomeCollections';
 import { PlavioLiveSection } from './components/Catalog/PlavioLiveSection';
+import { M3uLiveSection } from './components/Catalog/M3uLiveSection';
 import { MovieCard } from './components/Catalog/MovieCard';
 import { PosterOptions } from './components/Catalog/PosterOptions';
 import { SourceFilterBar } from './components/Catalog/SourceFilterBar';
@@ -1150,7 +1151,10 @@ export default function App() {
 
         {/* Live TV lives only in its own navigation destination. */}
         {currentTab === 'live' && (
-          <PlavioLiveSection onPlay={handlePlayMedia} />
+          <>
+            <M3uLiveSection onPlay={handlePlayMedia} />
+            <PlavioLiveSection onPlay={handlePlayMedia} />
+          </>
         )}
 
         {currentTab !== 'live' && <div className={(!isTvDisplay && currentTab === 'browse' && !searchQuery.trim() && sourceFilter === 'all') ? (isNativeAndroid ? 'flixleo-mobile-home-hide-legacy' : 'flixleo-mobile-home-hide-legacy flixleo-web-home-hide-legacy') : ''}>
