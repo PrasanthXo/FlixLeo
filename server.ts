@@ -923,7 +923,7 @@ const IPTV_PLAYLISTS = [
   { url: 'https://iptv-org.github.io/iptv/languages/tam.m3u', fallbackLanguage: 'Tamil' },
   { url: 'https://iptv-org.github.io/iptv/index.m3u', fallbackLanguage: 'Unknown' }
 ] as const;
-type IptvChannel = { id: string; name: string; logo: string; category: string; language: string; country: string; url: string };
+type IptvChannel = { id: string; name: string; logo: string; category: string; language: string; country: string; tvgId: string; url: string };
 let iptvCache: { until: number; channels: IptvChannel[] } | null = null;
 let iptvPending: Promise<IptvChannel[]> | null = null;
 function iptvAttribute(line: string, key: string): string {
@@ -955,9 +955,10 @@ async function iptvFetchPlaylist(url: string, fallbackLanguage: string): Promise
         const name = ((info.includes(',') ? info.slice(info.indexOf(',') + 1).trim() : '') || iptvAttribute(info, 'tvg-name') || 'Live Channel').slice(0, 120);
         const category = iptvAttribute(info, 'group-title') || 'Other Channels';
         const language = iptvAttribute(info, 'tvg-language') || fallbackLanguage;
-        const country = iptvAttribute(info, 'tvg-country') || (/(?:^|[.])lk(?:[.]|$)/i.test(iptvAttribute(info, 'tvg-id')) ? 'LK' : '');
+        const tvgId = iptvAttribute(info, 'tvg-id');
+        const country = iptvAttribute(info, 'tvg-country') || (/(?:^|[.])lk(?:[.]|$)/i.test(tvgId) ? 'LK' : '');
         channels.push({ id: '', name, logo: iptvHttps(iptvAttribute(info, 'tvg-logo')),
-          category, language, country, url: streamUrl });
+          category, language, country, tvgId, url: streamUrl });
       }
       info = '';
       if (channels.length >= 30000) break;
@@ -970,14 +971,27 @@ async function iptvGetChannels(): Promise<IptvChannel[]> {
   if (iptvPending) return iptvPending;
   iptvPending = (async () => {
     const result = await Promise.allSettled(IPTV_PLAYLISTS.map(p => iptvFetchPlaylist(p.url, p.fallbackLanguage)));
-    const seen = new Set<string>();
+    const seenUrls = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
     const channels: IptvChannel[] = [];
+    // Tamil playlist takes precedence because it appears first in IPTV_PLAYLISTS.
     for (const response of result) {
       if (response.status !== 'fulfilled') continue;
       for (const channel of response.value) {
-        const key = channel.url;
-        if (seen.has(key)) continue;
-        seen.add(key);
+        const urlKey = channel.url.replace(/#.*$/, '');
+        const idKey = channel.tvgId.toLowerCase();
+        const normalizedName = channel.name.toLowerCase()
+          .replace(/\\([^)]*(?:\\d{3,4}p|hd|sd|fhd|4k)[^)]*\\)/gi, '')
+          .replace(/\\b(?:hd|sd|fhd|4k|1080p|720p|480p|360p)\\b/gi, '')
+          .replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim();
+        const nameKey = normalizedName.length >= 4
+          ? normalizedName + '|' + (channel.country || channel.language).toLowerCase() : '';
+        if (seenUrls.has(urlKey) || (idKey && seenIds.has(idKey)) ||
+            (nameKey && seenNames.has(nameKey))) continue;
+        seenUrls.add(urlKey);
+        if (idKey) seenIds.add(idKey);
+        if (nameKey) seenNames.add(nameKey);
         channels.push({ ...channel, id: String(channels.length) });
       }
     }
