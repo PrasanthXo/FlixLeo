@@ -81,15 +81,19 @@ async function getLatestPublicSignedAndroid(): Promise<AndroidRelease | null> {
       const releases: any = await response.json();
       for (const item of Array.isArray(releases) ? releases : []) {
         if (item.draft || item.prerelease) continue;
-        const match = /^android-v1\.5\.(\d+)$/.exec(String(item.tag_name || ''));
+        // Private signing workflow publishes 1.6.x with code 100000 + run.
+        // Older signed 1.5.x builds use 1000 + run. Compare Android codes,
+        // not GitHub publication order, so every installed version sees upgrades.
+        const match = /^android-v1\.(5|6)\.(\d+)$/.exec(String(item.tag_name || ''));
         if (!match) continue;
+        const releaseName = '1.' + match[1] + '.' + match[2];
         const asset = (Array.isArray(item.assets) ? item.assets : []).find((a: any) =>
-          /^FlixLeo-Android-v1\.5\.\d+-signed\.apk$/i.test(String(a.name || '')) &&
+          String(a.name || '') === 'FlixLeo-Android-v' + releaseName + '-signed.apk' &&
           Number(a.size) > 8_000_000 && a.state === 'uploaded' &&
           /^https:\/\/github\.com\/PrasanthXo\/FlixLeo\/releases\/download\//i.test(String(a.browser_download_url || '')));
         if (!asset) continue;
         const candidate = { url: String(asset.browser_download_url),
-          version: '1.5.' + match[1], versionCode: 1000 + Number(match[1]) };
+          version: releaseName, versionCode: (match[1] === '6' ? 100000 : 1000) + Number(match[2]) };
         if (!release || candidate.versionCode > release.versionCode) release = candidate;
       }
     }
