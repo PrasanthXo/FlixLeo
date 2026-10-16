@@ -94,11 +94,17 @@ class MainActivity : ComponentActivity() {
     private fun handleEmailConfirmation(incoming: Intent?) {
         val uri = incoming?.data ?: return
         if (uri.scheme != "flixleo" || uri.host != "email-confirmed") return
-        state.showSignup = false
-        state.showAuth = true
-        state.authError = ""
-        state.notify("Mail confirmed. Sign in to FlixLeo.")
+        // Remove intent tokens immediately so activity re-creation cannot replay them.
         incoming.data = null
+        val access = uri.getQueryParameter("access_token").orEmpty()
+        val refresh = uri.getQueryParameter("refresh_token").orEmpty()
+        val kind = uri.getQueryParameter("type").orEmpty()
+        if (kind != "signup" || access.isBlank() || refresh.isBlank()) {
+            state.showAuth = true
+            state.notify("Mail confirmed. Sign in to FlixLeo.")
+            return
+        }
+        state.completeConfirmedEmailSignIn(access, refresh)
     }
     override fun onResume() {
         super.onResume()
