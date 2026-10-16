@@ -920,9 +920,9 @@ const stremioProviderCooldown = new Map<string, number>();
 
 
 const IPTV_PLAYLISTS = [
-  { url: 'https://iptv-org.github.io/iptv/countries/lk.m3u', fallbackLanguage: 'Unknown' },
-  { url: 'https://iptv-org.github.io/iptv/languages/tam.m3u', fallbackLanguage: 'Tamil' },
-  { url: 'https://iptv-org.github.io/iptv/index.m3u', fallbackLanguage: 'Unknown' }
+  { url: 'https://iptv-org.github.io/iptv/countries/lk.m3u', fallbackLanguage: 'Unknown', fallbackCountry: 'LK' },
+  { url: 'https://iptv-org.github.io/iptv/languages/tam.m3u', fallbackLanguage: 'Tamil', fallbackCountry: '' },
+  { url: 'https://iptv-org.github.io/iptv/index.m3u', fallbackLanguage: 'Unknown', fallbackCountry: '' }
 ] as const;
 type IptvChannel = { id: string; name: string; logo: string; category: string; language: string; country: string; tvgId: string; url: string };
 let iptvCache: { until: number; channels: IptvChannel[] } | null = null;
@@ -937,7 +937,7 @@ function iptvHttps(raw: string): string {
     return url.protocol === 'https:' && !url.username && !url.password ? url.href : '';
   } catch { return ''; }
 }
-async function iptvFetchPlaylist(url: string, fallbackLanguage: string): Promise<IptvChannel[]> {
+async function iptvFetchPlaylist(url: string, fallbackLanguage: string, fallbackCountry: string): Promise<IptvChannel[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 22000);
   try {
@@ -957,7 +957,7 @@ async function iptvFetchPlaylist(url: string, fallbackLanguage: string): Promise
         const category = iptvAttribute(info, 'group-title') || 'Other Channels';
         const language = iptvAttribute(info, 'tvg-language') || fallbackLanguage;
         const tvgId = iptvAttribute(info, 'tvg-id');
-        const country = iptvAttribute(info, 'tvg-country') || (/(?:^|[.])lk(?:[.]|$)/i.test(tvgId) ? 'LK' : '');
+        const country = iptvAttribute(info, 'tvg-country') || (/(?:^|[.])lk(?:[.]|$)/i.test(tvgId) ? 'LK' : fallbackCountry);
         channels.push({ id: '', name, logo: iptvHttps(iptvAttribute(info, 'tvg-logo')),
           category, language, country, tvgId, url: streamUrl });
       }
@@ -971,7 +971,7 @@ async function iptvGetChannels(): Promise<IptvChannel[]> {
   if (iptvCache && iptvCache.until > Date.now()) return iptvCache.channels;
   if (iptvPending) return iptvPending;
   iptvPending = (async () => {
-    const result = await Promise.allSettled(IPTV_PLAYLISTS.map(p => iptvFetchPlaylist(p.url, p.fallbackLanguage)));
+    const result = await Promise.allSettled(IPTV_PLAYLISTS.map(p => iptvFetchPlaylist(p.url, p.fallbackLanguage, p.fallbackCountry)));
     const seenUrls = new Set<string>();
     const seenIds = new Set<string>();
     const seenNames = new Set<string>();
