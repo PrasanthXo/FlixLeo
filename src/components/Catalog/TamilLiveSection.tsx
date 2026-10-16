@@ -81,7 +81,7 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
       id: 'iptv-' + channel.id + '-' + index,
       label: index === 0 ? channel.name : channel.name + ' · Backup ' + index,
       url, quality: 'Auto', source: 'custom',
-      streamType: channel.privateProvider || /\\.m3u8(?:$|[?#])/i.test(url) ? 'hls' : 'direct-video',
+      streamType: channel.privateProvider || /\.m3u8(?:$|[?#])/i.test(url) ? 'hls' : 'direct-video',
       isDirect: true
     }));
     const media: MediaItem = {
