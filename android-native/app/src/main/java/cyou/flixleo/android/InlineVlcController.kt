@@ -82,6 +82,19 @@ class InlineVlcController(context: Context) {
         }
     }
 
+    /** More prebuffering for high-bitrate VOD, but keep live channel latency low. */
+    private fun networkCacheMs(stream: FlixStream): Int {
+        val label = (stream.quality + " " + stream.name).lowercase()
+        val live = stream.id.startsWith("plavio-live-") ||
+            stream.url.contains(".m3u8", ignoreCase = true)
+        if (live) return 1500
+        return when {
+            Regex("""2160p|4k|uhd""").containsMatchIn(label) -> 5000
+            Regex("""1080p|fhd""").containsMatchIn(label) -> 3200
+            else -> 2200
+        }
+    }
+
     fun start(stream: FlixStream, displayTitle: String, resumeSeconds: Double = 0.0) {
         if (Uri.parse(stream.url).scheme != "https") {
             onError("Only HTTPS video sources are supported")
@@ -104,9 +117,10 @@ class InlineVlcController(context: Context) {
         controlsVisible = true
         mode = PlayerMode.BIG
         try {
+            val cacheMs = networkCacheMs(stream)
             // Reuse the VLC library across server changes; repeated native library shutdown
             // and recreation can race Android surface/decoder teardown and crash the app.
-            val vlc = libVlc ?: LibVLC(appContext, arrayListOf("--network-caching=1800", "--audio-time-stretch")).also { libVlc = it }
+            val vlc = libVlc ?: LibVLC(appContext, arrayListOf("--audio-time-stretch")).also { libVlc = it }
             val video = MediaPlayer(vlc)
             engine = video
             video.setEventListener { event ->
@@ -154,7 +168,8 @@ class InlineVlcController(context: Context) {
             // Some Android hardware decoders produce green/macroblocked frames for
             // certain sources. Prefer VLC's software decoder for stable rendering.
             media.setHWDecoderEnabled(false, false)
-            media.addOption(":network-caching=1800")
+            media.addOption(":network-caching=$cacheMs")
+            media.addOption(":http-reconnect=true")
             video.setMedia(media)
             media.release()
             pendingStart = true
