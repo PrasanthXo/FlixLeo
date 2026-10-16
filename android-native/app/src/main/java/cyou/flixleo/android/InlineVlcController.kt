@@ -20,6 +20,10 @@ data class AudioChoice(val id: Int, val label: String)
 class InlineVlcController(context: Context) {
     private val appContext = context.applicationContext
     private val handler = Handler(Looper.getMainLooper())
+    private val media3 = Media3PlaybackEngine(appContext)
+    var usingMedia3 by mutableStateOf(false)
+        private set
+    private var media3Failed = false
     private var libVlc: LibVLC? = null
     private var engine: MediaPlayer? = null
     private var surface: VLCVideoLayout? = null
@@ -98,6 +102,40 @@ class InlineVlcController(context: Context) {
     var onCompleted: () -> Unit = {}
     var onError: (String) -> Unit = {}
 
+    private fun startMedia3(stream: FlixStream, resumeSeconds: Double) {
+        usingMedia3 = true
+        media3.onBuffering = { isBuffering, percent ->
+            buffering = isBuffering
+            bufferPercent = percent
+        }
+        media3.onPlaying = {
+            playing = true
+            playbackStarted = true
+            buffering = false
+            problem = ""
+            trackRevision++
+        }
+        media3.onPaused = { playing = false }
+        media3.onTrackChanged = { trackRevision++ }
+        media3.onEnded = { if (!closing) onCompleted() }
+        media3.onFailed = { error ->
+            if (!closing && usingMedia3) {
+                diagnose("media3_error_${error.errorCode}")
+                val lastPosition = media3.positionMs.takeIf { it > 0L } ?: position
+                media3.stop()
+                usingMedia3 = false
+                media3Failed = true
+                problem = "Trying VLC compatibility playback…"
+                val previous = if (lastPosition > 0L) lastPosition / 1000.0 else resumeSeconds
+                start(stream, title, previous, recovering = true)
+            }
+        }
+        media3.play(stream.url, (resumeSeconds * 1000).toLong())
+    }
+
+    fun attachMedia3(view: androidx.media3.ui.PlayerView) = media3.attach(view)
+    fun detachMedia3(view: androidx.media3.ui.PlayerView) = media3.detach(view)
+
     private val ticker = object : Runnable {
         override fun run() {
             try {
@@ -117,7 +155,20 @@ class InlineVlcController(context: Context) {
                         onProgress(time, length)
                     }
                 }
-            } catch (_: Exception) { /* a transient libVLC stream state */ }
+                if (usingMedia3) {
+                    val length = media3.durationMs
+                    val time = media3.positionMs
+                    if (length > 0) duration = length
+                    position = time
+                    playing = media3.isPlaying
+                    canSeek = media3.canSeek
+                    if (buffering) bufferPercent = media3.bufferedPercent
+                    if (time > 0 && System.currentTimeMillis() - lastSavedAt >= 15000) {
+                        lastSavedAt = System.currentTimeMillis()
+                        onProgress(time, length)
+                    }
+                }
+            } catch (_: Exception) { /* a transient player state */ }
             handler.postDelayed(this, 500)
         }
     }
@@ -155,6 +206,7 @@ class InlineVlcController(context: Context) {
         // A transient CLOSED state can dispose VLCVideoLayout before reattachment.
         stop(notifyProgress = !recovering, keepSurfaceHost = true)
         closing = false
+        if (!recovering) media3Failed = false
         recoveryUsed = recovering
         if (!recovering) softwareFallback = decoderMode == DecoderMode.SOFTWARE
         activeStream = stream
@@ -175,6 +227,12 @@ class InlineVlcController(context: Context) {
         controlsVisible = true
         mode = PlayerMode.BIG
         try {
+            if (!recovering && !media3Failed) {
+                startMedia3(stream, resumeSeconds)
+                handler.removeCallbacks(ticker)
+                handler.post(ticker)
+                return
+            }
             val cacheMs = networkCacheMs(stream)
             // Reuse the VLC library across server changes; repeated native library shutdown
             // and recreation can race Android surface/decoder teardown and crash the app.
@@ -286,12 +344,14 @@ class InlineVlcController(context: Context) {
         if (mode == PlayerMode.FULLSCREEN) transitionTo(previousMode)
     }
     fun toggle() {
+        if (usingMedia3) { media3.toggle(); controlsVisible = true; return }
         val video = engine ?: return
         try { if (video.isPlaying) video.pause() else video.play() }
         catch (_: Exception) { }
         controlsVisible = true
     }
     fun jump(milliseconds: Long) {
+        if (usingMedia3) { media3.seekTo((media3.positionMs + milliseconds).coerceAtLeast(0)); return }
         val video = engine ?: return
         try {
             if (video.isSeekable) {
@@ -301,23 +361,25 @@ class InlineVlcController(context: Context) {
         controlsVisible = true
     }
     fun seekTo(milliseconds: Long) {
+        if (usingMedia3) { media3.seekTo(milliseconds); controlsVisible = true; return }
         try { engine?.let { if (it.isSeekable) it.setTime(milliseconds.coerceIn(0L, it.length.coerceAtLeast(0L))) } }
         catch (_: Exception) { }
         controlsVisible = true
     }
     fun audioChoices(): List<AudioChoice> =
-        runCatching { engine?.audioTracks?.filter { it.id >= 0 }?.map { AudioChoice(it.id, it.name ?: "Audio ${it.id}") } ?: emptyList() }
+        if (usingMedia3) media3.audioTracks() else runCatching { engine?.audioTracks?.filter { it.id >= 0 }?.map { AudioChoice(it.id, it.name ?: "Audio ${it.id}") } ?: emptyList() }
             .getOrDefault(emptyList())
     fun subtitleChoices(): List<AudioChoice> =
-        listOf(AudioChoice(-1, "Off")) +
+        if (usingMedia3) media3.subtitleTracks() else listOf(AudioChoice(-1, "Off")) +
             runCatching { engine?.spuTracks?.filter { it.id >= 0 }?.map { AudioChoice(it.id, it.name ?: "Subtitle ${it.id}") } ?: emptyList() }
                 .getOrDefault(emptyList())
-    fun selectedAudio(): Int = runCatching { engine?.audioTrack ?: -1 }.getOrDefault(-1)
-    fun selectedSubtitle(): Int = runCatching { engine?.spuTrack ?: -1 }.getOrDefault(-1)
-    fun chooseAudio(id: Int) { runCatching { engine?.setAudioTrack(id) }; controlsVisible = true }
-    fun chooseSubtitle(id: Int) { runCatching { engine?.setSpuTrack(id) }; controlsVisible = true }
+    fun selectedAudio(): Int = if (usingMedia3) media3.selectedAudio() else runCatching { engine?.audioTrack ?: -1 }.getOrDefault(-1)
+    fun selectedSubtitle(): Int = if (usingMedia3) media3.selectedSubtitle() else runCatching { engine?.spuTrack ?: -1 }.getOrDefault(-1)
+    fun chooseAudio(id: Int) { if (usingMedia3) { media3.chooseAudio(id); return }; runCatching { engine?.setAudioTrack(id) }; controlsVisible = true }
+    fun chooseSubtitle(id: Int) { if (usingMedia3) { media3.chooseSubtitle(id); return }; runCatching { engine?.setSpuTrack(id) }; controlsVisible = true }
     fun changeAspect() {
         aspect = (aspect + 1) % 4
+        if (usingMedia3) { media3.setAspect(aspect); return }
         runCatching {
             engine?.setAspectRatio(when (aspect) { 1 -> "16:9"; 2 -> "4:3"; 3 -> "21:9"; else -> null })
             engine?.setScale(0f)
@@ -327,6 +389,8 @@ class InlineVlcController(context: Context) {
         closing = true
         if (notifyProgress && position > 0) onProgress(position, duration)
         handler.removeCallbacks(ticker)
+        media3.stop()
+        usingMedia3 = false
         retryTask?.let { handler.removeCallbacks(it) }
         retryTask = null
         pendingStart = false
@@ -347,6 +411,7 @@ class InlineVlcController(context: Context) {
     }
     fun release() {
         stop(notifyProgress = false)
+        media3.release()
         surface = null
         runCatching { libVlc?.release() }
         libVlc = null
