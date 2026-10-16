@@ -2,7 +2,7 @@ import React from 'react';
 import { Play, RefreshCw, Tv2 } from 'lucide-react';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
-type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; logo: string; url: string; alternateUrls?: string[] };
+type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; tvgId?: string; logo: string; url: string; alternateUrls?: string[] };
 
 // Keep the Live TV browse menu compact while preserving every source channel.
 const LIVE_CATEGORIES = ['News', 'Sports', 'Entertainment', 'Movies & Series', 'Music', 'Kids', 'Documentary', 'Religious', 'Other'] as const;
@@ -40,8 +40,12 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
     return () => controller.abort();
   }, [reload]);
 
-  const isLocal = (channel: TamilChannel) => /^(LK|LKA|Sri Lanka)$/i.test(channel.country || '') ||
-    /(?:^|[.])lk(?:[.]|$)/i.test(channel.name);
+  // Some providers omit tvg-country even for well-known Sri Lankan stations.
+  const sriLankanStations = /\\b(?:hiru(?:\\s+tv)?|sirasa|shakthi|sakthi|derana|rupavahini|nethra|itn|independent television network|vasantham|siyatha|swarnavahini|shree\\s+fm|charana|monara|tnl\\s*tv|channel\\s*eye|star\\s*tamil\\s*television|imai\\s*tv|ndtv\\s*lanka|supreme\\s*tv|art\\s*tv|tv\\s*1|ada\\s*derana)\\b/i;
+  const isLocal = (channel: TamilChannel) => /^(?:LK|LKA|Sri\\s*Lanka)$/i.test((channel.country || '').trim()) ||
+    /(?:^|[.])lk(?:[.]|$)/i.test(channel.tvgId || '') ||
+    /\\bsri\\s*lanka(?:n)?\\b|\\blanka\\b/i.test(channel.name) ||
+    sriLankanStations.test(channel.name);
   const categories = ['All Categories', ...LIVE_CATEGORIES];
   const shown = channels.filter(c => (category === 'All Categories' || compactCategory(c.category) === category) &&
     c.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
