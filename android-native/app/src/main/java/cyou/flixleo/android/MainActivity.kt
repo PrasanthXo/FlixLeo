@@ -77,6 +77,21 @@ class MainActivity : ComponentActivity() {
         }
         setContent { FlixLeoNativeApp(state, video) }
         state.initialize()
+        handleEmailConfirmation(intent)
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleEmailConfirmation(intent)
+    }
+    private fun handleEmailConfirmation(incoming: Intent?) {
+        val uri = incoming?.data ?: return
+        if (uri.scheme != "flixleo" || uri.host != "email-confirmed") return
+        state.showSignup = false
+        state.showAuth = true
+        state.authError = ""
+        state.notify("Mail confirmed. Sign in to FlixLeo.")
+        incoming.data = null
     }
     override fun onResume() {
         super.onResume()
