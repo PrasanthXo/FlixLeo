@@ -62,13 +62,14 @@ router.get('/api/download/android',async(_req:Request,res:Response)=>{
     return res.redirect(302,'https://github.com/PrasanthXo/FlixLeo/releases');
   }
   const candidates=items.flatMap(r=>{
-    const m=/^android-v1\.5\.(\d+)$/.exec(r.tag);
+    const m=/^android-v1\.(5|6)\.(\d+)$/.exec(r.tag);
     if(!m)return [];
+    const name='FlixLeo-Android-v1.'+m[1]+'.'+m[2]+'-signed.apk';
     return r.assets.filter(a=>
-      /^FlixLeo-Android-v1\.5\.\d+-signed\.apk$/i.test(a.name)&&
+      a.name===name&&
       a.size>8_000_000&&
       /^https:\/\/github\.com\/PrasanthXo\/FlixLeo\/releases\/download\//i.test(a.url)
-    ).map(a=>({url:a.url,version:Number(m[1])}));
+    ).map(a=>({url:a.url,version:(m[1]==='6'?100000:1000)+Number(m[2])}));
   }).sort((a,b)=>b.version-a.version);
   if(candidates.length)return res.redirect(302,candidates[0].url);
   console.warn('Android download: no valid public signed Android release asset',items.map(r=>({tag:r.tag,assets:r.assets.map(a=>a.name)})));
