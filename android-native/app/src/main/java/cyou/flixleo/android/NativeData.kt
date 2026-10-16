@@ -305,7 +305,7 @@ class FlixApi {
             }
             if (url.isBlank()) return emptyList()
             val json = JSONObject().put("url", url).put("name", channel.name).put("quality", "Auto")
-            return listOfNotNull(FlixStream.parse(json, 0))
+            return listOfNotNull(FlixStream.parse(0, json))
         }
         return call("/api/stremio/plavio/live/streams?id=" + Uri.encode(channel.id) +
                 "&type=" + Uri.encode(channel.type)).optJSONArray("streams").objects()
