@@ -923,7 +923,7 @@ const IPTV_PLAYLISTS = [
   { url: 'https://iptv-org.github.io/iptv/languages/tam.m3u', fallbackLanguage: 'Tamil' },
   { url: 'https://iptv-org.github.io/iptv/index.m3u', fallbackLanguage: 'Unknown' }
 ] as const;
-type IptvChannel = { id: string; name: string; logo: string; category: string; language: string; url: string };
+type IptvChannel = { id: string; name: string; logo: string; category: string; language: string; country: string; url: string };
 let iptvCache: { until: number; channels: IptvChannel[] } | null = null;
 let iptvPending: Promise<IptvChannel[]> | null = null;
 function iptvAttribute(line: string, key: string): string {
@@ -955,8 +955,9 @@ async function iptvFetchPlaylist(url: string, fallbackLanguage: string): Promise
         const name = ((info.includes(',') ? info.slice(info.indexOf(',') + 1).trim() : '') || iptvAttribute(info, 'tvg-name') || 'Live Channel').slice(0, 120);
         const category = iptvAttribute(info, 'group-title') || 'Other Channels';
         const language = iptvAttribute(info, 'tvg-language') || fallbackLanguage;
+        const country = iptvAttribute(info, 'tvg-country') || (/(?:^|[.])lk(?:[.]|$)/i.test(iptvAttribute(info, 'tvg-id')) ? 'LK' : '');
         channels.push({ id: '', name, logo: iptvHttps(iptvAttribute(info, 'tvg-logo')),
-          category, language, url: streamUrl });
+          category, language, country, url: streamUrl });
       }
       info = '';
       if (channels.length >= 30000) break;
