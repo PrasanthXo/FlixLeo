@@ -120,7 +120,11 @@ class InlineVlcController(context: Context) {
             val cacheMs = networkCacheMs(stream)
             // Reuse the VLC library across server changes; repeated native library shutdown
             // and recreation can race Android surface/decoder teardown and crash the app.
-            val vlc = libVlc ?: LibVLC(appContext, arrayListOf("--audio-time-stretch")).also { libVlc = it }
+            val vlc = libVlc ?: LibVLC(appContext, arrayListOf(
+                "--audio-time-stretch",
+                // Avoid broken device-specific MediaCodec colour buffers.
+                "--avcodec-hw=none"
+            )).also { libVlc = it }
             val video = MediaPlayer(vlc)
             engine = video
             video.setEventListener { event ->
@@ -168,6 +172,9 @@ class InlineVlcController(context: Context) {
             // Some Android hardware decoders produce green/macroblocked frames for
             // certain sources. Prefer VLC's software decoder for stable rendering.
             media.setHWDecoderEnabled(false, false)
+            // Set the software decoder preference at media level as well; this prevents
+            // automatic hardware fallback on devices with green-frame MediaCodec bugs.
+            media.addOption(":avcodec-hw=none")
             media.addOption(":network-caching=$cacheMs")
             media.addOption(":http-reconnect=true")
             video.setMedia(media)
