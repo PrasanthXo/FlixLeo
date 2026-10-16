@@ -84,20 +84,20 @@ router.post('/api/native/auth/signup', throttle, async (req, res) => {
   const email = String(req.body?.email || '').trim();
   const password = String(req.body?.password || '');
   if (!/^.+@.+\..+$/.test(email) || email.length > 255 || password.length < 8 || password.length > 256) return res.status(400).json({ error: 'Use a valid email and password of at least 8 characters.' });
-  const result = await remote('/auth/v1/signup?redirect_to=' + encodeURIComponent('https://flixleo.cyou/'), { method: 'POST', body: JSON.stringify({ email, password }) });
+  const result = await remote('/auth/v1/signup?redirect_to=' + encodeURIComponent('https://flixleo.cyou/?native_email_confirmed=1'), { method: 'POST', body: JSON.stringify({ email, password }) });
   if (!result.ok) return res.status(result.status).json({ error: message(result) });
   return res.json({ success: true, message: 'Check your email to verify the account before signing in.' });
 });
 router.post('/api/native/auth/resend', throttle, async (req, res) => {
   const email = String(req.body?.email || '').trim();
   if (!/^.+@.+\..+$/.test(email)) return res.status(400).json({ error: 'Enter your email address.' });
-  await remote('/auth/v1/resend?redirect_to=' + encodeURIComponent('https://flixleo.cyou/'), { method: 'POST', body: JSON.stringify({ type: 'signup', email }) });
+  await remote('/auth/v1/resend?redirect_to=' + encodeURIComponent('https://flixleo.cyou/?native_email_confirmed=1'), { method: 'POST', body: JSON.stringify({ type: 'signup', email }) });
   return res.json({ success: true, message: 'If eligible, a verification email has been sent.' });
 });
 router.post('/api/native/auth/recover', throttle, async (req, res) => {
   const email = String(req.body?.email || '').trim();
   if (!/^.+@.+\..+$/.test(email)) return res.status(400).json({ error: 'Enter your email address.' });
-  await remote('/auth/v1/recover?redirect_to=' + encodeURIComponent('https://flixleo.cyou/'), { method: 'POST', body: JSON.stringify({ email }) });
+  await remote('/auth/v1/recover?redirect_to=' + encodeURIComponent('https://flixleo.cyou/?native_email_confirmed=1'), { method: 'POST', body: JSON.stringify({ email }) });
   return res.json({ success: true, message: 'If registered, a password-reset email has been sent.' });
 });
 router.post('/api/native/auth/logout', async (req, res) => {
