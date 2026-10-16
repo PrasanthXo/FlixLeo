@@ -127,7 +127,7 @@ export function PlavioLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirro
   };
 
   // Hide the entire optional add-on section when it has no real channel catalog.
-  if (!loading && catalogs.length === 0) return null;
+  if (catalogs.length === 0) return null;
 
   const visibleCatalogs = selectedType === 'all'
     ? catalogs : catalogs.filter(catalog => catalog.id === selectedType);
