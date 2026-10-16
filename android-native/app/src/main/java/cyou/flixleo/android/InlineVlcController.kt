@@ -122,12 +122,16 @@ class InlineVlcController(context: Context) {
             if (!closing && usingMedia3) {
                 diagnose("media3_error_${error.errorCode}")
                 val lastPosition = media3.positionMs.takeIf { it > 0L } ?: position
-                media3.stop()
-                usingMedia3 = false
+                val previous = if (lastPosition > 0L) lastPosition / 1000.0 else resumeSeconds
+                // Do not release the ExoPlayer instance or rebuild the Compose surface
+                // from inside its own listener callback. Defer the switch one UI loop.
                 media3Failed = true
                 problem = "Trying VLC compatibility playback…"
-                val previous = if (lastPosition > 0L) lastPosition / 1000.0 else resumeSeconds
-                start(stream, title, previous, recovering = true)
+                handler.post {
+                    if (!closing && usingMedia3 && activeStream == stream) {
+                        start(stream, title, previous, recovering = true)
+                    }
+                }
             }
         }
         media3.play(stream.url, (resumeSeconds * 1000).toLong())
