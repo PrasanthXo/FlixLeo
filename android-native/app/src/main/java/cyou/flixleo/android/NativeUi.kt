@@ -323,7 +323,7 @@ private fun Poster(item: FlixTitle, selected: Boolean, compact: Boolean = false,
                             leadingIcon = { Icon(Icons.Default.Share, null, tint = Gold) },
                             onClick = {
                                 expanded = false
-                                val link = "https://flixleo.cyou/?id=" + android.net.Uri.encode(item.id) + "&type=" + if (item.type == "tv") "tv" else "movie"
+                                val link = "https://flixleo.cyou/?media=" + android.net.Uri.encode(item.id)
                                 val send = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/plain"
                                     putExtra(Intent.EXTRA_TEXT, item.title + " — " + link)
