@@ -45,29 +45,44 @@ private val GoldPlayer = Color(0xFFFBBF24)
 private val BackgroundPlayer = Color(0xFF080A11)
 private val Glass = Color(0xDE111827)
 
-/** Android's reported link bandwidth is an estimate, not measured streaming throughput. */
+/** Link estimate only: not a speed test or a guarantee that a stream will play. */
+private data class NetworkAdvice(val label: String, val resolution: String)
+
 @Composable
-private fun rememberNetworkQuality(): String {
+private fun rememberNetworkAdvice(): NetworkAdvice {
     val context = LocalContext.current
-    var quality by remember { mutableStateOf("Unknown") }
+    var advice by remember { mutableStateOf(NetworkAdvice("Unknown", "Auto")) }
     LaunchedEffect(context) {
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         while (true) {
-            quality = runCatching {
-                val network = manager.activeNetwork
-                val caps = network?.let(manager::getNetworkCapabilities)
+            advice = runCatching {
+                val caps = manager.activeNetwork?.let(manager::getNetworkCapabilities)
                 when {
-                    caps == null || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) -> "Offline"
-                    !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) -> "Poor"
-                    caps.linkDownstreamBandwidthKbps >= 15_000 -> "Excellent"
-                    caps.linkDownstreamBandwidthKbps >= 3_000 -> "Good"
-                    else -> "Poor"
+                    caps == null || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ->
+                        NetworkAdvice("Offline", "—")
+                    !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ->
+                        NetworkAdvice("Poor", "480p")
+                    else -> {
+                        val kbps = caps.linkDownstreamBandwidthKbps
+                        val label = when {
+                            kbps >= 15_000 -> "Excellent"
+                            kbps >= 3_000 -> "Good"
+                            else -> "Poor"
+                        }
+                        val resolution = when {
+                            kbps >= 25_000 -> "4K"
+                            kbps >= 8_000 -> "1080p"
+                            kbps >= 4_000 -> "720p"
+                            else -> "480p"
+                        }
+                        NetworkAdvice(label, resolution)
+                    }
                 }
-            }.getOrDefault("Unknown")
+            }.getOrDefault(NetworkAdvice("Unknown", "Auto"))
             delay(1000)
         }
     }
-    return quality
+    return advice
 }
 
 private fun stamp(ms: Long): String {
@@ -260,7 +275,7 @@ private fun NativeVideoSurface(
         }
     }
 
-    val networkQuality = rememberNetworkQuality()
+    val networkAdvice = rememberNetworkAdvice()
     val showsControls = player.controlsVisible || mode == PlayerMode.MINI
     LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture, appForeground, trackMenu) {
         if (showsControls && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
@@ -310,13 +325,13 @@ private fun NativeVideoSurface(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Default.NetworkCheck, contentDescription = "Estimated network quality",
-                    tint = when (networkQuality) {
+                    tint = when (networkAdvice.label) {
                         "Excellent" -> Color(0xFF4ADE80)
                         "Good" -> GoldPlayer
                         else -> Color(0xFFFF7777)
                     }, modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(networkQuality, color = Color.White, fontSize = 10.sp)
+                Text(networkAdvice.label + " · Recommended " + networkAdvice.resolution, color = Color.White, fontSize = 10.sp, maxLines = 1)
             }
         }
         if (player.buffering && !player.inPictureInPicture) {
