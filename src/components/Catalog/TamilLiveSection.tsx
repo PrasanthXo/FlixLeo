@@ -62,7 +62,7 @@ export function TamilLiveSection({ onPlay, onSignIn }: { onPlay: (media: MediaIt
     } catch { /* user dismissed share menu */ }
   }
   const [category, setCategory] = React.useState('All Categories');
-  const [search, setSearch] = React.useState('');
+  const [search, setSearch] = React.useState(() => new URLSearchParams(window.location.search).get('liveChannel') || '');
   const [reload, setReload] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
