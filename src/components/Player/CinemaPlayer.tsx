@@ -52,6 +52,17 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const [selectedQuality, setSelectedQuality] = useState(-1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const [localSubtitle, setLocalSubtitle] = useState('');
+  const subtitleUrl = useRef<string | null>(null);
+  useEffect(() => () => { if (subtitleUrl.current) URL.revokeObjectURL(subtitleUrl.current); }, []);
+  const uploadLocalSubtitle = async (file?: File) => {
+    if (!file || media.duration === 'Live' || file.size > 3_000_000 || !/\\.(srt|vtt)$/i.test(file.name)) return;
+    const raw = await file.text();
+    const content = /\\.srt$/i.test(file.name) ? 'WEBVTT\\n\\n' + raw.replace(/\\r/g, '').replace(/(\\d\\d:\\d\\d:\\d\\d),(\\d{3})/g, '$1.$2') : raw;
+    if (subtitleUrl.current) URL.revokeObjectURL(subtitleUrl.current);
+    subtitleUrl.current = URL.createObjectURL(new Blob([content], { type: 'text/vtt' }));
+    setLocalSubtitle(subtitleUrl.current);
+  };
   const lastSaveRef = useRef(0);
   const active = mirrors[index];
   const desktopNative = Boolean(desktopBridge() && active && active.streamType !== 'embed-iframe');
@@ -271,7 +282,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           : desktopNative ? <div className={nativeFullscreen ? (fullscreenControlsVisible ? "h-[calc(100%-96px)] w-full" : "h-full w-full") : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div>
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
-            : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onDoubleClick={() => void toggleFrameFullscreen()} onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); if (media.type === 'tv') onEpisodeEnded?.(); }} className="h-full w-full object-contain" />}
+            : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onDoubleClick={() => void toggleFrameFullscreen()} onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); if (media.type === 'tv') onEpisodeEnded?.(); }} className="h-full w-full object-contain">{localSubtitle && <track key={localSubtitle} kind="subtitles" label="Uploaded subtitle" srcLang="und" src={localSubtitle} default />}</video>}
         {nativeFullscreen && <DesktopFullscreenControls title={media.title} onClose={() => { saveProgress(); onClose(); }} visible={fullscreenControlsVisible} aspectRatio={aspectRatio} onAspectRatioChange={changeAspectRatio} />}
         {docked && desktopNative && <div className="absolute bottom-0 left-0 right-0 z-[90] flex h-[52px] items-center justify-around gap-1 border-t border-white/15 bg-[#151925] px-2 text-white">
           <button type="button" aria-label="Rewind 10 seconds" className="rounded-lg p-2 text-white" onClick={() => void desktopBridge()?.commandNative('seekBackward')}>↶</button>
@@ -300,6 +311,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           </select>
         </label>}
         {active?.streamType === 'hls' && !qualityLevels.length && <p className="text-xs text-slate-400">Quality selection depends on stream and browser support. 4K is shown only when the provider offers it.</p>}
+        {media.duration !== 'Live' && <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-600 px-3 py-2 text-xs font-semibold text-white">Upload subtitles (.srt / .vtt)<input type="file" accept=".srt,.vtt" className="sr-only" onChange={event => void uploadLocalSubtitle(event.target.files?.[0])} /></label>}
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-semibold text-white text-sm">Select quality &amp; server</h3>
           <span className="text-xs text-slate-400">{mirrors.length} available</span>
