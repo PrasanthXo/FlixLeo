@@ -361,13 +361,13 @@ fun NativePlaybackOverlay(
                 .background(Color.Black))
         // Independent fullscreen chrome: a sibling of the native video view,
         // never a descendant of the VLC/Media3 surface.
-        if (currentMode == PlayerMode.FULLSCREEN && !player.inPictureInPicture) {
+        if ((currentMode == PlayerMode.FULLSCREEN || currentMode == PlayerMode.BIG) && !player.inPictureInPicture) {
             Row(
                 Modifier.align(Alignment.TopCenter).zIndex(50f).fillMaxWidth()
                     .background(Color(0xD9000000)).padding(horizontal = 12.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { player.leaveFullscreen(); player.controlsVisible = true }) {
+                IconButton(onClick = { if (currentMode == PlayerMode.FULLSCREEN) player.leaveFullscreen() else player.transitionTo(PlayerMode.MINI); player.controlsVisible = true }) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Exit fullscreen", tint = Color.White)
                 }
                 Text(player.title, color = Color.White, fontSize = 13.sp,
@@ -417,8 +417,8 @@ fun NativePlaybackOverlay(
                     IconButton(onClick = { fullscreenTrackMenu = "subtitle" }) {
                         Icon(Icons.Default.Subtitles, contentDescription = "Change subtitle track", tint = Color.White)
                     }
-                    IconButton(onClick = { player.leaveFullscreen(); player.controlsVisible = true }) {
-                        Icon(Icons.Default.FullscreenExit, contentDescription = "Exit fullscreen", tint = Color.White)
+                    IconButton(onClick = { if (currentMode == PlayerMode.FULLSCREEN) player.leaveFullscreen() else player.transitionTo(PlayerMode.FULLSCREEN); player.controlsVisible = true }) {
+                        Icon(if (currentMode == PlayerMode.FULLSCREEN) Icons.Default.FullscreenExit else Icons.Default.Fullscreen, contentDescription = "Toggle fullscreen", tint = Color.White)
                     }
                 }
             }
@@ -602,7 +602,7 @@ private fun NativeVideoSurface(
                 modifier = Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = .85f))
                     .padding(15.dp))
         }
-        if (!player.inPictureInPicture && showsControls && mode != PlayerMode.FULLSCREEN) {
+        if (!player.inPictureInPicture && showsControls && mode == PlayerMode.MINI) {
             if (mode == PlayerMode.MINI) {
                 Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).zIndex(4f).background(Glass)
                     .height(55.dp).padding(horizontal = 5.dp),
