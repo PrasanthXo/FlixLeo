@@ -338,9 +338,6 @@ fun NativePlaybackOverlay(
                     IconButton(onClick = { player.jump(10_000L) }) {
                         Icon(Icons.Default.Forward10, contentDescription = "Forward 10 seconds", tint = Color.White)
                     }
-                    IconButton(onClick = { player.changeAspect(); player.controlsVisible = true }) {
-                        Icon(Icons.Default.AspectRatio, contentDescription = "Change aspect ratio", tint = Color.White)
-                    }
                     IconButton(onClick = { fullscreenTrackMenu = "audio" }) {
                         Icon(Icons.Default.Audiotrack, contentDescription = "Change audio language", tint = Color.White)
                     }
