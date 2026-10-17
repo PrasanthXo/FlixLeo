@@ -101,6 +101,29 @@ fun NativePlaybackOverlay(
 ) {
     val currentMode = player.mode
     if (currentMode == PlayerMode.CLOSED) return
+    val context = LocalContext.current
+    var importedSubtitleNotice by remember { mutableStateOf("") }
+    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
+        if (selected != null) {
+            importedSubtitleNotice = runCatching {
+                val mime = context.contentResolver.getType(selected).orEmpty()
+                val displayName = runCatching {
+                    context.contentResolver.query(selected, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0).orEmpty() else ""
+                    }.orEmpty()
+                }.getOrDefault("")
+                val extension = if (displayName.endsWith(".vtt", true) || mime.contains("vtt")) "vtt" else "srt"
+                val bytes = context.contentResolver.openInputStream(selected)?.use { it.readBytes() }
+                    ?: throw IllegalArgumentException("Unable to read subtitle")
+                if (bytes.size > 3_000_000) throw IllegalArgumentException("Subtitle must be under 3 MB")
+                val subtitle = File(context.cacheDir, "flixleo-uploaded-subtitle." + extension)
+                subtitle.writeBytes(bytes)
+                if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
+                else "Could not import subtitle; try another .srt or .vtt file"
+            }.getOrElse { "Could not import subtitle file" }
+        }
+        player.controlsVisible = true
+    }
     val activity = LocalContext.current as Activity
     var lastNonPiP by remember { mutableStateOf(PlayerMode.BIG) }
 
@@ -185,6 +208,37 @@ fun NativePlaybackOverlay(
                             Text("Fullscreen")
                         }
                     }
+                    Surface(
+                        color = Color(0xFF172238),
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.ClosedCaption, null, tint = GoldPlayer)
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("External subtitles", fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("Add an SRT or VTT file without opening player controls",
+                                        fontSize = 12.sp, color = Color.LightGray)
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Button(
+                                onClick = { subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = GoldPlayer, contentColor = Color.Black)
+                            ) {
+                                Icon(Icons.Default.UploadFile, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Upload subtitle", fontWeight = FontWeight.Bold)
+                            }
+                            if (importedSubtitleNotice.isNotBlank()) {
+                                Text(importedSubtitleNotice, color = GoldPlayer, modifier = Modifier.padding(top = 8.dp))
+                            }
+                        }
+                    }
                     HorizontalDivider(Modifier.padding(vertical = 17.dp), color = Color.DarkGray)
                     Text("Video quality", fontWeight = FontWeight.Bold, color = Color.White)
                     Spacer(Modifier.height(8.dp))
@@ -252,38 +306,9 @@ private fun NativeVideoSurface(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     var trackMenu by remember { mutableStateOf("") }
-    var importedSubtitleNotice by remember { mutableStateOf("") }
-    var subtitlePickerReturn by remember { mutableIntStateOf(0) }
     var holdControlsAfterSubtitle by remember(player) { mutableStateOf(false) }
     var forceFullscreenControls by remember(player) { mutableStateOf(false) }
-    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
-        if (selected != null) {
-            importedSubtitleNotice = runCatching {
-                val mime = context.contentResolver.getType(selected).orEmpty()
-                val displayName = runCatching {
-                    context.contentResolver.query(selected, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                        if (cursor.moveToFirst()) cursor.getString(0).orEmpty() else ""
-                    }.orEmpty()
-                }.getOrDefault("")
-                val extension = if (displayName.endsWith(".vtt", true) || mime.contains("vtt")) "vtt" else "srt"
-                val bytes = context.contentResolver.openInputStream(selected)?.use { it.readBytes() }
-                    ?: throw IllegalArgumentException("Unable to read subtitle")
-                if (bytes.size > 3_000_000) throw IllegalArgumentException("Subtitle must be under 3 MB")
-                val subtitle = File(context.cacheDir, "flixleo-uploaded-subtitle." + extension)
-                subtitle.writeBytes(bytes)
-                if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
-                else "Could not import subtitle; try another .srt or .vtt file"
-            }.getOrElse { "Could not import subtitle file" }
-        }
-        // The system document picker may return while playback has continued
-        // and the existing auto-hide timer has expired. Restart the timeout.
-        trackMenu = ""
-        subtitlePickerReturn++
-        holdControlsAfterSubtitle = true
-        forceFullscreenControls = true
-        player.controlsVisible = true
-        // Never detach/reattach a playing video surface on document picker return.
-    }
+    var subtitlePickerReturn by remember { mutableIntStateOf(0) }
 
     val networkAdvice = rememberNetworkAdvice()
     val showsControls = player.controlsVisible || holdControlsAfterSubtitle || forceFullscreenControls || mode == PlayerMode.MINI
@@ -530,14 +555,6 @@ private fun NativeVideoSurface(
             title = { Text(if (trackMenu == "audio") "Audio language" else "Subtitle language") },
             text = {
                 Column(Modifier.heightIn(max = 330.dp).verticalScroll(rememberScrollState())) {
-                    if (trackMenu == "subtitle" && !state.playingTitle?.id.orEmpty().startsWith("plavio-live-")) {
-                        TextButton(onClick = { trackMenu = ""; subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) }) {
-                            Icon(Icons.Default.UploadFile, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Upload .srt / .vtt subtitle")
-                        }
-                        if (importedSubtitleNotice.isNotBlank()) Text(importedSubtitleNotice, color = GoldPlayer)
-                    }
                     if (tracks.isEmpty()) Text("No tracks detected in this stream.")
                     tracks.forEach { track ->
                         Row(Modifier.fillMaxWidth().clickable {
