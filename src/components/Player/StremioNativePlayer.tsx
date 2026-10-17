@@ -169,7 +169,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
   const lastSave = useRef(0);
   const save = () => {
     const video = videoRef.current;
-    if (!video || !Number.isFinite(video.currentTime) || Date.now() - lastSave.current < 5000) return;
+    if (liveChannel || media.duration === 'Live' || !video || !Number.isFinite(video.currentTime) || (Date.now() - lastSave.current < 5000 && !video.ended && video.duration - video.currentTime > 90)) return;
     lastSave.current = Date.now();
     try {
       const data = JSON.parse(localStorage.getItem('flixleo_continue_watching') || '[]');
@@ -553,7 +553,7 @@ export const StremioNativePlayer: React.FC<Props> = ({ media, mirrors, initialMi
         onWaiting={() => setBuffering(true)}
         onCanPlay={() => setBuffering(false)}
         onTimeUpdate={event => { setPosition(event.currentTarget.currentTime); setDuration(event.currentTarget.duration || 0); save(); }}
-        onEnded={() => { setPlaying(false); save(); onEpisodeEnded?.(); }}>
+        onEnded={() => { setPlaying(false); save(); if (!liveChannel && media.type === 'tv') onEpisodeEnded?.(); }}>
         {selectedSubtitle && !selectedSubtitle.startsWith('hls-sub:') && !selectedSubtitle.startsWith('native-sub:') && !selectedSubtitle.startsWith('shaka-sub:') && <track key={selectedSubtitle} kind="subtitles" src={uploadedRef.current || selectedSubtitle} srcLang="en" label="Selected subtitles" default />}
       </video>}
       {nativeFullscreen && <DesktopFullscreenControls title={media.title} onClose={() => { save(); onClose(); }} visible={fullscreenControlsVisible} aspectRatio={aspectRatio} onAspectRatioChange={changeAspectRatio} />}
