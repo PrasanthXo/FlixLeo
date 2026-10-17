@@ -182,8 +182,10 @@ fun NativePlaybackOverlay(
 
         if (currentMode == PlayerMode.BIG) {
             Column(Modifier.fillMaxSize().background(BackgroundPlayer)
+                // Keep scrolling content strictly below the fixed video viewport.
+                // This lets users watch each caption while tapping subtitle sync.
+                .padding(top = bigVideoHeight)
                 .verticalScroll(bigScroll)) {
-                Spacer(Modifier.height(bigVideoHeight))
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 26.dp)) {
                     Spacer(Modifier.height(18.dp))
                     Text("NOW PLAYING", color = GoldPlayer, fontSize = 10.sp, fontWeight = FontWeight.Bold)
