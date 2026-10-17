@@ -135,16 +135,20 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
                     NativePlaybackOverlay(player, state, modifier = Modifier.fillMaxSize())
                 }
                 state.upcomingEpisode?.let { next ->
-                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .86f)),
-                        contentAlignment = Alignment.Center) {
-                        Column(Modifier.fillMaxWidth().padding(18.dp)
+                    Box(
+                        Modifier.fillMaxSize().then(if (player.mode == PlayerMode.MINI)
+                            Modifier else Modifier.background(Color.Black.copy(alpha = .80f))),
+                        contentAlignment = if (player.mode == PlayerMode.MINI) Alignment.BottomStart else Alignment.Center
+                    ) {
+                        Column(Modifier.fillMaxWidth(if (player.mode == PlayerMode.MINI) .62f else 1f)
+                            .padding(18.dp)
                             .clip(RoundedCornerShape(24.dp)).background(Card).padding(18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("UP NEXT · ${state.upcomingCountdown}s", color = Gold,
+                            Text(if (state.upcomingCountdown > 0) "UP NEXT · ${state.upcomingCountdown}s" else "UP NEXT · Episode preview", color = Gold,
                                 fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Spacer(Modifier.height(12.dp))
                             AsyncImage(next.poster, state.upcomingName,
-                                modifier = Modifier.width(135.dp).height(180.dp)
+                                modifier = Modifier.width(if (player.mode == PlayerMode.MINI) 75.dp else 135.dp).height(if (player.mode == PlayerMode.MINI) 92.dp else 180.dp)
                                     .clip(RoundedCornerShape(15.dp)),
                                 contentScale = ContentScale.Crop)
                             Spacer(Modifier.height(12.dp))
