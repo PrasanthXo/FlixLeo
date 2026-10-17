@@ -736,12 +736,34 @@ private fun LiveScreen(state: FlixState) {
     val antennaRotation by spin.animateFloat(initialValue = 0f, targetValue = 360f,
         animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)),
         label = "Rotating antenna")
+    var selectedCategory by remember { mutableStateOf("All Categories") }
+    var categoryMenuOpen by remember { mutableStateOf(false) }
+    val categoryOptions = listOf("All Categories", "Favorites") +
+        listOf("Sports", "News", "Entertainment", "Movies & Series", "Music", "Kids",
+            "Documentary", "Religious", "Other") +
+        state.live.map { it.name }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 25.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 17.dp, vertical = 8.dp)) {
                 Icon(Icons.Default.LiveTv, contentDescription = null, tint = Gold, modifier = Modifier.size(30.dp))
                 Spacer(Modifier.width(11.dp))
                 Text("Live TV", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
+            }
+            Box(Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 10.dp)) {
+                OutlinedButton(onClick = { categoryMenuOpen = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)) {
+                    Text(selectedCategory, modifier = Modifier.weight(1f), color = Color.White)
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Choose category", tint = Gold)
+                }
+                DropdownMenu(expanded = categoryMenuOpen, onDismissRequest = { categoryMenuOpen = false }) {
+                    categoryOptions.distinct().forEach { option ->
+                        DropdownMenuItem(text = { Text(option) }, onClick = {
+                            selectedCategory = option
+                            categoryMenuOpen = false
+                        })
+                    }
+                }
             }
             if (state.liveLoading) {
                 Row(Modifier.fillMaxWidth().padding(18.dp),
@@ -765,13 +787,13 @@ private fun LiveScreen(state: FlixState) {
         val favoriteChannels = state.live.flatMap { it.channels }.filter {
             state.liveFavorites.contains(it.name.lowercase())
         }.distinctBy { it.name.lowercase() }
-        if (favoriteChannels.isNotEmpty()) {
+        if (favoriteChannels.isNotEmpty() && selectedCategory in listOf("All Categories", "Favorites")) {
             item {
                 Heading("Favorites")
                 LiveChannelRow(favoriteChannels, state)
             }
         }
-        items(state.live) { category ->
+        items(state.live.filter { selectedCategory == "All Categories" || it.name == selectedCategory }) { category ->
             Heading(category.name)
             LiveChannelRow(category.channels, state)
         }
