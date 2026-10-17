@@ -216,6 +216,56 @@ fun NativePlaybackOverlay(
                             Text("Fullscreen")
                         }
                     }
+                    // Persistent transport controls are deliberately outside the
+                    // AndroidView video surface. They remain clickable even when
+                    // LibVLC / Media3 reorders the native video layer.
+                    Surface(
+                        color = Color(0xFF141D2D),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                    ) {
+                        Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(stamp(player.position), color = Color.LightGray, fontSize = 11.sp)
+                                var outsideSeek by remember { mutableFloatStateOf(-1f) }
+                                val total = (player.duration / 1000L).coerceAtLeast(1).toFloat()
+                                Slider(
+                                    value = if (outsideSeek >= 0) outsideSeek.coerceIn(0f, total)
+                                        else (player.position / 1000f).coerceIn(0f, total),
+                                    onValueChange = { outsideSeek = it },
+                                    onValueChangeFinished = {
+                                        if (outsideSeek >= 0) player.seekTo((outsideSeek * 1000).toLong())
+                                        outsideSeek = -1f
+                                    },
+                                    enabled = player.canSeek && player.duration > 0,
+                                    valueRange = 0f..total,
+                                    colors = SliderDefaults.colors(thumbColor = GoldPlayer, activeTrackColor = GoldPlayer),
+                                    modifier = Modifier.weight(1f).height(26.dp)
+                                )
+                                Text(stamp(player.duration), color = Color.LightGray, fontSize = 11.sp)
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { player.jump(-10_000L) }) {
+                                    Icon(Icons.Default.Replay10, contentDescription = "Back 10 seconds", tint = Color.White)
+                                }
+                                IconButton(onClick = { player.toggle() }) {
+                                    Icon(if (player.playing) Icons.Default.PauseCircle else Icons.Default.PlayCircle,
+                                        contentDescription = if (player.playing) "Pause" else "Play",
+                                        tint = GoldPlayer, modifier = Modifier.size(34.dp))
+                                }
+                                IconButton(onClick = { player.jump(10_000L) }) {
+                                    Icon(Icons.Default.Forward10, contentDescription = "Forward 10 seconds", tint = Color.White)
+                                }
+                                IconButton(onClick = { player.changeAspect() }) {
+                                    Icon(Icons.Default.AspectRatio, contentDescription = "Change video aspect ratio", tint = Color.White)
+                                }
+                                IconButton(onClick = { player.transitionTo(PlayerMode.FULLSCREEN) }) {
+                                    Icon(Icons.Default.Fullscreen, contentDescription = "Enter fullscreen", tint = Color.White)
+                                }
+                            }
+                        }
+                    }
                     Surface(
                         color = Color(0xFF172238),
                         shape = RoundedCornerShape(12.dp),
