@@ -642,7 +642,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         showSignup = false
         showAuth = true
         authError = ""
-        message = "Sign in or create a FlixLeo account to start playback."
+        message = "Sign in or create an account to start watching."
         return true
     }
     fun play(stream: FlixStream) {
