@@ -107,6 +107,7 @@ fun NativePlaybackOverlay(
     var fullscreenTrackMenu by remember(player) { mutableStateOf("") }
     var subtitleSettingsOpen by remember(player) { mutableStateOf(false) }
     var controlTouch by remember(player) { mutableIntStateOf(0) }
+    var resumeAfterSubtitlePicker by remember(player) { mutableStateOf(false) }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) {
             importedSubtitleNotice = runCatching {
@@ -129,6 +130,8 @@ fun NativePlaybackOverlay(
                 else "Could not import subtitle; try another .srt or .vtt file"
             }.getOrElse { "Could not import subtitle file" }
         }
+        if (resumeAfterSubtitlePicker && !player.playing && player.mode != PlayerMode.CLOSED) player.toggle()
+        resumeAfterSubtitlePicker = false
         // Return to expanded playback after the Android file picker closes.
         // Keep decoder and playback position unchanged.
         subtitleReturnControls = false
@@ -360,7 +363,7 @@ fun NativePlaybackOverlay(
         AlertDialog(onDismissRequest = { subtitleSettingsOpen = false; player.controlsVisible = true; controlTouch++ },
             title = { Text("Subtitles") },
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(onClick = { subtitleSettingsOpen = false; subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) }) {
+                TextButton(onClick = { subtitleSettingsOpen = false; resumeAfterSubtitlePicker = player.playing; if (player.playing) player.toggle(); subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) }) {
                     Icon(Icons.Default.UploadFile, null); Spacer(Modifier.width(8.dp)); Text("Upload .srt / .vtt")
                 }
                 TextButton(onClick = { subtitleSettingsOpen = false; fullscreenTrackMenu = "subtitle" }) { Text("Change subtitle track") }
