@@ -197,14 +197,19 @@ private fun NativeVideoSurface(
         if (selected != null) {
             importedSubtitleNotice = runCatching {
                 val mime = context.contentResolver.getType(selected).orEmpty()
-                val extension = if (mime.contains("vtt")) "vtt" else "srt"
+                val displayName = runCatching {
+                    context.contentResolver.query(selected, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0).orEmpty() else ""
+                    }.orEmpty()
+                }.getOrDefault("")
+                val extension = if (displayName.endsWith(".vtt", true) || mime.contains("vtt")) "vtt" else "srt"
                 val bytes = context.contentResolver.openInputStream(selected)?.use { it.readBytes() }
                     ?: throw IllegalArgumentException("Unable to read subtitle")
                 if (bytes.size > 3_000_000) throw IllegalArgumentException("Subtitle must be under 3 MB")
                 val subtitle = File(context.cacheDir, "flixleo-uploaded-subtitle." + extension)
                 subtitle.writeBytes(bytes)
                 if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
-                else "This playback engine cannot import subtitle files; select LibVLC playback"
+                else "Could not import subtitle; try another .srt or .vtt file"
             }.getOrElse { "Could not import subtitle file" }
         }
     }
