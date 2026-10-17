@@ -66,16 +66,21 @@ class MainActivity : ComponentActivity() {
         }
         video.onCompleted = {
             val finished = currentPlayback
-            val completedDuration = video.duration
-            video.stop(notifyProgress = false)
-            currentPlayback = null
-            if (finished != null) {
+            // Live channels can signal end-of-item at segment boundaries.
+            // Do not destroy their player, navigate away, or save them as watched movies.
+            if (finished?.first?.id?.startsWith("plavio-live-") == true) {
+                state.notify("Live channel interrupted. Choose another stream to retry.")
+            } else if (finished != null) {
+                val completedDuration = video.duration
                 state.store.remember(finished.first, 0.0,
                     completedDuration / 1000.0, finished.second.id, ended = true)
                 state.localRevision++
                 state.uploadCloud()
                 if (finished.first.type == "tv" && finished.first.episode > 0) {
+                    // Keep the player visible while resolving the next episode.
                     state.playNextEpisode(finished.first, finished.second)
+                } else {
+                    video.pause()
                 }
             }
         }
