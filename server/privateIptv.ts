@@ -82,13 +82,19 @@ async function refresh() {
   loading = (async () => {
     const urls = originList();
     if (!urls.length) { channelMap.clear(); cacheUntil = Date.now() + 60_000; return; }
-    const result = await Promise.allSettled(urls.map(async (source) => {
-      const res = await fetchRemote(source);
-      if (!res.ok || Number(res.headers.get('content-length') || 0) > 15_000_000) throw Error('Playlist unavailable');
-      const body = await res.text();
-      if (body.length > 15_000_000 || !body.trimStart().startsWith('#EXTM3U')) throw Error('Not M3U');
-      return body;
-    }));
+    // Do not hold up to 40 complete M3U bodies in memory simultaneously.
+    // Limit concurrent downloads and keep only a small batch while parsing.
+    const result: PromiseSettledResult<string>[] = [];
+    for (let offset = 0; offset < urls.length; offset += 3) {
+      const batch = await Promise.allSettled(urls.slice(offset, offset + 3).map(async (source) => {
+        const res = await fetchRemote(source);
+        if (!res.ok || Number(res.headers.get('content-length') || 0) > 15_000_000) throw Error('Playlist unavailable');
+        const body = await res.text();
+        if (body.length > 15_000_000 || !body.trimStart().startsWith('#EXTM3U')) throw Error('Not M3U');
+        return body;
+      }));
+      result.push(...batch);
+    }
     const next = new Map<string, PrivateChannel>();
     const seen = new Set<string>();
     for (const item of result) {
