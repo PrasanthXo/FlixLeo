@@ -254,7 +254,8 @@ private fun NativeVideoSurface(
     var trackMenu by remember { mutableStateOf("") }
     var importedSubtitleNotice by remember { mutableStateOf("") }
     var subtitlePickerReturn by remember { mutableIntStateOf(0) }
-    var holdControlsAfterSubtitle by remember { mutableStateOf(false) }
+    var holdControlsAfterSubtitle by remember(player) { mutableStateOf(false) }
+    var forceFullscreenControls by remember(player) { mutableStateOf(false) }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) {
             importedSubtitleNotice = runCatching {
@@ -279,14 +280,15 @@ private fun NativeVideoSurface(
         trackMenu = ""
         subtitlePickerReturn++
         holdControlsAfterSubtitle = true
+        forceFullscreenControls = true
         player.controlsVisible = true
         player.restoreVideoSurface()
     }
 
     val networkAdvice = rememberNetworkAdvice()
-    val showsControls = player.controlsVisible || holdControlsAfterSubtitle || mode == PlayerMode.MINI
+    val showsControls = player.controlsVisible || holdControlsAfterSubtitle || forceFullscreenControls || mode == PlayerMode.MINI
     LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture, appForeground, trackMenu, subtitlePickerReturn) {
-        if (showsControls && !holdControlsAfterSubtitle && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
+        if (showsControls && !holdControlsAfterSubtitle && !forceFullscreenControls && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
             delay(if (subtitlePickerReturn > 0) 8000 else 4500)
             if (appForeground && trackMenu.isEmpty()) player.controlsVisible = false
         }
@@ -319,7 +321,7 @@ private fun NativeVideoSurface(
         Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode) {
             detectTapGestures(
                 onTap = { 
-                    if (holdControlsAfterSubtitle) { holdControlsAfterSubtitle = false; player.controlsVisible = true }
+                    if (holdControlsAfterSubtitle || forceFullscreenControls) { holdControlsAfterSubtitle = false; forceFullscreenControls = false; player.controlsVisible = true }
                     else player.controlsVisible = !player.controlsVisible
                 },
                 onDoubleTap = {
