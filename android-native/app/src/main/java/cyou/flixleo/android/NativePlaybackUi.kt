@@ -122,7 +122,10 @@ fun NativePlaybackOverlay(
                 if (bytes.size > 3_000_000) throw IllegalArgumentException("Subtitle must be under 3 MB")
                 val subtitle = File(context.cacheDir, "flixleo-uploaded-subtitle." + extension)
                 subtitle.writeBytes(bytes)
-                if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
+                if (player.importSubtitle(Uri.fromFile(subtitle))) {
+                    if (player.saveSubtitle(Uri.fromFile(subtitle), extension)) "Subtitle installed and saved for Continue Watching"
+                    else "Subtitle installed, but could not save it locally"
+                }
                 else "Could not import subtitle; try another .srt or .vtt file"
             }.getOrElse { "Could not import subtitle file" }
         }
