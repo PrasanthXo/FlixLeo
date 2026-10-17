@@ -114,6 +114,37 @@ function mediaToken(url: string) {
   if (mediaMap.size > 120000) for (const [key,v] of mediaMap) if (v.expires < Date.now()) mediaMap.delete(key);
   return '/api/live/private/media/' + id;
 }
+// Backward-compatible catalog for Android versions that fetch the Plavio Live TV endpoint.
+// Only opaque IDs and channel metadata leave the backend.
+export async function legacyIptvCatalogs() {
+  await refresh();
+  const names = ['Sports', 'News', 'Entertainment', 'Movies & Series', 'Music', 'Kids', 'Documentary', 'Religious', 'Other'];
+  const grouped = new Map<string, PrivateChannel[]>();
+  for (const ch of channelMap.values()) {
+    const group = names.includes(ch.category) ? ch.category : 'Other';
+    if (!grouped.has(group)) grouped.set(group, []);
+    grouped.get(group)!.push(ch);
+  }
+  return names.flatMap(name => {
+    const channels = grouped.get(name) || [];
+    if (!channels.length) return [];
+    return [{
+      id: 'flixleo-' + name.toLowerCase().replace(/[^a-z]+/g, '-'),
+      type: 'channel', name,
+      items: channels.slice(0, 350).map(ch => ({
+        id: 'flixlive_' + ch.id, type: 'channel', name: ch.name,
+        poster: ch.logo, description: '', genres: [name]
+      }))
+    }];
+  });
+}
+export async function legacyIptvStream(id: string): Promise<string | null> {
+  if (!/^flixlive_[a-f0-9]{28}$/.test(id)) return null;
+  await refresh();
+  const channel = channelMap.get(id.slice('flixlive_'.length));
+  return channel ? mediaToken(channel.url) : null;
+}
+
 export function installPrivateIptv(app: Express) {
   app.get('/api/live/private/channels', async (_req: Request, res: Response) => {
     try {
