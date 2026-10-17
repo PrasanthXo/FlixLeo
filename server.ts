@@ -1116,11 +1116,13 @@ app.get('/api/stremio/plavio/live/catalog', async (_req: Request, res: Response)
       });
       return { ...catalog, items };
     }).filter(catalog => catalog.items.length > 0);
-    if (!catalogs.length && serveStalePlavioCatalog(res)) return;
-    if (catalogs.length) cachedPlavioChannels = { expires: Date.now() + 60_000, catalogs };
+    const privateCatalogs = await legacyIptvCatalogs().catch(() => []);
+    const mergedCatalogs = [...privateCatalogs, ...catalogs];
+    if (!mergedCatalogs.length && serveStalePlavioCatalog(res)) return;
+    if (mergedCatalogs.length) cachedPlavioChannels = { expires: Date.now() + 60_000, catalogs: mergedCatalogs };
     res.setHeader('Cache-Control', 'public, max-age=30');
-    return res.json({ provider: 'PlavioHD', catalogs,
-      ...(!catalogs.length ? { message: 'No Live TV channels are currently available.' } : {}) });
+    return res.json({ provider: 'FlixLeo Live TV', catalogs: mergedCatalogs,
+      ...(!mergedCatalogs.length ? { message: 'No Live TV channels are currently available.' } : {}) });
   } catch (error) {
     console.warn('PlavioHD live catalog unavailable:', error instanceof Error ? error.message : 'unknown provider failure');
     if (serveStalePlavioCatalog(res)) return;
