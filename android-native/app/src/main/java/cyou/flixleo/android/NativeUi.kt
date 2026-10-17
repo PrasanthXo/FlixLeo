@@ -200,6 +200,29 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
             }
         }
         if (state.showAuth) AccountDialog(state)
+        if (state.emailVerificationCompleted) {
+            AlertDialog(
+                onDismissRequest = {
+                    state.emailVerificationCompleted = false
+                    state.showSignup = false
+                    state.showAuth = true
+                },
+                icon = {
+                    Icon(Icons.Default.Verified, contentDescription = null, tint = Gold)
+                },
+                title = { Text("Email verified successfully") },
+                text = {
+                    Text("Your email address has been confirmed. You can now sign in to your FlixLeo account and start watching movies, series, and Live TV.")
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        state.emailVerificationCompleted = false
+                        state.showSignup = false
+                        state.showAuth = true
+                    }) { Text("Continue to sign in") }
+                }
+            )
+        }
         if (state.signupConfirmationEmail.isNotBlank()) {
             AlertDialog(
                 onDismissRequest = { state.signupConfirmationEmail = "" },
