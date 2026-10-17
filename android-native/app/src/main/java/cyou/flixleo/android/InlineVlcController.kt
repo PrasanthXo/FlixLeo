@@ -437,7 +437,7 @@ class InlineVlcController(context: Context) {
             androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
         return runCatching {
             if (usingMedia3) {
-                media3.importSubtitle(uri, format)
+                media3.importSubtitle(uri, format).also { if (it) subtitleDelayMs = 0L }
             } else {
                 val path = uri.path ?: return@runCatching false
                 engine?.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle, path, true) == true
@@ -447,14 +447,21 @@ class InlineVlcController(context: Context) {
     var subtitleDelayMs by mutableLongStateOf(0L)
         private set
     fun adjustSubtitleDelay(deltaMs: Long): Boolean {
-        if (usingMedia3 || mode == PlayerMode.CLOSED) return false
+        if (mode == PlayerMode.CLOSED) return false
         val next = (subtitleDelayMs + deltaMs).coerceIn(-10_000L, 10_000L)
         return runCatching {
-            val vlc = engine ?: return@runCatching false
-            vlc.setSpuDelay(next * 1000L)
-            subtitleDelayMs = next
-            controlsVisible = true
-            true
+            val success = if (usingMedia3) media3.shiftUploadedSubtitle(next)
+                else {
+                    val vlc = engine ?: return@runCatching false
+                    vlc.setSpuDelay(next * 1000L)
+                    true
+                }
+            if (success) {
+                subtitleDelayMs = next
+                controlsVisible = true
+                trackRevision++
+            }
+            success
         }.getOrDefault(false)
     }
     fun resetSubtitleDelay(): Boolean = adjustSubtitleDelay(-subtitleDelayMs)
