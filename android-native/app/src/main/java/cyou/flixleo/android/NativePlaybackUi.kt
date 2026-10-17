@@ -103,6 +103,13 @@ fun NativePlaybackOverlay(
     if (currentMode == PlayerMode.CLOSED) return
     val context = LocalContext.current
     var importedSubtitleNotice by remember { mutableStateOf("") }
+    var subtitleImportSuccess by remember { mutableStateOf(false) }
+    LaunchedEffect(importedSubtitleNotice) {
+        if (importedSubtitleNotice.isNotBlank()) {
+            delay(3500)
+            importedSubtitleNotice = ""
+        }
+    }
     var subtitleReturnControls by remember(player) { mutableStateOf(false) }
     var fullscreenTrackMenu by remember(player) { mutableStateOf("") }
     var subtitleSettingsOpen by remember(player) { mutableStateOf(false) }
@@ -129,9 +136,13 @@ fun NativePlaybackOverlay(
                 if (bytes.size > 3_000_000) throw IllegalArgumentException("Subtitle must be under 3 MB")
                 val subtitle = File(context.cacheDir, "flixleo-uploaded-subtitle." + extension)
                 subtitle.writeBytes(bytes)
-                if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
-                else "Could not import subtitle; try another .srt or .vtt file"
-            }.getOrElse { "Could not import subtitle file" }
+                subtitleImportSuccess = player.importSubtitle(Uri.fromFile(subtitle))
+                if (subtitleImportSuccess) "Subtitles installed successfully. Press Play to continue watching."
+                else "Unable to install subtitles. Try another .srt or .vtt file."
+            }.getOrElse {
+                subtitleImportSuccess = false
+                "Unable to install subtitles. Please try another file."
+            }
         }
         // Return to expanded playback after the Android file picker closes.
         // Keep decoder and playback position unchanged.
@@ -296,6 +307,28 @@ fun NativePlaybackOverlay(
                     .background(Color(0xDD111827), RoundedCornerShape(10.dp))
                     .padding(horizontal = 16.dp, vertical = 10.dp))
         }
+        // Show import status over the video, not inside the closed subtitle dialog.
+        // The video remains paused until the user explicitly presses Play.
+        if (importedSubtitleNotice.isNotBlank() && currentMode != PlayerMode.MINI && !player.inPictureInPicture) {
+            Row(
+                Modifier.align(Alignment.TopCenter).zIndex(75f)
+                    .padding(top = if (currentMode == PlayerMode.FULLSCREEN) 68.dp else 54.dp)
+                    .padding(horizontal = 18.dp)
+                    .background(Color(0xF2111827), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                Icon(
+                    if (subtitleImportSuccess) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                    contentDescription = null,
+                    tint = if (subtitleImportSuccess) Color(0xFF4ADE80) else Color(0xFFFCA5A5),
+                    modifier = Modifier.size(22.dp)
+                )
+                Text(importedSubtitleNotice, color = Color.White, fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold)
+            }
+        }
         // Independent fullscreen chrome: a sibling of the native video view,
         // never a descendant of the VLC/Media3 surface.
         if ((currentMode == PlayerMode.FULLSCREEN || currentMode == PlayerMode.BIG) && !player.inPictureInPicture && player.controlsVisible) {
@@ -399,7 +432,6 @@ fun NativePlaybackOverlay(
                     OutlinedButton(onClick = { player.adjustSubtitleDelay(100L) }, enabled = canSync, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("+0.1s") }
                 }
                 TextButton(onClick = { player.resetSubtitleDelay() }, enabled = canSync) { Text("Reset sync") }
-                if (importedSubtitleNotice.isNotBlank()) Text(importedSubtitleNotice)
             } }, confirmButton = { TextButton(onClick = { subtitleSettingsOpen = false; player.controlsVisible = true; controlTouch++ }) { Text("Done") } })
     }
     if (fullscreenTrackMenu.isNotBlank()) {
