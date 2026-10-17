@@ -1152,7 +1152,7 @@ export default function App() {
         {/* Live TV lives only in its own navigation destination. */}
         {currentTab === 'live' && (
           <>
-            <TamilLiveSection onPlay={handlePlayMedia} />
+            <TamilLiveSection onPlay={handlePlayMedia} onSignIn={() => setCurrentTab('profile')} />
             <PlavioLiveSection onPlay={handlePlayMedia} />
           </>
         )}
