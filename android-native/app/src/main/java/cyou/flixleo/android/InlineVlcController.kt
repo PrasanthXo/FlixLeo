@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.Executors
 import androidx.compose.runtime.*
 import org.videolan.libvlc.LibVLC
@@ -20,6 +22,33 @@ data class AudioChoice(val id: Int, val label: String)
 
 class InlineVlcController(context: Context) {
     private val appContext = context.applicationContext
+    private val subtitleFolder = File(appContext.filesDir, "subtitles")
+    private val subtitlePrefs = appContext.getSharedPreferences("subtitle_local", Context.MODE_PRIVATE)
+    private var subtitleKey = ""
+    private var subtitleRestored = false
+    fun setSubtitleMediaKey(key: String) { subtitleKey = key; subtitleRestored = false }
+    private fun subtitleId(): String = MessageDigest.getInstance("SHA-256")
+        .digest(subtitleKey.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    private fun loadLocalSubtitle(uri: Uri, ext: String): Boolean {
+        val mime = if (ext == "vtt") androidx.media3.common.MimeTypes.TEXT_VTT
+            else androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
+        return runCatching {
+            if (usingMedia3) media3.importSubtitle(uri, mime).also { if (it) media3.chooseSubtitle(-1) }
+            else engine?.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle,
+                uri.path ?: return@runCatching false, true) == true
+        }.getOrDefault(false).also { if (it) trackRevision++ }
+    }
+    private fun restoreLocalSubtitle() {
+        if (subtitleRestored || subtitleKey.isBlank() || mode == PlayerMode.CLOSED) return
+        val id = subtitleId()
+        val ext = subtitlePrefs.getString("$id.ext", null) ?: return
+        val file = File(subtitleFolder, "$id.$ext")
+        if (file.isFile && loadLocalSubtitle(Uri.fromFile(file), ext)) {
+            subtitleRestored = true
+            val delay = subtitlePrefs.getLong("$id.delay", 0L)
+            if (delay != 0L) adjustSubtitleDelay(delay)
+        }
+    }
     private val handler = Handler(Looper.getMainLooper())
     private val vlcTeardown = Executors.newSingleThreadExecutor { job ->
         Thread(job, "FlixLeo-VLC-teardown").apply { isDaemon = true }
@@ -145,6 +174,7 @@ class InlineVlcController(context: Context) {
             buffering = false
             problem = ""
             trackRevision++
+            restoreLocalSubtitle()
         }
         media3.onPaused = { playing = false }
         media3.onTrackChanged = { trackRevision++ }
@@ -250,6 +280,8 @@ class InlineVlcController(context: Context) {
         activeStream = stream
         activeResume = resumeSeconds
         playbackStarted = false
+        subtitleRestored = false
+        subtitleDelayMs = 0L
         title = displayTitle
         quality = stream.quality
         position = 0
@@ -288,6 +320,7 @@ class InlineVlcController(context: Context) {
                             buffering = false
                             problem = ""
                             trackRevision++
+                            restoreLocalSubtitle()
                         }
                         MediaPlayer.Event.Paused -> {
                             playing = false
@@ -439,18 +472,28 @@ class InlineVlcController(context: Context) {
         return
     }; runCatching { engine?.setSpuTrack(id) }; controlsVisible = true }
     fun importSubtitle(uri: Uri): Boolean {
-        if (mode == PlayerMode.CLOSED) return false
-        val format = if (uri.path.orEmpty().endsWith(".vtt", true))
-            androidx.media3.common.MimeTypes.TEXT_VTT else
-            androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
+        if (mode == PlayerMode.CLOSED || subtitleKey.isBlank()) return false
         return runCatching {
-            if (usingMedia3) {
-                media3.importSubtitle(uri, format).also { if (it) { subtitleDelayMs = 0L; media3.chooseSubtitle(-1) } }
-            } else {
-                val path = uri.path ?: return@runCatching false
-                engine?.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle, path, true) == true
+            val ext = if (uri.path.orEmpty().endsWith(".vtt", true)) "vtt" else "srt"
+            subtitleFolder.mkdirs()
+            val id = subtitleId()
+            val target = File(subtitleFolder, "$id.$ext")
+            appContext.contentResolver.openInputStream(uri)?.use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            } ?: return@runCatching false
+            if (target.length() == 0L || target.length() > 3_000_000L) {
+                target.delete()
+                return@runCatching false
             }
-        }.getOrDefault(false).also { if (it) trackRevision++ }
+            if (!loadLocalSubtitle(Uri.fromFile(target), ext)) {
+                target.delete()
+                return@runCatching false
+            }
+            subtitlePrefs.edit().putString("$id.ext", ext).putLong("$id.delay", 0L).apply()
+            subtitleRestored = true
+            subtitleDelayMs = 0L
+            true
+        }.getOrDefault(false)
     }
     fun uploadedCaptionText(): String = if (usingMedia3) media3.captionAt(position) else ""
     var subtitleDelayMs by mutableLongStateOf(0L)
@@ -470,6 +513,8 @@ class InlineVlcController(context: Context) {
                 }
             if (success) {
                 subtitleDelayMs = next
+                if (subtitleKey.isNotBlank() && subtitleRestored)
+                    subtitlePrefs.edit().putLong("${subtitleId()}.delay", next).apply()
                 controlsVisible = true
                 trackRevision++
             }
