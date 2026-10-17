@@ -594,8 +594,20 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         selected = item
         play(source)
     }
-    fun playNextEpisode(title: FlixTitle, previous: FlixStream) = scope.launch {
-        dismissUpcoming()
+    fun beginUpcomingCountdown() {
+        if (upcomingEpisode == null || upcomingJob?.isActive == true) return
+        upcomingCountdown = 10
+        upcomingJob = scope.launch {
+            while (upcomingCountdown > 0) {
+                delay(1000)
+                upcomingCountdown--
+            }
+            playUpcomingNow()
+        }
+    }
+    fun playNextEpisode(title: FlixTitle, previous: FlixStream, autoplay: Boolean = true) = scope.launch {
+        if (autoplay && upcomingEpisode != null) { beginUpcomingCountdown(); return@launch }
+        if (upcomingEpisode != null) return@launch
         try {
             val all = api.episodes(title).sortedWith(compareBy({ it.season }, { it.number }))
             val next = all.firstOrNull { it.season > title.season ||
@@ -613,14 +625,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             upcomingName = next.title.ifBlank { "Episode ${next.number}" }
             upcomingStream = chosen
             upcomingSources = sources
-            upcomingCountdown = 10
-            upcomingJob = scope.launch {
-                while (upcomingCountdown > 0) {
-                    delay(1000)
-                    upcomingCountdown--
-                }
-                playUpcomingNow()
-            }
+            if (autoplay) beginUpcomingCountdown()
         } catch (_: Exception) { message = "Could not load the next episode" }
     }
     fun toggleWatch(title: FlixTitle) {
