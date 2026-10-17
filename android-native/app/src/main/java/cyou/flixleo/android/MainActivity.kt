@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
             // InlineVlcController.start() performs the one required stop itself.
             // Avoid double stop/detach/release during high-bitrate server changes.
             currentPlayback = title to stream
+            video.setSubtitleMediaKey(state.entryKey(title))
             val resume = state.store.history.find { it.key == state.entryKey(title) }?.progress ?: 0.0
             state.playingTitle = title
             state.playbackStreams = state.streams.ifEmpty { state.playbackStreams.ifEmpty { listOf(stream) } }
