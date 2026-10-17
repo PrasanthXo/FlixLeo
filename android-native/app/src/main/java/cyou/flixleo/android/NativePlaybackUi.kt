@@ -434,6 +434,22 @@ private fun NativeVideoSurface(
                         }
                         if (importedSubtitleNotice.isNotBlank()) Text(importedSubtitleNotice, color = GoldPlayer)
                     }
+                    if (trackMenu == "subtitle") {
+                        Text("Subtitle sync", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedButton(onClick = { player.adjustSubtitleDelay(-250L) },
+                                enabled = !player.usingMedia3) { Text("−") }
+                            Text(String.format(java.util.Locale.US, "%+.2f s",
+                                player.subtitleDelayMs / 1000.0),
+                                modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            OutlinedButton(onClick = { player.adjustSubtitleDelay(250L) },
+                                enabled = !player.usingMedia3) { Text("+") }
+                        }
+                        TextButton(onClick = { player.resetSubtitleDelay() },
+                            enabled = !player.usingMedia3) { Text("Reset sync") }
+                        if (player.usingMedia3) Text("Delay adjustment is available in LibVLC playback only.",
+                            color = Color.LightGray, fontSize = 12.sp)
+                    }
                     if (tracks.isEmpty()) Text("No tracks detected in this stream.")
                     tracks.forEach { track ->
                         Row(Modifier.fillMaxWidth().clickable {
