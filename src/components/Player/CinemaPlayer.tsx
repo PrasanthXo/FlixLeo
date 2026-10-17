@@ -56,9 +56,9 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
   const subtitleUrl = useRef<string | null>(null);
   useEffect(() => () => { if (subtitleUrl.current) URL.revokeObjectURL(subtitleUrl.current); }, []);
   const uploadLocalSubtitle = async (file?: File) => {
-    if (!file || media.duration === 'Live' || file.size > 3_000_000 || !/\\.(srt|vtt)$/i.test(file.name)) return;
+    if (!file || media.duration === 'Live' || file.size > 3_000_000 || !/\.(srt|vtt)$/i.test(file.name)) return;
     const raw = await file.text();
-    const content = /\\.srt$/i.test(file.name) ? 'WEBVTT\\n\\n' + raw.replace(/\\r/g, '').replace(/(\\d\\d:\\d\\d:\\d\\d),(\\d{3})/g, '$1.$2') : raw;
+    const content = /\.srt$/i.test(file.name) ? 'WEBVTT\n\n' + raw.replace(/\r/g, '').replace(/(\d\d:\d\d:\d\d),(\d{3})/g, '$1.$2') : raw;
     if (subtitleUrl.current) URL.revokeObjectURL(subtitleUrl.current);
     subtitleUrl.current = URL.createObjectURL(new Blob([content], { type: 'text/vtt' }));
     setLocalSubtitle(subtitleUrl.current);
