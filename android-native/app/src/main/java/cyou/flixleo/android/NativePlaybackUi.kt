@@ -362,6 +362,9 @@ fun NativePlaybackOverlay(
         // Independent fullscreen chrome: a sibling of the native video view,
         // never a descendant of the VLC/Media3 surface.
         if ((currentMode == PlayerMode.FULLSCREEN || currentMode == PlayerMode.BIG) && !player.inPictureInPicture) {
+            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                .height(if (currentMode == PlayerMode.BIG) bigVideoHeight else maxHeight)
+                .zIndex(50f)) {
             Row(
                 Modifier.align(Alignment.TopCenter).zIndex(50f).fillMaxWidth()
                     .background(Color(0xD9000000)).padding(horizontal = 12.dp, vertical = 5.dp),
@@ -421,6 +424,7 @@ fun NativePlaybackOverlay(
                         Icon(if (currentMode == PlayerMode.FULLSCREEN) Icons.Default.FullscreenExit else Icons.Default.Fullscreen, contentDescription = "Toggle fullscreen", tint = Color.White)
                     }
                 }
+            }
             }
         }
     }
