@@ -318,7 +318,7 @@ private fun NativeVideoSurface(
                 modifier = Modifier.fillMaxSize().zIndex(-1f)
             )
         }
-        Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode) {
+        Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode, holdControlsAfterSubtitle, forceFullscreenControls) {
             detectTapGestures(
                 onTap = { 
                     if (holdControlsAfterSubtitle || forceFullscreenControls) { holdControlsAfterSubtitle = false; forceFullscreenControls = false; player.controlsVisible = true }
