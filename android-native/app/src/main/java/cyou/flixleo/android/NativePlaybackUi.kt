@@ -107,6 +107,13 @@ fun NativePlaybackOverlay(
     var fullscreenTrackMenu by remember(player) { mutableStateOf("") }
     var subtitleSettingsOpen by remember(player) { mutableStateOf(false) }
     var controlTouch by remember(player) { mutableIntStateOf(0) }
+    var aspectNotice by remember(player) { mutableStateOf("") }
+    LaunchedEffect(aspectNotice) {
+        if (aspectNotice.isNotBlank()) {
+            delay(1600)
+            aspectNotice = ""
+        }
+    }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) {
             importedSubtitleNotice = runCatching {
@@ -283,6 +290,12 @@ fun NativePlaybackOverlay(
                     )
                 })
         }
+        if (aspectNotice.isNotBlank() && (currentMode == PlayerMode.BIG || currentMode == PlayerMode.FULLSCREEN)) {
+            Text("Aspect ratio: " + aspectNotice, color = Color.White, fontSize = 13.sp,
+                modifier = Modifier.align(Alignment.Center).zIndex(60f)
+                    .background(Color(0xDD111827), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 16.dp, vertical = 10.dp))
+        }
         // Independent fullscreen chrome: a sibling of the native video view,
         // never a descendant of the VLC/Media3 surface.
         if ((currentMode == PlayerMode.FULLSCREEN || currentMode == PlayerMode.BIG) && !player.inPictureInPicture && player.controlsVisible) {
@@ -337,6 +350,16 @@ fun NativePlaybackOverlay(
                     }
                     IconButton(onClick = { player.jump(10_000L) }) {
                         Icon(Icons.Default.Forward10, contentDescription = "Forward 10 seconds", tint = Color.White)
+                    }
+                    IconButton(onClick = {
+                        player.changeAspect()
+                        aspectNotice = when (player.aspect) {
+                            1 -> "16:9"; 2 -> "4:3"; 3 -> "21:9"; else -> "Original"
+                        }
+                        player.controlsVisible = true
+                        controlTouch++
+                    }) {
+                        Icon(Icons.Default.AspectRatio, contentDescription = "Change aspect ratio", tint = Color.White)
                     }
                     IconButton(onClick = { fullscreenTrackMenu = "audio" }) {
                         Icon(Icons.Default.Audiotrack, contentDescription = "Change audio language", tint = Color.White)
