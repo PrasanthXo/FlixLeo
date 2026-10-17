@@ -252,6 +252,7 @@ private fun NativeVideoSurface(
     }
     var trackMenu by remember { mutableStateOf("") }
     var importedSubtitleNotice by remember { mutableStateOf("") }
+    var subtitlePickerReturn by remember { mutableIntStateOf(0) }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) {
             importedSubtitleNotice = runCatching {
@@ -270,17 +271,21 @@ private fun NativeVideoSurface(
                 if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
                 else "Could not import subtitle; try another .srt or .vtt file"
             }.getOrElse { "Could not import subtitle file" }
-            player.controlsVisible = true
-            player.restoreVideoSurface()
         }
+        // The system document picker may return while playback has continued
+        // and the existing auto-hide timer has expired. Restart the timeout.
+        trackMenu = ""
+        subtitlePickerReturn++
+        player.controlsVisible = true
+        player.restoreVideoSurface()
     }
 
     val networkAdvice = rememberNetworkAdvice()
     val showsControls = player.controlsVisible || mode == PlayerMode.MINI
-    LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture, appForeground, trackMenu) {
+    LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture, appForeground, trackMenu, subtitlePickerReturn) {
         if (showsControls && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
-            delay(4500)
-            player.controlsVisible = false
+            delay(if (subtitlePickerReturn > 0) 8000 else 4500)
+            if (appForeground && trackMenu.isEmpty()) player.controlsVisible = false
         }
     }
 
@@ -316,7 +321,7 @@ private fun NativeVideoSurface(
                 }
             )
         })
-        if (!player.inPictureInPicture) {
+        if (!player.inPictureInPicture && showsControls) {
             Row(
                 Modifier.align(Alignment.BottomStart)
                     .padding(start = 8.dp, bottom = if (mode == PlayerMode.MINI) 58.dp else if (showsControls) 115.dp else 8.dp)
@@ -490,7 +495,7 @@ private fun NativeVideoSurface(
             text = {
                 Column(Modifier.heightIn(max = 330.dp).verticalScroll(rememberScrollState())) {
                     if (trackMenu == "subtitle" && !state.playingTitle?.id.orEmpty().startsWith("plavio-live-")) {
-                        TextButton(onClick = { subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) }) {
+                        TextButton(onClick = { trackMenu = ""; subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) }) {
                             Icon(Icons.Default.UploadFile, null)
                             Spacer(Modifier.width(8.dp))
                             Text("Upload .srt / .vtt subtitle")
