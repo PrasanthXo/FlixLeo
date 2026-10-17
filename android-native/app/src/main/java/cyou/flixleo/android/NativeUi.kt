@@ -1,5 +1,7 @@
 package cyou.flixleo.android
 
+import android.content.Intent
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -760,22 +762,64 @@ private fun LiveScreen(state: FlixState) {
                 }
             }
         }
+        val favoriteChannels = state.live.flatMap { it.channels }.filter {
+            state.liveFavorites.contains(it.name.lowercase())
+        }.distinctBy { it.name.lowercase() }
+        if (favoriteChannels.isNotEmpty()) {
+            item {
+                Heading("Favorites")
+                LiveChannelRow(favoriteChannels, state)
+            }
+        }
         items(state.live) { category ->
             Heading(category.name)
-            LazyRow(contentPadding = PaddingValues(horizontal = 17.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(category.channels, key = { it.id }) { channel ->
-                    Column(Modifier.width(130.dp).clip(RoundedCornerShape(14.dp))
-                        .background(Card).clickable { state.channel(channel) }.padding(6.dp)) {
-                        AsyncImage(model = channel.poster.ifBlank { null }, contentDescription = channel.name,
-                            contentScale = ContentScale.Fit,
-                            error = painterResource(R.drawable.flixleo_brand),
-                            fallback = painterResource(R.drawable.flixleo_brand),
-                            modifier = Modifier.fillMaxWidth().height(95.dp))
-                        Text(channel.name, color = Color.White, fontSize = 12.sp,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+            LiveChannelRow(category.channels, state)
+        }
+    }
+}
+@Composable
+private fun LiveChannelRow(channels: List<LiveChannel>, state: FlixState) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LazyRow(contentPadding = PaddingValues(horizontal = 17.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(channels, key = { it.id }) { channel ->
+            var openMenu by remember(channel.id) { mutableStateOf(false) }
+            Column(Modifier.width(140.dp).clip(RoundedCornerShape(14.dp))
+                .background(Card).clickable { state.channel(channel) }.padding(6.dp)) {
+                Box {
+                    AsyncImage(model = channel.poster.ifBlank { null }, contentDescription = channel.name,
+                        contentScale = ContentScale.Fit,
+                        error = painterResource(R.drawable.flixleo_brand),
+                        fallback = painterResource(R.drawable.flixleo_brand),
+                        modifier = Modifier.fillMaxWidth().height(95.dp))
+                    Box(Modifier.align(Alignment.TopEnd)) {
+                        IconButton(onClick = { openMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Channel options", tint = Color.White)
+                        }
+                        DropdownMenu(expanded = openMenu, onDismissRequest = { openMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (state.liveFavorites.contains(channel.name.lowercase()))
+                                    "Remove from Favorites" else "Add to Favorites") },
+                                leadingIcon = { Icon(Icons.Default.Star, null) },
+                                onClick = { openMenu = false; state.toggleLiveFavorite(channel) })
+                            DropdownMenuItem(
+                                text = { Text("Share") },
+                                leadingIcon = { Icon(Icons.Default.Share, null) },
+                                onClick = {
+                                    openMenu = false
+                                    val share = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT,
+                                            "Watch " + channel.name + " on FlixLeo Live TV: https://flixleo.cyou/?liveChannel=" +
+                                                android.net.Uri.encode(channel.name))
+                                    }
+                                    context.startActivity(Intent.createChooser(share, "Share Live TV channel"))
+                                })
+                        }
                     }
                 }
+                Text(channel.name, color = Color.White, fontSize = 12.sp,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
