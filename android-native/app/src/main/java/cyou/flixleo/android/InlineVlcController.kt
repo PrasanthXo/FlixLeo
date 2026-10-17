@@ -352,10 +352,11 @@ class InlineVlcController(context: Context) {
         surface = view
         val video = engine ?: return
         try {
-            // Restore SurfaceView output used before the recent 4K regression.
-            // TextureView can add GPU composition overhead for high-bitrate HDR frames.
-            // Decoder selection remains configurable (Auto / Hardware / Software).
-            video.attachViews(view, null, false, false)
+            // Use TextureView for LibVLC, because the SurfaceView punches through
+            // Compose's controls after Android's subtitle document picker returns.
+            // This keeps the video in the same compositing layer as UI controls.
+            // Hardware/software decoder selection is unchanged.
+            video.attachViews(view, null, false, true)
             attached = true
             if (pendingStart) {
                 pendingStart = false
