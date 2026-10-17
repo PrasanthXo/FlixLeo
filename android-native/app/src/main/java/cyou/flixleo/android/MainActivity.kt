@@ -170,10 +170,10 @@ class MainActivity : ComponentActivity() {
     }
     override fun onPause() {
         super.onPause()
+        // The file picker and other background transitions must not resume an
+        // already paused video, even if a player event arrives slightly late.
         if (::video.isInitialized && !enteringPip &&
             !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) &&
-            // A file picker or background transition must never toggle a paused
-            // video back into playback because of a delayed player event.
             video.playing) video.pause()
     }
     override fun onDestroy() {
