@@ -397,6 +397,18 @@ class InlineVlcController(context: Context) {
     fun leaveFullscreen() {
         if (mode == PlayerMode.FULLSCREEN) transitionTo(previousMode)
     }
+    // Pause explicitly before opening the Android document picker. Never use
+    // toggle() here: a stale isPlaying state could accidentally start playback.
+    fun pause() {
+        if (mode == PlayerMode.CLOSED) return
+        if (usingMedia3) media3.pause()
+        else runCatching { engine?.pause() }
+        // The Activity's onPause handler runs as the document picker opens.
+        // Update Compose state synchronously so it cannot toggle playback back on.
+        playing = false
+        controlsVisible = true
+    }
+
     fun toggle() {
         if (usingMedia3) { media3.toggle(); controlsVisible = true; return }
         val video = engine ?: return
