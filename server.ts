@@ -908,6 +908,16 @@ app.get('/api/stremio/audio-fix/:ticket', (req: Request, res: Response) => {
     clearTimeout(timeout);
     activeAudioFixes--;
   };
+  // A disconnected viewer or failing transcoder must not emit an unhandled
+  // stdout pipe error and take down the entire Render service.
+  process.stdout.on('error', () => {
+    cleanup();
+    if (!res.destroyed) res.destroy();
+  });
+  res.on('error', () => {
+    cleanup();
+    if (!process.killed) process.kill('SIGKILL');
+  });
   process.stdout.pipe(res);
   process.stderr.on('data', () => { /* Never disclose origin URLs in error logs. */ });
   process.on('error', () => { cleanup(); if (!res.headersSent) res.status(502).end('Audio conversion failed'); else res.end(); });
