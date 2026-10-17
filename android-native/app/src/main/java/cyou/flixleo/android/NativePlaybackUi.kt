@@ -535,6 +535,21 @@ private fun NativeVideoSurface(
                         }
                         if (importedSubtitleNotice.isNotBlank()) Text(importedSubtitleNotice, color = GoldPlayer)
                     }
+                    if (tracks.isEmpty()) Text("No tracks detected in this stream.")
+                    tracks.forEach { track ->
+                        Row(Modifier.fillMaxWidth().clickable {
+                            if (trackMenu == "audio") player.chooseAudio(track.id)
+                            else player.chooseSubtitle(track.id)
+                            trackMenu = ""
+                        }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = track.id == chosen, onClick = null)
+                            Spacer(Modifier.width(10.dp))
+                            Text(track.label, maxLines = 2, fontSize = 14.sp)
+                        }
+                    }
+                    if (trackMenu == "subtitle") {
+                        HorizontalDivider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 8.dp))
+                    }
                     if (trackMenu == "subtitle") {
                         Text("Subtitle timing", color = GoldPlayer, fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
@@ -552,21 +567,8 @@ private fun NativeVideoSurface(
                             Text("Timing adjustment works with uploaded SRT/VTT subtitles.",
                                 color = Color.LightGray, fontSize = 11.sp)
                         }
-                        HorizontalDivider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 8.dp))
-                        Text("Subtitle tracks", color = GoldPlayer, fontWeight = FontWeight.SemiBold)
                     }
-                    if (tracks.isEmpty()) Text("No tracks detected in this stream.")
-                    tracks.forEach { track ->
-                        Row(Modifier.fillMaxWidth().clickable {
-                            if (trackMenu == "audio") player.chooseAudio(track.id)
-                            else player.chooseSubtitle(track.id)
-                            trackMenu = ""
-                        }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = track.id == chosen, onClick = null)
-                            Spacer(Modifier.width(10.dp))
-                            Text(track.label, maxLines = 2, fontSize = 14.sp)
-                        }
-                    }
+
                 }
             },
             confirmButton = { TextButton(onClick = { trackMenu = "" }) { Text("Close") } }
