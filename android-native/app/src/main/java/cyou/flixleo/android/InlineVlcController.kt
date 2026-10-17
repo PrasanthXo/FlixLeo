@@ -450,7 +450,11 @@ class InlineVlcController(context: Context) {
         if (mode == PlayerMode.CLOSED) return false
         val next = (subtitleDelayMs + deltaMs).coerceIn(-10_000L, 10_000L)
         return runCatching {
-            val success = if (usingMedia3) media3.shiftUploadedSubtitle(next)
+            // Media3 subtitle replacement calls setMediaItem()/prepare(), which
+            // tears down the video decoder and can leave a black video surface.
+            // Do not invoke it during active playback until a seamless path exists.
+            if (usingMedia3) return@runCatching false
+            val success = if (usingMedia3) false
                 else {
                     val vlc = engine ?: return@runCatching false
                     vlc.setSpuDelay(next * 1000L)
