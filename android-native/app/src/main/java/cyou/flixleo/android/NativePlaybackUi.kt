@@ -4,6 +4,9 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.os.Build
 import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.content.Context
 import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,6 +44,31 @@ import org.videolan.libvlc.util.VLCVideoLayout
 private val GoldPlayer = Color(0xFFFBBF24)
 private val BackgroundPlayer = Color(0xFF080A11)
 private val Glass = Color(0xDE111827)
+
+/** Android's reported link bandwidth is an estimate, not measured streaming throughput. */
+@Composable
+private fun rememberNetworkQuality(): String {
+    val context = LocalContext.current
+    var quality by remember { mutableStateOf("Unknown") }
+    LaunchedEffect(context) {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        while (true) {
+            quality = runCatching {
+                val network = manager.activeNetwork
+                val caps = network?.let(manager::getNetworkCapabilities)
+                when {
+                    caps == null || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) -> "Offline"
+                    !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) -> "Poor"
+                    caps.linkDownstreamBandwidthKbps >= 15_000 -> "Excellent"
+                    caps.linkDownstreamBandwidthKbps >= 3_000 -> "Good"
+                    else -> "Poor"
+                }
+            }.getOrDefault("Unknown")
+            delay(1000)
+        }
+    }
+    return quality
+}
 
 private fun stamp(ms: Long): String {
     val t = ms.coerceAtLeast(0) / 1000
@@ -232,6 +260,7 @@ private fun NativeVideoSurface(
         }
     }
 
+    val networkQuality = rememberNetworkQuality()
     val showsControls = player.controlsVisible || mode == PlayerMode.MINI
     LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture, appForeground, trackMenu) {
         if (showsControls && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
@@ -272,6 +301,24 @@ private fun NativeVideoSurface(
                 }
             )
         })
+        if (!player.inPictureInPicture) {
+            Row(
+                Modifier.align(Alignment.BottomStart)
+                    .padding(start = 8.dp, bottom = if (mode == PlayerMode.MINI) 58.dp else if (showsControls) 115.dp else 8.dp)
+                    .background(Glass, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 7.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.NetworkCheck, contentDescription = "Estimated network quality",
+                    tint = when (networkQuality) {
+                        "Excellent" -> Color(0xFF4ADE80)
+                        "Good" -> GoldPlayer
+                        else -> Color(0xFFFF7777)
+                    }, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(networkQuality, color = Color.White, fontSize = 10.sp)
+            }
+        }
         if (player.buffering && !player.inPictureInPicture) {
             val compact = mode == PlayerMode.MINI
             Box(Modifier.align(Alignment.Center)
