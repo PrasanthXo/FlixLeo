@@ -294,7 +294,8 @@ private fun NativeVideoSurface(
     Box(modifier) {
         if (player.usingMedia3) {
             val media3View = remember(context) {
-                androidx.media3.ui.PlayerView(context).apply {
+                (android.view.LayoutInflater.from(context)
+                    .inflate(R.layout.flixleo_media3_player, null) as androidx.media3.ui.PlayerView).apply {
                     useController = false
                     setBackgroundColor(android.graphics.Color.BLACK)
                 }
