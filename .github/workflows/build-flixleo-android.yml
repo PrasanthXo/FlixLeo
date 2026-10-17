@@ -39,7 +39,7 @@ jobs:
       # Build current native Android debug APK after Live TV search/category changes.
       - name: Build Android debug APK
         working-directory: android-native
-        run: gradle --no-daemon :app:assembleDebug --stacktrace
+        run: gradle --no-daemon --stacktrace :app:assembleDebug --stacktrace
       - name: Show APK size and SHA-256
         run: |
           ls -lh android-native/app/build/outputs/apk/debug/app-debug.apk
