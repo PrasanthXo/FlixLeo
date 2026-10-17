@@ -358,6 +358,64 @@ fun NativePlaybackOverlay(
             onControlsRestored = { subtitleReturnControls = false },
             modifier = geometry.clip(RoundedCornerShape(if (currentMode == PlayerMode.MINI) 14.dp else 0.dp))
                 .background(Color.Black))
+        // Independent fullscreen chrome: a sibling of the native video view,
+        // never a descendant of the VLC/Media3 surface.
+        if (currentMode == PlayerMode.FULLSCREEN && !player.inPictureInPicture) {
+            Row(
+                Modifier.align(Alignment.TopCenter).zIndex(50f).fillMaxWidth()
+                    .background(Color(0xD9000000)).padding(horizontal = 12.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { player.leaveFullscreen(); player.controlsVisible = true }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Exit fullscreen", tint = Color.White)
+                }
+                Text(player.title, color = Color.White, fontSize = 13.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                IconButton(onClick = { state.closePlayback() }) {
+                    Icon(Icons.Default.Close, contentDescription = "Close player", tint = Color.White)
+                }
+            }
+            Column(
+                Modifier.align(Alignment.BottomCenter).zIndex(50f).fillMaxWidth()
+                    .background(Color(0xE6000000)).padding(horizontal = 12.dp, vertical = 5.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stamp(player.position), color = Color.White, fontSize = 11.sp)
+                    var fullSeek by remember { mutableFloatStateOf(-1f) }
+                    val maxSeek = (player.duration / 1000L).coerceAtLeast(1).toFloat()
+                    Slider(
+                        value = if (fullSeek >= 0f) fullSeek.coerceIn(0f, maxSeek)
+                            else (player.position / 1000f).coerceIn(0f, maxSeek),
+                        onValueChange = { fullSeek = it },
+                        onValueChangeFinished = {
+                            if (fullSeek >= 0f) player.seekTo((fullSeek * 1000).toLong())
+                            fullSeek = -1f
+                        },
+                        enabled = player.canSeek && player.duration > 0,
+                        valueRange = 0f..maxSeek,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(thumbColor = GoldPlayer, activeTrackColor = GoldPlayer)
+                    )
+                    Text(stamp(player.duration), color = Color.White, fontSize = 11.sp)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { player.jump(-10_000L) }) {
+                        Icon(Icons.Default.Replay10, contentDescription = "Back 10 seconds", tint = Color.White)
+                    }
+                    IconButton(onClick = { player.toggle() }) {
+                        Icon(if (player.playing) Icons.Default.PauseCircle else Icons.Default.PlayCircle,
+                            contentDescription = "Play or pause", tint = GoldPlayer, modifier = Modifier.size(34.dp))
+                    }
+                    IconButton(onClick = { player.jump(10_000L) }) {
+                        Icon(Icons.Default.Forward10, contentDescription = "Forward 10 seconds", tint = Color.White)
+                    }
+                    IconButton(onClick = { player.leaveFullscreen(); player.controlsVisible = true }) {
+                        Icon(Icons.Default.FullscreenExit, contentDescription = "Exit fullscreen", tint = Color.White)
+                    }
+                }
+            }
+        }
     }
 }
 
