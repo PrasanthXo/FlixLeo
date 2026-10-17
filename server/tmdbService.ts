@@ -54,16 +54,32 @@ export const TMDB_LANGUAGES: Record<string, string> = {
 // In-memory cache for TMDB API calls (5 min TTL)
 const cache = new Map<string, { data: any; expiry: number }>();
 
+const MAX_CACHED_TMDB_KEYS = 250;
 export function getCached(key: string) {
   const cached = cache.get(key);
-  if (cached && Date.now() < cached.expiry) {
-    return cached.data;
+  if (!cached) return null;
+  if (Date.now() >= cached.expiry) {
+    cache.delete(key);
+    return null;
   }
-  return null;
+  // Refresh insertion order so the oldest unused entry can be evicted.
+  cache.delete(key);
+  cache.set(key, cached);
+  return cached.data;
 }
 
 export function setCached(key: string, data: any, ttlMs = 300000) {
-  cache.set(key, { data, expiry: Date.now() + ttlMs });
+  const now = Date.now();
+  for (const [k, value] of cache) {
+    if (value.expiry <= now) cache.delete(k);
+  }
+  cache.delete(key);
+  cache.set(key, { data, expiry: now + ttlMs });
+  while (cache.size > MAX_CACHED_TMDB_KEYS) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
 }
 
 // Transform TMDB raw movie object into FlixLeo MediaItem
