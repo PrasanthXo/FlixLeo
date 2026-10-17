@@ -51,7 +51,7 @@ export default function App() {
   const [isTvDisplay] = useState(() => window.location.pathname.toLowerCase().replace(/\/$/, '') === '/tv6' || /smart-tv|smarttv|hbbtv|netcast|web0s|webos|tizen|android tv|googletv|aft[a-z]|bravia|viera|roku|vidaa/i.test(navigator.userAgent));
   // Catalog State
   const [catalog, setCatalog] = useState<MediaItem[]>(MEDIA_CATALOG);
-  const [currentTab, setCurrentTab] = useState<string>('browse');
+  const [currentTab, setCurrentTab] = useState<string>(() => new URLSearchParams(window.location.search).has('liveChannel') ? 'live' : 'browse');
   const [sourceFilter, setSourceFilter] = useState<SourceType | 'all'>('all');
   const [tmdbCategory, setTmdbCategory] = useState<'trending' | 'popular' | 'top_rated' | 'indian' | 'all'>('trending');
   const [tmdbMovies, setTmdbMovies] = useState<MediaItem[]>([]);
