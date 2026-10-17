@@ -1334,7 +1334,7 @@ installSubtitleGateway(app, fetchFromTmdb);
 
 async function startServer() {
   app.use(serveAppLanding);
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && process.env.RENDER !== 'true') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
