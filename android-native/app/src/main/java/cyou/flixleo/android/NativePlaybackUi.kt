@@ -212,62 +212,50 @@ fun NativePlaybackOverlay(
                     }
                     Surface(
                         color = Color(0xFF172238),
-                        shape = RoundedCornerShape(18.dp),
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     ) {
-                        Column(Modifier.padding(16.dp)) {
+                        Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.ClosedCaption, null, tint = GoldPlayer)
-                                Spacer(Modifier.width(10.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text("External subtitles", fontWeight = FontWeight.Bold, color = Color.White)
-                                    Text("Add an SRT or VTT file without opening player controls",
-                                        fontSize = 12.sp, color = Color.LightGray)
+                                Icon(Icons.Default.ClosedCaption, null, tint = GoldPlayer,
+                                    modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(7.dp))
+                                Text("Subtitles", color = Color.White, fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                OutlinedButton(
+                                    onClick = { subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Icon(Icons.Default.UploadFile, null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Upload", fontSize = 12.sp)
                                 }
                             }
-                            Spacer(Modifier.height(12.dp))
-                            Button(
-                                onClick = { subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = GoldPlayer, contentColor = Color.Black)
-                            ) {
-                                Icon(Icons.Default.UploadFile, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Upload subtitle", fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(Modifier.height(16.dp))
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
-                            Spacer(Modifier.height(12.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Tune, null, tint = GoldPlayer, modifier = Modifier.size(19.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Subtitle sync", color = Color.White, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.weight(1f))
-                                Text(String.format(java.util.Locale.US, "%+.2f s", player.subtitleDelayMs / 1000.0),
-                                    color = GoldPlayer, fontWeight = FontWeight.Bold)
-                            }
-                            Text("Adjust subtitle timing without restarting playback.",
-                                color = Color.LightGray, fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp))
+                            Spacer(Modifier.height(7.dp))
                             val canSync = if (player.usingMedia3) player.selectedSubtitle() == 1000000
                                 else player.selectedSubtitle() != -1
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                modifier = Modifier.fillMaxWidth()) {
+                                Text("Sync", color = Color.LightGray, fontSize = 12.sp)
+                                Spacer(Modifier.weight(1f))
                                 OutlinedButton(onClick = { player.adjustSubtitleDelay(-100L) },
-                                    enabled = canSync, modifier = Modifier.weight(1f)) { Text("− 0.1s") }
+                                    enabled = canSync, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(34.dp)) { Text("−0.1s", fontSize = 12.sp) }
+                                Text(String.format(java.util.Locale.US, "%+.1f", player.subtitleDelayMs / 1000.0),
+                                    color = GoldPlayer, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 OutlinedButton(onClick = { player.adjustSubtitleDelay(100L) },
-                                    enabled = canSync, modifier = Modifier.weight(1f)) { Text("+ 0.1s") }
+                                    enabled = canSync, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(34.dp)) { Text("+0.1s", fontSize = 12.sp) }
+                                IconButton(onClick = { player.resetSubtitleDelay() }, enabled = canSync,
+                                    modifier = Modifier.size(34.dp)) {
+                                    Icon(Icons.Default.RestartAlt, contentDescription = "Reset subtitle sync",
+                                        modifier = Modifier.size(18.dp))
+                                }
                             }
-                            TextButton(onClick = { player.resetSubtitleDelay() }, enabled = canSync) {
-                                Icon(Icons.Default.RestartAlt, null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Reset sync")
-                            }
-                            if (!canSync) Text("Upload and enable a subtitle to adjust sync.",
-                                color = Color.LightGray, fontSize = 11.sp)
                             if (importedSubtitleNotice.isNotBlank()) {
-                                Text(importedSubtitleNotice, color = GoldPlayer, modifier = Modifier.padding(top = 8.dp))
+                                Text(importedSubtitleNotice, color = GoldPlayer, fontSize = 11.sp)
                             }
                         }
                     }
