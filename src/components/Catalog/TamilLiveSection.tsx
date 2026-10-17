@@ -147,7 +147,7 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
         {items.map(c => <button key={c.id} type="button" onClick={() => void play(c)}
           className="group overflow-hidden rounded-2xl border border-white/10 bg-[#111e30] text-left hover:border-amber-400 focus-visible:outline-2 focus-visible:outline-amber-400">
           <div className="relative flex aspect-video items-center justify-center bg-gradient-to-br from-slate-700 to-black">
-            <Tv2 size={28} className="text-slate-500"/>
+            <img src="/pwa-512.png" alt="" loading="lazy" className="h-12 w-12 object-contain opacity-60" />
             {c.logo && <img src={c.logo} alt="" loading="lazy" referrerPolicy="no-referrer"
               className="absolute inset-0 h-full w-full object-contain p-2" onError={e => { e.currentTarget.style.display = 'none'; }}/>}
             <span className="absolute left-2 top-2 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">LIVE</span>
