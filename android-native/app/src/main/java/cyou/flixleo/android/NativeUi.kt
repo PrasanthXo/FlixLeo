@@ -200,6 +200,34 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
             }
         }
         if (state.showAuth) AccountDialog(state)
+        if (state.signupConfirmationEmail.isNotBlank()) {
+            AlertDialog(
+                onDismissRequest = { state.signupConfirmationEmail = "" },
+                icon = { Icon(Icons.Default.MarkEmailUnread, contentDescription = null, tint = Gold) },
+                title = { Text("Verify your email address") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Thank you for signing up for FlixLeo!")
+                        Text("Please check the inbox for the email address below and open the verification link to confirm your account.")
+                        Text(state.signupConfirmationEmail, color = Gold, fontWeight = FontWeight.SemiBold)
+                        Text("After verifying your email, return to FlixLeo and sign in to start watching.")
+                        Text("Can't find the email? Check your Spam or Junk folder.", color = Muted, fontSize = 12.sp)
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { state.signupConfirmationEmail = "" }) {
+                        Text("Got it")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        state.signupConfirmationEmail = ""
+                        state.showSignup = false
+                        state.showAuth = true
+                    }) { Text("Go to sign in") }
+                }
+            )
+        }
         if (state.showOnboarding && state.account != null) PostSignupInterestsDialog(state)
         val update = state.updateNotice
         if (update != null) AlertDialog(
