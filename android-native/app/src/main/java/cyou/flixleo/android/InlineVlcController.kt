@@ -430,6 +430,20 @@ class InlineVlcController(context: Context) {
             }
         }.getOrDefault(false).also { if (it) trackRevision++ }
     }
+    var subtitleDelayMs by mutableLongStateOf(0L)
+        private set
+    fun adjustSubtitleDelay(deltaMs: Long): Boolean {
+        if (usingMedia3 || mode == PlayerMode.CLOSED) return false
+        val next = (subtitleDelayMs + deltaMs).coerceIn(-10_000L, 10_000L)
+        return runCatching {
+            val vlc = engine ?: return@runCatching false
+            vlc.setSpuDelay(next * 1000L)
+            subtitleDelayMs = next
+            controlsVisible = true
+            true
+        }.getOrDefault(false)
+    }
+    fun resetSubtitleDelay(): Boolean = adjustSubtitleDelay(-subtitleDelayMs)
     fun changeAspect() {
         aspect = (aspect + 1) % 4
         if (usingMedia3) { media3.setAspect(aspect); return }
