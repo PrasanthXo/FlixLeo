@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var video: InlineVlcController
     private var currentPlayback: Pair<FlixTitle, FlixStream>? = null
     private var lastCloudSync = 0L
+    private var nextEpisodePreviewKey = ""
     private var restoreAfterPip = PlayerMode.MINI
     private var enteringPip = false
 
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
         state = FlixState(FlixStore(applicationContext), FlixApi(), scope, installedVersionCode)
         state.onPlay = { title, stream ->
             state.dismissUpcoming()
+            nextEpisodePreviewKey = ""
             // InlineVlcController.start() performs the one required stop itself.
             // Avoid double stop/detach/release during high-bitrate server changes.
             currentPlayback = title to stream
@@ -54,6 +56,14 @@ class MainActivity : ComponentActivity() {
         }
         video.onProgress = { pos, length ->
             currentPlayback?.let { (title, stream) ->
+                if (title.type == "tv" && title.episode > 0 && length > 0 &&
+                    pos in 1 until length && length - pos <= 60000L) {
+                    val key = state.entryKey(title)
+                    if (nextEpisodePreviewKey != key) {
+                        nextEpisodePreviewKey = key
+                        state.playNextEpisode(title, stream, autoplay = false)
+                    }
+                }
                 if (pos > 0 && !title.id.startsWith("plavio-live-")) {
                     val previousDuration = state.store.history.find { it.key == state.entryKey(title) }?.duration ?: 0.0
                     val measured = length / 1000.0
