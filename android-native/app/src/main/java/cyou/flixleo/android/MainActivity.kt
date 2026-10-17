@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
         video.onProgress = { pos, length ->
             currentPlayback?.let { (title, stream) ->
                 if (title.type == "tv" && title.episode > 0 && length > 0 &&
-                    pos in 1 until length && length - pos <= 60000L) {
+                    pos > 0L && pos < length && length - pos <= 60000L) {
                     val key = state.entryKey(title)
                     if (nextEpisodePreviewKey != key) {
                         nextEpisodePreviewKey = key
