@@ -307,16 +307,16 @@ private fun NativeVideoSurface(
             AndroidView(
                 factory = { media3View.also { player.attachMedia3(it) } },
                 update = { player.attachMedia3(it) },
-                modifier = Modifier.fillMaxSize().zIndex(0f)
+                modifier = Modifier.fillMaxSize().zIndex(-1f)
             )
         } else {
             AndroidView(
                 factory = { view.also { player.attach(it) } },
                 update = { player.attach(it) },
-                modifier = Modifier.fillMaxSize().zIndex(0f)
+                modifier = Modifier.fillMaxSize().zIndex(-1f)
             )
         }
-        Box(Modifier.matchParentSize().zIndex(1f).pointerInput(mode) {
+        Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode) {
             detectTapGestures(
                 onTap = { 
                     if (holdControlsAfterSubtitle) { holdControlsAfterSubtitle = false; player.controlsVisible = true }
