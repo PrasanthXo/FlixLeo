@@ -242,7 +242,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         scope.launch {
             refreshSession().join()
             account?.user?.optString("id")?.let { store.activateUser(it); localRevision++ }
-            if (account != null) syncOnLogin(showNotice = false)
+            if (account != null) { syncOnLogin(showNotice = false); refreshLiveFavorites() }
         }
     }
     private var lastUpdateCheckAt = 0L
@@ -278,7 +278,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             lastCloudPullAt = now
             scope.launch {
                 refreshSession().join()
-                if (account != null) syncOnLogin(showNotice = false)
+                if (account != null) { syncOnLogin(showNotice = false); refreshLiveFavorites() }
             }
         }
     }
@@ -822,6 +822,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         account = null
         cloudRestoredForUser = null
         approvedTvs = emptyList()
+        liveFavorites = emptyList()
         selected = null
         playbackStreams = emptyList()
         showOnboarding = false
