@@ -103,6 +103,7 @@ fun NativePlaybackOverlay(
     if (currentMode == PlayerMode.CLOSED) return
     val context = LocalContext.current
     var importedSubtitleNotice by remember { mutableStateOf("") }
+    var subtitleReturnControls by remember(player) { mutableStateOf(false) }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) {
             importedSubtitleNotice = runCatching {
@@ -128,6 +129,7 @@ fun NativePlaybackOverlay(
         if (player.mode != PlayerMode.BIG && player.mode != PlayerMode.CLOSED) {
             player.transitionTo(PlayerMode.BIG)
         }
+        subtitleReturnControls = true
         player.controlsVisible = true
     }
     val activity = LocalContext.current as Activity
@@ -352,7 +354,8 @@ fun NativePlaybackOverlay(
             PlayerMode.FULLSCREEN -> Modifier.fillMaxSize()
             PlayerMode.CLOSED -> Modifier.size(0.dp)
         }
-        NativeVideoSurface(player, state, currentMode,
+        NativeVideoSurface(player, state, currentMode, subtitleReturnControls,
+            onControlsRestored = { subtitleReturnControls = false },
             modifier = geometry.clip(RoundedCornerShape(if (currentMode == PlayerMode.MINI) 14.dp else 0.dp))
                 .background(Color.Black))
     }
@@ -361,6 +364,8 @@ fun NativePlaybackOverlay(
 @Composable
 private fun NativeVideoSurface(
     player: InlineVlcController, state: FlixState, mode: PlayerMode,
+    subtitleReturnControls: Boolean,
+    onControlsRestored: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -387,9 +392,9 @@ private fun NativeVideoSurface(
     var subtitlePickerReturn by remember { mutableIntStateOf(0) }
 
     val networkAdvice = rememberNetworkAdvice()
-    val showsControls = player.controlsVisible || holdControlsAfterSubtitle || forceFullscreenControls || mode == PlayerMode.MINI
+    val showsControls = player.controlsVisible || subtitleReturnControls || holdControlsAfterSubtitle || forceFullscreenControls || mode == PlayerMode.MINI
     LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture, appForeground, trackMenu, subtitlePickerReturn) {
-        if (showsControls && !holdControlsAfterSubtitle && !forceFullscreenControls && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
+        if (showsControls && !subtitleReturnControls && !holdControlsAfterSubtitle && !forceFullscreenControls && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
             delay(if (subtitlePickerReturn > 0) 8000 else 4500)
             if (appForeground && trackMenu.isEmpty()) player.controlsVisible = false
         }
@@ -422,7 +427,7 @@ private fun NativeVideoSurface(
         Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode, holdControlsAfterSubtitle, forceFullscreenControls) {
             detectTapGestures(
                 onTap = { 
-                    if (holdControlsAfterSubtitle || forceFullscreenControls) { holdControlsAfterSubtitle = false; forceFullscreenControls = false; player.controlsVisible = true }
+                    if (holdControlsAfterSubtitle || forceFullscreenControls || subtitleReturnControls) { holdControlsAfterSubtitle = false; forceFullscreenControls = false; onControlsRestored(); player.controlsVisible = true }
                     else player.controlsVisible = !player.controlsVisible
                 },
                 onDoubleTap = {
