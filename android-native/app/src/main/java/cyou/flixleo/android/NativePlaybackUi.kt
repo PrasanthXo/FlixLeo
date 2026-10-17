@@ -253,6 +253,7 @@ private fun NativeVideoSurface(
     var trackMenu by remember { mutableStateOf("") }
     var importedSubtitleNotice by remember { mutableStateOf("") }
     var subtitlePickerReturn by remember { mutableIntStateOf(0) }
+    var holdControlsAfterSubtitle by remember { mutableStateOf(false) }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) {
             importedSubtitleNotice = runCatching {
@@ -276,14 +277,15 @@ private fun NativeVideoSurface(
         // and the existing auto-hide timer has expired. Restart the timeout.
         trackMenu = ""
         subtitlePickerReturn++
+        holdControlsAfterSubtitle = true
         player.controlsVisible = true
         player.restoreVideoSurface()
     }
 
     val networkAdvice = rememberNetworkAdvice()
-    val showsControls = player.controlsVisible || mode == PlayerMode.MINI
+    val showsControls = player.controlsVisible || holdControlsAfterSubtitle || mode == PlayerMode.MINI
     LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture, appForeground, trackMenu, subtitlePickerReturn) {
-        if (showsControls && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
+        if (showsControls && !holdControlsAfterSubtitle && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
             delay(if (subtitlePickerReturn > 0) 8000 else 4500)
             if (appForeground && trackMenu.isEmpty()) player.controlsVisible = false
         }
@@ -314,7 +316,10 @@ private fun NativeVideoSurface(
         }
         Box(Modifier.matchParentSize().pointerInput(mode) {
             detectTapGestures(
-                onTap = { player.controlsVisible = !player.controlsVisible },
+                onTap = { 
+                    if (holdControlsAfterSubtitle) { holdControlsAfterSubtitle = false; player.controlsVisible = true }
+                    else player.controlsVisible = !player.controlsVisible
+                },
                 onDoubleTap = {
                     if (mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
                     else player.transitionTo(PlayerMode.FULLSCREEN)
@@ -329,14 +334,7 @@ private fun NativeVideoSurface(
                     .padding(horizontal = 7.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.NetworkCheck, contentDescription = "Estimated network quality",
-                    tint = when (networkAdvice.label) {
-                        "Excellent" -> Color(0xFF4ADE80)
-                        "Good" -> GoldPlayer
-                        else -> Color(0xFFFF7777)
-                    }, modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(networkAdvice.label + " · Recommended " + networkAdvice.resolution, color = Color.White, fontSize = 10.sp, maxLines = 1)
+                Text("Recommended " + networkAdvice.resolution, color = Color.White, fontSize = 10.sp, maxLines = 1)
             }
         }
         if (player.buffering && !player.inPictureInPicture) {
