@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.Executors
 import androidx.compose.runtime.*
 import org.videolan.libvlc.LibVLC
@@ -20,6 +22,36 @@ data class AudioChoice(val id: Int, val label: String)
 
 class InlineVlcController(context: Context) {
     private val appContext = context.applicationContext
+    private val subtitlePrefs = appContext.getSharedPreferences("saved_subtitles", Context.MODE_PRIVATE)
+    private var activeSubtitleKey = ""
+    private fun subtitleId(key: String): String =
+        MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    private fun subtitleFile(key: String): File? {
+        if (key.isBlank()) return null
+        val folder = File(appContext.filesDir, "subtitles")
+        return listOf("srt", "vtt").map { File(folder, "${subtitleId(key)}.$it") }
+            .firstOrNull { it.isFile }
+    }
+    fun saveSubtitle(uri: Uri, extension: String): Boolean {
+        val key = activeSubtitleKey
+        if (key.isBlank() || extension !in listOf("srt", "vtt")) return false
+        return runCatching {
+            val folder = File(appContext.filesDir, "subtitles").apply { mkdirs() }
+            val target = File(folder, "${subtitleId(key)}.$extension")
+            appContext.contentResolver.openInputStream(uri)?.use { source ->
+                target.outputStream().use { source.copyTo(it) }
+            } ?: return@runCatching false
+            File(folder, "${subtitleId(key)}.${if (extension == "srt") "vtt" else "srt"}").delete()
+            subtitlePrefs.edit().putLong("delay_${subtitleId(key)}", subtitleDelayMs).apply()
+            true
+        }.getOrDefault(false)
+    }
+    private fun restoreSubtitle() {
+        val file = subtitleFile(activeSubtitleKey) ?: return
+        val desiredDelay = subtitlePrefs.getLong("delay_${subtitleId(activeSubtitleKey)}", 0L)
+        if (importSubtitle(Uri.fromFile(file)) && desiredDelay != 0L) adjustSubtitleDelay(desiredDelay)
+    }
     private val handler = Handler(Looper.getMainLooper())
     private val vlcTeardown = Executors.newSingleThreadExecutor { job ->
         Thread(job, "FlixLeo-VLC-teardown").apply { isDaemon = true }
@@ -168,6 +200,7 @@ class InlineVlcController(context: Context) {
             }
         }
         media3.play(stream.url, (resumeSeconds * 1000).toLong())
+        restoreSubtitle()
     }
 
     fun attachMedia3(view: androidx.media3.ui.PlayerView) = media3.attach(view)
@@ -234,7 +267,7 @@ class InlineVlcController(context: Context) {
         }
     }
 
-    fun start(stream: FlixStream, displayTitle: String, resumeSeconds: Double = 0.0, recovering: Boolean = false) {
+    fun start(stream: FlixStream, displayTitle: String, resumeSeconds: Double = 0.0, recovering: Boolean = false, subtitleKey: String = activeSubtitleKey) {
         if (Uri.parse(stream.url).scheme != "https") {
             onError("Only HTTPS video sources are supported")
             return
@@ -244,6 +277,8 @@ class InlineVlcController(context: Context) {
         stop(notifyProgress = !recovering, keepSurfaceHost = true,
             preserveMedia3 = !recovering && usingMedia3 && decoderMode != DecoderMode.SOFTWARE)
         closing = false
+        activeSubtitleKey = subtitleKey
+        subtitleDelayMs = 0L
         if (!recovering) { media3Failed = false; media3ErrorCode = null; media3FailureDetail = null }
         recoveryUsed = recovering
         if (!recovering) softwareFallback = decoderMode == DecoderMode.SOFTWARE
@@ -361,6 +396,7 @@ class InlineVlcController(context: Context) {
             if (pendingStart) {
                 pendingStart = false
                 video.play()
+                handler.postDelayed({ if (engine === video && !closing) restoreSubtitle() }, 350)
             }
         } catch (e: Exception) {
             diagnose("surface_attachment_failed_${e.javaClass.simpleName}")
@@ -470,6 +506,8 @@ class InlineVlcController(context: Context) {
                 }
             if (success) {
                 subtitleDelayMs = next
+                if (activeSubtitleKey.isNotBlank()) subtitlePrefs.edit()
+                    .putLong("delay_${subtitleId(activeSubtitleKey)}", next).apply()
                 controlsVisible = true
                 trackRevision++
             }
