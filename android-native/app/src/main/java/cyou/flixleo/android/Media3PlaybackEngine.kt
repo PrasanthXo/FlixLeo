@@ -28,32 +28,44 @@ internal class Media3PlaybackEngine(context: Context) {
     private var boundView: PlayerView? = null
     private var generation = 0
 
-    private var uploadedText: String? = null
-    private var uploadedMime: String? = null
-    private val cueTime = Regex("""(?<!\d)(?:(\d{2}):)?(\d{2}):(\d{2})([,.])(\d{3})(?!\d)""")
+    private data class Caption(val start: Long, val end: Long, val text: String)
+    private var captions: List<Caption> = emptyList()
+    private var captionEnabled = false
+    private var captionDelayMs = 0L
+    private val timestamp = Regex("""(?:(\d{2}):)?(\d{2}):(\d{2})[,.](\d{3})""")
 
-    fun shiftUploadedSubtitle(offsetMs: Long): Boolean {
-        val original = uploadedText ?: return false
-        val mime = uploadedMime ?: return false
-        val shifted = cueTime.replace(original) { match ->
-            val h = match.groupValues[1].toLongOrNull() ?: 0L
-            val m = match.groupValues[2].toLong()
-            val s = match.groupValues[3].toLong()
-            val millis = match.groupValues[5].toLong()
-            val time = (h * 3600000 + m * 60000 + s * 1000 + millis + offsetMs).coerceAtLeast(0)
-            val separator = match.groupValues[4]
-            if (match.groupValues[1].isEmpty())
-                "%02d:%02d%s%03d".format(time / 60000, time / 1000 % 60, separator, time % 1000)
-            else
-                "%02d:%02d:%02d%s%03d".format(time / 3600000, time / 60000 % 60,
-                    time / 1000 % 60, separator, time % 1000)
+    private fun time(text: String): Long? {
+        val m = timestamp.matchEntire(text.trim()) ?: return null
+        return ((m.groupValues[1].toLongOrNull() ?: 0L) * 3600 +
+            m.groupValues[2].toLong() * 60 + m.groupValues[3].toLong()) * 1000 +
+            m.groupValues[4].toLong()
+    }
+    private fun parseCaptions(content: String): List<Caption> {
+        val normalized = content.removePrefix("\uFEFF").replace("\r\n", "\n").replace('\r', '\n')
+        return normalized.split(Regex("""\n\s*\n""")).mapNotNull { block ->
+            val lines = block.lines()
+            val index = lines.indexOfFirst { it.contains("-->") }
+            if (index < 0) return@mapNotNull null
+            val span = lines[index].split("-->")
+            if (span.size != 2) return@mapNotNull null
+            val start = time(span[0]) ?: return@mapNotNull null
+            val end = time(span[1].trim().substringBefore(' ')) ?: return@mapNotNull null
+            val text = lines.drop(index + 1).joinToString("\n").trim()
+            if (end <= start || text.isEmpty()) null else Caption(start, end, text)
         }
-        return runCatching {
-            val extension = if (mime == androidx.media3.common.MimeTypes.TEXT_VTT) "vtt" else "srt"
-            val file = java.io.File(applicationContext.cacheDir, "flixleo-synced-subtitle.$extension")
-            file.writeText(shifted)
-            installSubtitle(Uri.fromFile(file), mime)
-        }.getOrDefault(false)
+    }
+    val hasUploadedCaptions: Boolean get() = captions.isNotEmpty()
+    val uploadedCaptionsSelected: Boolean get() = captionEnabled && hasUploadedCaptions
+    fun setUploadedCaptionsEnabled(enabled: Boolean) { captionEnabled = enabled && hasUploadedCaptions }
+    fun setUploadedCaptionDelay(offsetMs: Long): Boolean {
+        if (!hasUploadedCaptions) return false
+        captionDelayMs = offsetMs
+        return true
+    }
+    fun captionAt(positionMs: Long): String {
+        if (!uploadedCaptionsSelected) return ""
+        val t = positionMs - captionDelayMs
+        return captions.firstOrNull { t >= it.start && t < it.end }?.text.orEmpty()
     }
 
     var onBuffering: (Boolean, Int) -> Unit = { _, _ -> }
@@ -85,38 +97,23 @@ internal class Media3PlaybackEngine(context: Context) {
     }
 
     fun importSubtitle(uri: Uri, mimeType: String): Boolean {
-        val original = runCatching {
+        if (player == null) return false
+        val text = runCatching {
             applicationContext.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
         }.getOrNull() ?: return false
-        if (!installSubtitle(uri, mimeType)) return false
-        uploadedText = original
-        uploadedMime = mimeType
-        return true
-    }
-
-    private fun installSubtitle(uri: Uri, mimeType: String): Boolean {
-        val active = player ?: return false
-        val item = active.currentMediaItem ?: return false
-        val playbackPosition = active.currentPosition.coerceAtLeast(0L)
-        val wasPlaying = active.playWhenReady
-        val subtitle = MediaItem.SubtitleConfiguration.Builder(uri)
-            .setMimeType(mimeType)
-            .setLanguage("und")
-            .setLabel("Uploaded subtitle")
-            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-            .build()
-        active.setMediaItem(item.buildUpon().setSubtitleConfigurations(listOf(subtitle)).build(), playbackPosition)
-        active.trackSelectionParameters = active.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-            .build()
-        active.prepare()
-        active.playWhenReady = wasPlaying
+        val parsed = parseCaptions(text)
+        if (parsed.isEmpty()) return false
+        captions = parsed
+        captionEnabled = true
+        captionDelayMs = 0L
+        // Crucially: no setMediaItem(), prepare(), or decoder/surface reset.
         return true
     }
 
     fun play(url: String, resumeMs: Long = 0L) {
-        uploadedText = null
-        uploadedMime = null
+        captions = emptyList()
+        captionEnabled = false
+        captionDelayMs = 0L
         require(Uri.parse(url).scheme.equals("https", ignoreCase = true)) {
             "Only HTTPS media sources are supported"
         }
