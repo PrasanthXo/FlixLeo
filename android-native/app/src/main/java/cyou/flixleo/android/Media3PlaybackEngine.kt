@@ -176,6 +176,11 @@ internal class Media3PlaybackEngine(context: Context) {
         created.playWhenReady = true
     }
 
+    fun pause() {
+        // Idempotent: also cancels an in-flight playWhenReady while buffering.
+        player?.pause()
+    }
+
     fun toggle() {
         player?.let { if (it.isPlaying) it.pause() else it.play() }
     }
