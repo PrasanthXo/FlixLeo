@@ -199,7 +199,7 @@ private fun NativeVideoSurface(
     DisposableEffect(lifecycleOwner, player) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> { appForeground = true; player.controlsVisible = true }
+                Lifecycle.Event.ON_RESUME -> { appForeground = true; player.controlsVisible = true; player.restoreVideoSurface() }
                 Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> appForeground = false
                 else -> Unit
             }
@@ -228,6 +228,7 @@ private fun NativeVideoSurface(
                 else "Could not import subtitle; try another .srt or .vtt file"
             }.getOrElse { "Could not import subtitle file" }
             player.controlsVisible = true
+            player.restoreVideoSurface()
         }
     }
 
