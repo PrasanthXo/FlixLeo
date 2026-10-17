@@ -82,48 +82,45 @@ async function refresh() {
   loading = (async () => {
     const urls = originList();
     if (!urls.length) { channelMap.clear(); cacheUntil = Date.now() + 60_000; return; }
-    // Do not hold up to 40 complete M3U bodies in memory simultaneously.
-    // Limit concurrent downloads and keep only a small batch while parsing.
-    const result: PromiseSettledResult<string>[] = [];
-    for (let offset = 0; offset < urls.length; offset += 3) {
-      const batch = await Promise.allSettled(urls.slice(offset, offset + 3).map(async (source) => {
+    const next = new Map<string, PrivateChannel>();
+    const seen = new Set<string>();
+    // Process each small batch immediately; never retain all remote playlists.
+    for (let offset = 0; offset < urls.length && next.size < CAP; offset += 3) {
+      const batch = await Promise.allSettled(urls.slice(offset, offset + 3).map(async source => {
         const res = await fetchRemote(source);
         if (!res.ok || Number(res.headers.get('content-length') || 0) > 15_000_000) throw Error('Playlist unavailable');
         const body = await res.text();
         if (body.length > 15_000_000 || !body.trimStart().startsWith('#EXTM3U')) throw Error('Not M3U');
         return body;
       }));
-      result.push(...batch);
-    }
-    const next = new Map<string, PrivateChannel>();
-    const seen = new Set<string>();
-    for (const item of result) {
-      if (item.status !== 'fulfilled') continue;
-      let info = '';
-      let sourceCount = 0;
-      for (const raw of item.value.split(/\r?\n/)) {
-        const line = raw.trim();
-        if (line.startsWith('#EXTINF:')) { info = line; continue; }
-        if (!info || !line || line.startsWith('#')) continue;
-        if (!safeExternal(line) || !isLive(info, line)) { info = ''; continue; }
-        const name = (info.includes(',') ? info.slice(info.indexOf(',') + 1).trim() : '') || attr(info, 'tvg-name') || 'Live TV';
-        const tvgId = attr(info, 'tvg-id');
-        const genre = category(info);
-        const country = attr(info, 'tvg-country');
-        const language = attr(info, 'tvg-language') || 'Unknown';
-        const logo = attr(info, 'tvg-logo');
-        const key = (tvgId ? 'id:' + tvgId.toLowerCase() : 'url:' + line);
-        info = '';
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const id = randomBytes(14).toString('hex');
-        next.set(id, { id, name: name.slice(0, 120), url: line,
-          category: genre, language,
-          country, logo: logo.startsWith('https://') ? logo : '' });
-        sourceCount++;
-        if (next.size >= CAP || sourceCount >= PER_SOURCE_CAP) break;
+      for (const item of batch) {
+        if (item.status !== 'fulfilled') continue;
+        let info = '';
+        let sourceCount = 0;
+        for (const raw of item.value.split(/\r?\n/)) {
+          const line = raw.trim();
+          if (line.startsWith('#EXTINF:')) { info = line; continue; }
+          if (!info || !line || line.startsWith('#')) continue;
+          if (!safeExternal(line) || !isLive(info, line)) { info = ''; continue; }
+          const name = (info.includes(',') ? info.slice(info.indexOf(',') + 1).trim() : '') || attr(info, 'tvg-name') || 'Live TV';
+          const tvgId = attr(info, 'tvg-id');
+          const genre = category(info);
+          const country = attr(info, 'tvg-country');
+          const language = attr(info, 'tvg-language') || 'Unknown';
+          const logo = attr(info, 'tvg-logo');
+          const key = (tvgId ? 'id:' + tvgId.toLowerCase() : 'url:' + line);
+          info = '';
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const id = randomBytes(14).toString('hex');
+          next.set(id, { id, name: name.slice(0, 120), url: line,
+            category: genre, language, country,
+            logo: logo.startsWith('https://') ? logo : '' });
+          sourceCount++;
+          if (next.size >= CAP || sourceCount >= PER_SOURCE_CAP) break;
+        }
+        if (next.size >= CAP) break;
       }
-      if (next.size >= CAP) break;
     }
     if (next.size || !channelMap.size) { channelMap.clear(); next.forEach((v,k) => channelMap.set(k,v)); }
     cacheUntil = Date.now() + 15 * 60_000;
