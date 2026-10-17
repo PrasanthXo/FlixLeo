@@ -420,7 +420,7 @@ class InlineVlcController(context: Context) {
         if (usingMedia3 || mode == PlayerMode.CLOSED) return false
         return runCatching {
             val path = uri.path ?: return@runCatching false
-            engine?.addSlave(Media.Slave.Type.Subtitle, path, true) == true
+            engine?.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle, path, true) == true
         }.getOrDefault(false).also { if (it) trackRevision++ }
     }
     fun changeAspect() {
