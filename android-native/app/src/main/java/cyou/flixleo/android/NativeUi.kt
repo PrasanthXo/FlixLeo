@@ -1099,7 +1099,7 @@ private fun ProfileScreen(state: FlixState) {
                             ?: if (session == null) "Welcome to FlixLeo" else "Your account",
                             color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(session?.user?.optString("email") ?: "Enjoy movies without signing in",
+                        Text(session?.user?.optString("email") ?: "Sign in to play movies, series and Live TV",
                             color = Muted, fontSize = 12.sp, maxLines = 2)
                         Spacer(Modifier.height(6.dp))
                         Text(if (session == null) "GUEST MODE" else "✓ VERIFIED ACCOUNT",
