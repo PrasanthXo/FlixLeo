@@ -4,7 +4,7 @@ import nativeMobileApi from './server/nativeMobileApi';
 import windowsDownload from './server/windowsDownload';
 import landingRoutes, { serveAppLanding } from './server/landingRoutes';
 import { installSubtitleGateway } from './server/subtitleGateway';
-import { installPrivateIptv } from './server/privateIptv';
+import { installPrivateIptv, legacyIptvCatalogs, legacyIptvStream } from './server/privateIptv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -1087,11 +1087,10 @@ app.get('/api/stremio/plavio/live/catalog', async (_req: Request, res: Response)
         name: String(entry.name || entry.id).trim().slice(0, 80) || 'Live TV' }];
     }).slice(0, 12);
     if (!channelCatalogs.length) {
-      if (serveStalePlavioCatalog(res)) return;
-      return res.json({
-      provider: 'PlavioHD', catalogs: [],
-      message: 'This add-on does not currently advertise a Live TV channel catalog.'
-    });
+      const catalogs = await legacyIptvCatalogs();
+      if (!catalogs.length && serveStalePlavioCatalog(res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ provider: 'FlixLeo Live TV', catalogs });
     }
     // Maintain manifest order; one failed channel type should not remove other types.
     const requests = await Promise.allSettled(channelCatalogs.map(async catalog =>
@@ -1136,6 +1135,11 @@ app.get('/api/stremio/plavio/live/streams', async (req: Request, res: Response) 
     return res.status(400).json({ error: 'Invalid channel ID' });
   }
   try {
+    if (type === 'channel' && id.startsWith('flixlive_')) {
+      const url = await legacyIptvStream(id);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ streams: url ? [{ url: 'https://' + req.get('host') + url, title: 'Live TV' }] : [] });
+    }
     const payload = await fetchPlavioJson('/stream/' + type + '/' + encodeURIComponent(id) + '.json');
     const raw = Array.isArray(payload?.streams) ? payload.streams.slice(0, 40) : [];
     const streams = raw.flatMap((entry: any) => {
