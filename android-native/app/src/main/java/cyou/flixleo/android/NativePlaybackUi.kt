@@ -28,6 +28,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
@@ -306,16 +307,16 @@ private fun NativeVideoSurface(
             AndroidView(
                 factory = { media3View.also { player.attachMedia3(it) } },
                 update = { player.attachMedia3(it) },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize().zIndex(0f)
             )
         } else {
             AndroidView(
                 factory = { view.also { player.attach(it) } },
                 update = { player.attach(it) },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize().zIndex(0f)
             )
         }
-        Box(Modifier.matchParentSize().pointerInput(mode) {
+        Box(Modifier.matchParentSize().zIndex(1f).pointerInput(mode) {
             detectTapGestures(
                 onTap = { 
                     if (holdControlsAfterSubtitle) { holdControlsAfterSubtitle = false; player.controlsVisible = true }
@@ -343,7 +344,7 @@ private fun NativeVideoSurface(
         if (!player.inPictureInPicture && !showsControls && mode != PlayerMode.MINI) {
             IconButton(
                 onClick = { player.controlsVisible = true },
-                modifier = Modifier.align(Alignment.BottomEnd)
+                modifier = Modifier.align(Alignment.BottomEnd).zIndex(5f)
                     .padding(12.dp)
                     .background(Glass, RoundedCornerShape(14.dp))
                     .size(44.dp)
