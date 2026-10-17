@@ -56,6 +56,26 @@ internal class Media3PlaybackEngine(context: Context) {
         }
     }
 
+    fun importSubtitle(uri: Uri, mimeType: String): Boolean {
+        val active = player ?: return false
+        val item = active.currentMediaItem ?: return false
+        val playbackPosition = active.currentPosition.coerceAtLeast(0L)
+        val wasPlaying = active.playWhenReady
+        val subtitle = MediaItem.SubtitleConfiguration.Builder(uri)
+            .setMimeType(mimeType)
+            .setLanguage("und")
+            .setLabel("Uploaded subtitle")
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .build()
+        active.setMediaItem(item.buildUpon().setSubtitleConfigurations(listOf(subtitle)).build(), playbackPosition)
+        active.trackSelectionParameters = active.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .build()
+        active.prepare()
+        active.playWhenReady = wasPlaying
+        return true
+    }
+
     fun play(url: String, resumeMs: Long = 0L) {
         require(Uri.parse(url).scheme.equals("https", ignoreCase = true)) {
             "Only HTTPS media sources are supported"
