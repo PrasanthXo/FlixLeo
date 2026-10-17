@@ -340,20 +340,6 @@ private fun NativeVideoSurface(
                     tint = Color.White, modifier = Modifier.size(23.dp))
             }
         }
-        // Always offer a Compose button to recover controls if the native
-        // SurfaceView consumes a tap after subtitle import / background restore.
-        if (!player.inPictureInPicture && !showsControls && mode != PlayerMode.MINI) {
-            IconButton(
-                onClick = { player.controlsVisible = true },
-                modifier = Modifier.align(Alignment.BottomEnd)
-                    .padding(12.dp)
-                    .background(Glass, RoundedCornerShape(18.dp))
-                    .size(38.dp)
-            ) {
-                Icon(Icons.Default.Tune, contentDescription = "Show player controls",
-                    tint = Color.White, modifier = Modifier.size(21.dp))
-            }
-        }
         if (!player.inPictureInPicture && showsControls) {
             Row(
                 Modifier.align(Alignment.BottomStart)
