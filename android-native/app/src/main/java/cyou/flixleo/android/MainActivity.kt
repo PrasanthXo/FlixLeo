@@ -172,7 +172,9 @@ class MainActivity : ComponentActivity() {
         super.onPause()
         if (::video.isInitialized && !enteringPip &&
             !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) &&
-            video.playing) video.toggle()
+            // A file picker or background transition must never toggle a paused
+            // video back into playback because of a delayed player event.
+            video.playing) video.pause()
     }
     override fun onDestroy() {
         if (::video.isInitialized) video.release()
