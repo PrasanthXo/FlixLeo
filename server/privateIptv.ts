@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from 'express';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
 
@@ -27,17 +28,32 @@ const safeExternal = (input: string) => {
     return true;
   } catch { return false; }
 };
-async function fetchRemote(url: string, init: RequestInit = {}) {
+async function fetchRemote(url: string, init: RequestInit = {}, streaming = false) {
   if (!safeExternal(url)) throw Error('Disallowed upstream');
-  const response = await fetch(url, { ...init, redirect: 'manual', signal: AbortSignal.timeout(18000) });
-  if (response.status >= 300 && response.status < 400) {
-    const location = response.headers.get('location');
-    if (!location) throw Error('Invalid redirect');
-    const next = new URL(location, url).href;
-    if (!safeExternal(next)) throw Error('Disallowed redirect');
-    return fetch(next, { ...init, redirect: 'error', signal: AbortSignal.timeout(18000) });
+  const controller = new AbortController();
+  // For media, bound the connection setup but never abort an active live stream
+  // merely because its playback lasts longer than the initial fetch timeout.
+  const timeout = setTimeout(() => controller.abort(), 18000);
+  try {
+    let response = await fetch(url, { ...init, redirect: 'manual', signal: controller.signal });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) throw Error('Invalid redirect');
+      const next = new URL(location, url).href;
+      if (!safeExternal(next)) throw Error('Disallowed redirect');
+      response = await fetch(next, { ...init, redirect: 'error', signal: controller.signal });
+    }
+    if (streaming) {
+      clearTimeout(timeout);
+    } else {
+      // Non-streaming playlist fetches should still be bounded while reading the body.
+      return response;
+    }
+    return response;
+  } catch (error) {
+    clearTimeout(timeout);
+    throw error;
   }
-  return response;
 }
 function attr(info: string, key: string) {
   return (info.match(new RegExp('(?:^|\\s)' + key + '="([^"]*)"', 'i'))?.[1] || '').trim().slice(0, 120);
@@ -166,7 +182,7 @@ export function installPrivateIptv(app: Express) {
     const token = mediaMap.get(req.params.token);
     if (!token || token.expires < Date.now()) return res.sendStatus(404);
     try {
-      const upstream = await fetchRemote(token.url, { headers: req.headers.range ? { Range: String(req.headers.range) } : {} });
+      const upstream = await fetchRemote(token.url, { headers: req.headers.range ? { Range: String(req.headers.range) } : {} }, true);
       if (!upstream.ok || !upstream.body) return res.sendStatus(502);
       const contentType = upstream.headers.get('content-type') || '';
       const isPlaylist = /mpegurl|m3u8/i.test(contentType) || /\.m3u8(?:[?#]|$)/i.test(new URL(upstream.url).pathname);
@@ -195,7 +211,10 @@ export function installPrivateIptv(app: Express) {
         const contentRange = upstream.headers.get('content-range');
         if (contentRange) res.setHeader('Content-Range', contentRange);
         res.setHeader('Accept-Ranges', 'bytes');
-        Readable.fromWeb(upstream.body as any).pipe(res);
+        const stream = Readable.fromWeb(upstream.body as any);
+        // pipeline handles upstream socket/timeout errors instead of letting an
+        // unhandled Readable 'error' terminate the entire Render Node process.
+        await pipeline(stream, res);
       }
     } catch { if (!res.headersSent) res.sendStatus(502); else res.end(); }
   });
