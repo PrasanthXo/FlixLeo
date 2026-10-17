@@ -1,5 +1,6 @@
 import React from 'react';
-import { Play, RefreshCw, Tv2, RadioTower, Signal } from 'lucide-react';
+import { Play, RefreshCw, Tv2, RadioTower, Signal, MoreVertical, Star, Share2 } from 'lucide-react';
+import { currentCloudUser, liveFavoriteAccessToken } from '../../lib/cloudSync';
 import type { MediaItem, StreamMirror } from '../../types/stream';
 
 type TamilChannel = { id: string; name: string; category: string; language: string; country?: string; tvgId?: string; logo: string; url: string; alternateUrls?: string[]; privateProvider?: boolean };
@@ -19,8 +20,47 @@ function compactCategory(raw: string): string {
   return 'Other';
 }
 
-export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirrorId?: string) => void }) {
+export function TamilLiveSection({ onPlay, onSignIn }: { onPlay: (media: MediaItem, mirrorId?: string) => void; onSignIn?: () => void }) {
   const [channels, setChannels] = React.useState<TamilChannel[]>([]);
+  const [favorites, setFavorites] = React.useState<TamilChannel[]>([]);
+  const [menu, setMenu] = React.useState('');
+  const [favoriteError, setFavoriteError] = React.useState('');
+  const user = currentCloudUser();
+  React.useEffect(() => {
+    if (!user) { setFavorites([]); return; }
+    let active = true;
+    void liveFavoriteAccessToken()
+      .then(token => fetch('/api/live/favorites', { headers: { Authorization: 'Bearer ' + token } }))
+      .then(async response => { if (!response.ok) throw Error('Sync failed'); return response.json(); })
+      .then(data => { if (active) setFavorites(Array.isArray(data.favorites) ? data.favorites : []); })
+      .catch(() => { if (active) setFavoriteError('Could not load cloud favorites.'); });
+    return () => { active = false; };
+  }, [user?.id]);
+  const keyOf = (channel: TamilChannel) => (channel.tvgId || channel.name).trim().toLowerCase() + '|' + (channel.country || '').toLowerCase();
+  async function toggleFavorite(channel: TamilChannel) {
+    setMenu('');
+    if (!user) { setFavoriteError('Sign in or sign up to add favorite channels.'); onSignIn?.(); return; }
+    const key = keyOf(channel);
+    const next = favorites.some(f => keyOf(f) === key) ? favorites.filter(f => keyOf(f) !== key) : [...favorites, channel];
+    try {
+      const token = await liveFavoriteAccessToken();
+      const response = await fetch('/api/live/favorites', { method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ favorites: next }) });
+      if (!response.ok) throw Error('Cloud favorites save failed');
+      setFavorites(next);
+      setFavoriteError('');
+    } catch { setFavoriteError('Unable to save favorites. Retry when connected.'); }
+  }
+  async function shareChannel(channel: TamilChannel) {
+    setMenu('');
+    const url = new URL(window.location.href);
+    url.searchParams.set('liveChannel', channel.name);
+    try {
+      if (navigator.share) await navigator.share({ title: channel.name + ' · FlixLeo Live TV', url: url.href });
+      else await navigator.clipboard.writeText(url.href);
+    } catch { /* user dismissed share menu */ }
+  }
   const [category, setCategory] = React.useState('All Categories');
   const [search, setSearch] = React.useState('');
   const [reload, setReload] = React.useState(0);
@@ -57,15 +97,19 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
     if (/\b(?:espn|star sports|sky sports|sony sports|ten sports|bein sports|eurosport|sports? tv|cricket tv|willow tv|f1 tv|nfl network|nba tv|fox sports|tnt sports|super sport|supersport|sport1|sport 1)\b/i.test(title)) return 'Sports';
     return compactCategory(channel.category);
   };
-  const categories = ['All Categories', ...LIVE_CATEGORIES];
-  const shown = channels.filter(ch => (category === 'All Categories' || channelCategory(ch) === category) &&
+  const categories = ['All Categories', 'Favorites', ...LIVE_CATEGORIES];
+  const shown = channels.filter(ch => (category === 'All Categories' || category === 'Favorites' || channelCategory(ch) === category) &&
     ch.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const byCategory = shown.reduce<Record<string, TamilChannel[]>>((acc,ch) => {
     (acc[channelCategory(ch)] ||= []).push(ch);
     return acc;
   }, {});
-  const orderedGroups: Array<readonly [string, TamilChannel[]]> = LIVE_CATEGORIES.filter(name => byCategory[name]?.length)
+  const favoriteChannels = shown.filter(ch => favorites.some(f => keyOf(f) === keyOf(ch)));
+  const normalGroups: Array<readonly [string, TamilChannel[]]> = LIVE_CATEGORIES.filter(name => byCategory[name]?.length)
     .map(name => [name, byCategory[name].sort((a,b) => a.name.localeCompare(b.name))] as const);
+  const orderedGroups: Array<readonly [string, TamilChannel[]]> =
+    category === 'Favorites' ? [['Favorites', favoriteChannels]] :
+    favoriteChannels.length ? [['Favorites', favoriteChannels], ...normalGroups] : normalGroups;
   async function play(channel: TamilChannel) {
     let primaryUrl = channel.url;
     if (channel.privateProvider) {
@@ -115,6 +159,7 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
         </button>
       </div>
     </div>
+    {favoriteError && <p role="alert" className="text-sm text-amber-300">{favoriteError}</p>}
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="space-y-1 text-sm text-slate-300">Category
         <select value={category} onChange={e => setCategory(e.target.value)}
@@ -144,17 +189,33 @@ export function TamilLiveSection({ onPlay }: { onPlay: (media: MediaItem, mirror
       <div className="mb-4 flex justify-between gap-3"><h3 className="text-lg font-bold text-white">{name}</h3>
         <span className="text-xs text-slate-400">{items.length} channels</span></div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {items.map(c => <button key={c.id} type="button" onClick={() => void play(c)}
-          className="group overflow-hidden rounded-2xl border border-white/10 bg-[#111e30] text-left hover:border-amber-400 focus-visible:outline-2 focus-visible:outline-amber-400">
+        {items.map(c => <div key={c.id} role="button" tabIndex={0} onClick={() => void play(c)}
+          onKeyDown={event => { if (event.key === 'Enter') void play(c); }}
+          className="group relative rounded-2xl border border-white/10 bg-[#111e30] text-left hover:border-amber-400 focus-visible:outline-2 focus-visible:outline-amber-400">
           <div className="relative flex aspect-video items-center justify-center bg-gradient-to-br from-slate-700 to-black">
             <img src="/pwa-512.png" alt="" loading="lazy" className="h-12 w-12 object-contain opacity-60" />
             {c.logo && <img src={c.logo} alt="" loading="lazy" referrerPolicy="no-referrer"
               className="absolute inset-0 h-full w-full object-contain p-2" onError={e => { e.currentTarget.style.display = 'none'; }}/>}
             <span className="absolute left-2 top-2 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">LIVE</span>
+            <div className="absolute right-2 top-2 z-20">
+              <button type="button" aria-label={'Channel options: ' + c.name}
+                onClick={event => { event.stopPropagation(); setMenu(menu === c.id ? '' : c.id); }}
+                className="rounded-full bg-black/75 p-2 text-white"><MoreVertical size={17}/></button>
+              {menu === c.id && <div className="absolute right-0 top-9 z-30 w-48 rounded-xl border border-white/20 bg-slate-900 p-1 shadow-xl">
+                <button type="button" onClick={event => { event.stopPropagation(); void toggleFavorite(c); }}
+                  className="flex w-full items-center gap-2 rounded-lg p-2 text-sm text-white hover:bg-white/10">
+                  <Star size={16}/>{favorites.some(f => keyOf(f) === keyOf(c)) ? 'Remove from Favorites' : 'Add to Favorites'}
+                </button>
+                <button type="button" onClick={event => { event.stopPropagation(); void shareChannel(c); }}
+                  className="flex w-full items-center gap-2 rounded-lg p-2 text-sm text-white hover:bg-white/10">
+                  <Share2 size={16}/>Share
+                </button>
+              </div>}
+            </div>
             <Play size={20} className="absolute bottom-2 right-2 rounded-full bg-amber-400 p-1 text-black"/>
           </div>
           <div className="px-3 py-2.5"><p className="truncate text-sm font-semibold text-white">{c.name}</p><p className="truncate text-xs text-slate-400">{c.language}</p></div>
-        </button>)}
+        </div>)}
       </div>
     </div>)}
   </section>;
