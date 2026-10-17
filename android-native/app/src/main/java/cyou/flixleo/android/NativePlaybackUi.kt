@@ -340,7 +340,7 @@ fun NativePlaybackOverlay(
         AlertDialog(onDismissRequest = { subtitleSettingsOpen = false; player.controlsVisible = true; controlTouch++ },
             title = { Text("Subtitles") },
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(onClick = { subtitleSettingsOpen = false; subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) }) {
+                TextButton(onClick = { if (player.playing) player.toggle(); player.controlsVisible = true; controlTouch++; subtitleSettingsOpen = false; subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) }) {
                     Icon(Icons.Default.UploadFile, null); Spacer(Modifier.width(8.dp)); Text("Upload .srt / .vtt")
                 }
                 TextButton(onClick = { subtitleSettingsOpen = false; fullscreenTrackMenu = "subtitle" }) { Text("Change subtitle track") }
