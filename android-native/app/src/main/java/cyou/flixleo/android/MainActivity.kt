@@ -54,8 +54,13 @@ class MainActivity : ComponentActivity() {
         }
         video.onProgress = { pos, length ->
             currentPlayback?.let { (title, stream) ->
-                if (pos > 0) {
-                    state.store.remember(title, pos / 1000.0, length / 1000.0, stream.id)
+                if (pos > 0 && !title.id.startsWith("plavio-live-")) {
+                    val previousDuration = state.store.history.find { it.key == state.entryKey(title) }?.duration ?: 0.0
+                    val measured = length / 1000.0
+                    // IPTV/decoder resets can report zero or stale duration. Never overwrite
+                    // a known movie/episode length with an invalid smaller number.
+                    val reliableDuration = if (measured > 0 && measured >= pos / 1000.0) measured else previousDuration
+                    state.store.remember(title, pos / 1000.0, reliableDuration, stream.id)
                     state.localRevision++
                     if (System.currentTimeMillis() - lastCloudSync > 65000) {
                         lastCloudSync = System.currentTimeMillis()
