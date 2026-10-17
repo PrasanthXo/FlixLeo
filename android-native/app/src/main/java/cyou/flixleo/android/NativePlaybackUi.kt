@@ -326,6 +326,20 @@ private fun NativeVideoSurface(
                 }
             )
         })
+        // Dedicated recovery control: a SurfaceView or the Android document picker
+        // can consume the first tap, but this Compose button remains clickable.
+        if (!player.inPictureInPicture && !showsControls && mode != PlayerMode.MINI) {
+            IconButton(
+                onClick = { player.controlsVisible = true },
+                modifier = Modifier.align(Alignment.BottomEnd)
+                    .padding(12.dp)
+                    .background(Glass, RoundedCornerShape(14.dp))
+                    .size(44.dp)
+            ) {
+                Icon(Icons.Default.Tune, contentDescription = "Show player controls",
+                    tint = Color.White, modifier = Modifier.size(23.dp))
+            }
+        }
         if (!player.inPictureInPicture && showsControls) {
             Row(
                 Modifier.align(Alignment.BottomStart)
