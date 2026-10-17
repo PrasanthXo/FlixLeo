@@ -105,6 +105,8 @@ fun NativePlaybackOverlay(
     var importedSubtitleNotice by remember { mutableStateOf("") }
     var subtitleReturnControls by remember(player) { mutableStateOf(false) }
     var fullscreenTrackMenu by remember(player) { mutableStateOf("") }
+    var subtitleSettingsOpen by remember(player) { mutableStateOf(false) }
+    var controlTouch by remember(player) { mutableIntStateOf(0) }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) {
             importedSubtitleNotice = runCatching {
@@ -126,12 +128,15 @@ fun NativePlaybackOverlay(
         }
         // Return to expanded playback after the Android file picker closes.
         // Keep decoder and playback position unchanged.
-        if (player.mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
-        if (player.mode != PlayerMode.BIG && player.mode != PlayerMode.CLOSED) {
-            player.transitionTo(PlayerMode.BIG)
-        }
-        subtitleReturnControls = true
+        subtitleReturnControls = false
         player.controlsVisible = true
+        controlTouch++
+    }
+    LaunchedEffect(controlTouch, currentMode, player.playing, subtitleSettingsOpen, fullscreenTrackMenu) {
+        if (currentMode != PlayerMode.MINI && player.playing && !subtitleSettingsOpen && fullscreenTrackMenu.isEmpty()) {
+            delay(5000)
+            player.controlsVisible = false
+        }
     }
     val activity = LocalContext.current as Activity
     var lastNonPiP by remember { mutableStateOf(PlayerMode.BIG) }
@@ -219,55 +224,6 @@ fun NativePlaybackOverlay(
                             Text("Fullscreen")
                         }
                     }
-                    Surface(
-                        color = Color(0xFF172238),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    ) {
-                        Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.ClosedCaption, null, tint = GoldPlayer,
-                                    modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(7.dp))
-                                Text("Subtitles", color = Color.White, fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp, modifier = Modifier.weight(1f))
-                                OutlinedButton(
-                                    onClick = { subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) },
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier.height(34.dp)
-                                ) {
-                                    Icon(Icons.Default.UploadFile, null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Upload", fontSize = 12.sp)
-                                }
-                            }
-                            Spacer(Modifier.height(7.dp))
-                            val canSync = if (player.usingMedia3) player.selectedSubtitle() == 1000000
-                                else player.selectedSubtitle() != -1
-                            Row(verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                modifier = Modifier.fillMaxWidth()) {
-                                Text("Sync", color = Color.LightGray, fontSize = 12.sp)
-                                Spacer(Modifier.weight(1f))
-                                OutlinedButton(onClick = { player.adjustSubtitleDelay(-100L) },
-                                    enabled = canSync, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                    modifier = Modifier.height(34.dp)) { Text("−0.1s", fontSize = 12.sp) }
-                                Text(String.format(java.util.Locale.US, "%+.1f", player.subtitleDelayMs / 1000.0),
-                                    color = GoldPlayer, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                OutlinedButton(onClick = { player.adjustSubtitleDelay(100L) },
-                                    enabled = canSync, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                    modifier = Modifier.height(34.dp)) { Text("+0.1s", fontSize = 12.sp) }
-                                IconButton(onClick = { player.resetSubtitleDelay() }, enabled = canSync,
-                                    modifier = Modifier.size(34.dp)) {
-                                    Icon(Icons.Default.RestartAlt, contentDescription = "Reset subtitle sync",
-                                        modifier = Modifier.size(18.dp))
-                                }
-                            }
-                            if (importedSubtitleNotice.isNotBlank()) {
-                                Text(importedSubtitleNotice, color = GoldPlayer, fontSize = 11.sp)
-                            }
-                        }
-                    }
                     HorizontalDivider(Modifier.padding(vertical = 17.dp), color = Color.DarkGray)
                     Text("Video quality", fontWeight = FontWeight.Bold, color = Color.White)
                     Spacer(Modifier.height(8.dp))
@@ -307,11 +263,12 @@ fun NativePlaybackOverlay(
         }
         NativeVideoSurface(player, state, currentMode, subtitleReturnControls,
             onControlsRestored = { subtitleReturnControls = false },
+            onVideoTap = { player.controlsVisible = !player.controlsVisible; controlTouch++ },
             modifier = geometry.clip(RoundedCornerShape(if (currentMode == PlayerMode.MINI) 14.dp else 0.dp))
                 .background(Color.Black))
         // Independent fullscreen chrome: a sibling of the native video view,
         // never a descendant of the VLC/Media3 surface.
-        if ((currentMode == PlayerMode.FULLSCREEN || currentMode == PlayerMode.BIG) && !player.inPictureInPicture) {
+        if ((currentMode == PlayerMode.FULLSCREEN || currentMode == PlayerMode.BIG) && !player.inPictureInPicture && player.controlsVisible) {
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth()
                 .height(if (currentMode == PlayerMode.BIG) bigVideoHeight else maxHeight)
                 .zIndex(50f)) {
@@ -367,7 +324,7 @@ fun NativePlaybackOverlay(
                     IconButton(onClick = { fullscreenTrackMenu = "audio" }) {
                         Icon(Icons.Default.Audiotrack, contentDescription = "Change audio language", tint = Color.White)
                     }
-                    IconButton(onClick = { fullscreenTrackMenu = "subtitle" }) {
+                    IconButton(onClick = { subtitleSettingsOpen = true }) {
                         Icon(Icons.Default.Subtitles, contentDescription = "Change subtitle track", tint = Color.White)
                     }
                     IconButton(onClick = { if (currentMode == PlayerMode.FULLSCREEN) player.leaveFullscreen() else player.transitionTo(PlayerMode.FULLSCREEN); player.controlsVisible = true }) {
@@ -377,6 +334,25 @@ fun NativePlaybackOverlay(
             }
             }
         }
+    }
+    if (subtitleSettingsOpen) {
+        val canSync = if (player.usingMedia3) player.selectedSubtitle() == 1000000 else player.selectedSubtitle() != -1
+        AlertDialog(onDismissRequest = { subtitleSettingsOpen = false; player.controlsVisible = true; controlTouch++ },
+            title = { Text("Subtitles") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextButton(onClick = { subtitleSettingsOpen = false; subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) }) {
+                    Icon(Icons.Default.UploadFile, null); Spacer(Modifier.width(8.dp)); Text("Upload .srt / .vtt")
+                }
+                TextButton(onClick = { subtitleSettingsOpen = false; fullscreenTrackMenu = "subtitle" }) { Text("Change subtitle track") }
+                Text("Subtitle synchronization", color = Color.White)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    OutlinedButton(onClick = { player.adjustSubtitleDelay(-100L) }, enabled = canSync, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("−0.1s") }
+                    Text(String.format(java.util.Locale.US, "%+.1fs", player.subtitleDelayMs / 1000.0), modifier = Modifier.weight(1f), color = GoldPlayer)
+                    OutlinedButton(onClick = { player.adjustSubtitleDelay(100L) }, enabled = canSync, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("+0.1s") }
+                }
+                TextButton(onClick = { player.resetSubtitleDelay() }, enabled = canSync) { Text("Reset sync") }
+                if (importedSubtitleNotice.isNotBlank()) Text(importedSubtitleNotice)
+            } }, confirmButton = { TextButton(onClick = { subtitleSettingsOpen = false; player.controlsVisible = true; controlTouch++ }) { Text("Done") } })
     }
     if (fullscreenTrackMenu.isNotBlank()) {
         val audioMenu = fullscreenTrackMenu == "audio"
@@ -420,6 +396,7 @@ private fun NativeVideoSurface(
     player: InlineVlcController, state: FlixState, mode: PlayerMode,
     subtitleReturnControls: Boolean,
     onControlsRestored: () -> Unit,
+    onVideoTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -481,8 +458,7 @@ private fun NativeVideoSurface(
         Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode, holdControlsAfterSubtitle, forceFullscreenControls, subtitleReturnControls) {
             detectTapGestures(
                 onTap = { 
-                    if (holdControlsAfterSubtitle || forceFullscreenControls || subtitleReturnControls) { holdControlsAfterSubtitle = false; forceFullscreenControls = false; onControlsRestored(); player.controlsVisible = true }
-                    else player.controlsVisible = !player.controlsVisible
+                    onControlsRestored(); onVideoTap()
                 },
                 onDoubleTap = {
                     forceFullscreenControls = true
