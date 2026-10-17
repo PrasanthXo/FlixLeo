@@ -326,6 +326,17 @@ private fun NativeVideoSurface(
                 }
             )
         })
+        // Independent Compose caption layer: never restart the video decoder.
+        val caption = player.uploadedCaptionText()
+        if (caption.isNotBlank() && !player.inPictureInPicture) {
+            Text(caption, color = Color.White, fontSize = if (mode == PlayerMode.MINI) 12.sp else 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(horizontal = 20.dp, bottom = if (showsControls) 125.dp else 28.dp)
+                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 8.dp, vertical = 3.dp))
+        }
         // Dedicated recovery control: a SurfaceView or the Android document picker
         // can consume the first tap, but this Compose button remains clickable.
         if (!player.inPictureInPicture && !showsControls && mode != PlayerMode.MINI) {
@@ -543,14 +554,14 @@ private fun NativeVideoSurface(
                             color = Color.LightGray, fontSize = 12.sp)
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween) {
-                            OutlinedButton(onClick = { player.adjustSubtitleDelay(-250L) }, enabled = !player.usingMedia3) { Text("− 0.25s") }
+                            OutlinedButton(onClick = { player.adjustSubtitleDelay(-250L) }, enabled = player.selectedSubtitle() != -1) { Text("− 0.25s") }
                             Text(String.format(java.util.Locale.US, "%+.2f s", player.subtitleDelayMs / 1000.0),
                                 color = Color.White, fontWeight = FontWeight.Bold)
-                            OutlinedButton(onClick = { player.adjustSubtitleDelay(250L) }, enabled = !player.usingMedia3) { Text("+ 0.25s") }
+                            OutlinedButton(onClick = { player.adjustSubtitleDelay(250L) }, enabled = player.selectedSubtitle() != -1) { Text("+ 0.25s") }
                         }
-                        TextButton(onClick = { player.resetSubtitleDelay() }, enabled = !player.usingMedia3) { Text("Reset timing") }
+                        TextButton(onClick = { player.resetSubtitleDelay() }, enabled = player.selectedSubtitle() != -1) { Text("Reset timing") }
                         if (player.usingMedia3) {
-                            Text("Timing adjustment is temporarily unavailable for Media3 while playback stability is repaired.",
+                            Text("Timing adjustment applies to uploaded SRT/VTT subtitles. Embedded Media3 tracks do not support delay.",
                                 color = Color.LightGray, fontSize = 11.sp)
                         }
                     }
