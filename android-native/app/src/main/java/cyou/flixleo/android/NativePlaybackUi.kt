@@ -450,6 +450,25 @@ private fun NativeVideoSurface(
                         if (player.usingMedia3) Text("Delay adjustment is available in LibVLC playback only.",
                             color = Color.LightGray, fontSize = 12.sp)
                     }
+                    if (trackMenu == "subtitle") {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceEvenly) {
+                            TextButton(onClick = { player.adjustSubtitleDelay(-250L) }, enabled = !player.usingMedia3) {
+                                Text("− 0.25s")
+                            }
+                            Text("Sync: " + String.format(java.util.Locale.US, "%+.2fs", player.subtitleDelayMs / 1000.0),
+                                color = Color.White, fontSize = 13.sp)
+                            TextButton(onClick = { player.adjustSubtitleDelay(250L) }, enabled = !player.usingMedia3) {
+                                Text("+ 0.25s")
+                            }
+                        }
+                        if (player.usingMedia3) {
+                            Text("Subtitle timing adjustment is available with LibVLC playback.",
+                                color = GoldPlayer, fontSize = 12.sp)
+                        } else {
+                            TextButton(onClick = { player.resetSubtitleDelay() }) { Text("Reset subtitle sync") }
+                        }
+                    }
                     if (tracks.isEmpty()) Text("No tracks detected in this stream.")
                     tracks.forEach { track ->
                         Row(Modifier.fillMaxWidth().clickable {
