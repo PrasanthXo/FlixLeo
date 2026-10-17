@@ -266,6 +266,23 @@ fun NativePlaybackOverlay(
             onVideoTap = { player.controlsVisible = !player.controlsVisible; controlTouch++ },
             modifier = geometry.clip(RoundedCornerShape(if (currentMode == PlayerMode.MINI) 14.dp else 0.dp))
                 .background(Color.Black))
+        // Capture taps above the native TextureView, including after Android's
+        // subtitle picker returns. Native video views can consume Compose touches.
+        if ((currentMode == PlayerMode.BIG || currentMode == PlayerMode.FULLSCREEN) && !player.inPictureInPicture) {
+            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                .height(if (currentMode == PlayerMode.BIG) bigVideoHeight else maxHeight)
+                .zIndex(40f).pointerInput(currentMode) {
+                    detectTapGestures(
+                        onTap = { player.controlsVisible = !player.controlsVisible; controlTouch++ },
+                        onDoubleTap = {
+                            player.controlsVisible = true
+                            controlTouch++
+                            if (currentMode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
+                            else player.transitionTo(PlayerMode.FULLSCREEN)
+                        }
+                    )
+                })
+        }
         // Independent fullscreen chrome: a sibling of the native video view,
         // never a descendant of the VLC/Media3 surface.
         if ((currentMode == PlayerMode.FULLSCREEN || currentMode == PlayerMode.BIG) && !player.inPictureInPicture && player.controlsVisible) {
@@ -458,7 +475,7 @@ private fun NativeVideoSurface(
                 modifier = Modifier.fillMaxSize().zIndex(-1f)
             )
         }
-        Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode, holdControlsAfterSubtitle, forceFullscreenControls, subtitleReturnControls) {
+        if (mode == PlayerMode.MINI) Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode, holdControlsAfterSubtitle, forceFullscreenControls, subtitleReturnControls) {
             detectTapGestures(
                 onTap = { 
                     onControlsRestored(); onVideoTap()
