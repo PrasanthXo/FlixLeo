@@ -729,8 +729,17 @@ private fun LiveScreen(state: FlixState) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 25.dp)) {
         item {
             Heading("Live TV", "Channel categories from connected providers")
-            if (state.live.isEmpty()) {
-                Text("Channels not available right now", color = Muted, modifier = Modifier.padding(17.dp))
+            if (state.liveLoading) {
+                Row(Modifier.fillMaxWidth().padding(18.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Gold, strokeWidth = 2.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Tuning live channels…", color = Muted)
+                }
+            } else if (state.live.isEmpty()) {
+                Text(state.liveError.ifBlank { "Channels not available right now" },
+                    color = Muted, modifier = Modifier.padding(17.dp))
                 TextButton(onClick = { state.refreshLive() }, modifier = Modifier.padding(start = 12.dp)) {
                     Text("Retry Live TV")
                 }
