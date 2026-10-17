@@ -602,7 +602,7 @@ private fun NativeVideoSurface(
                 modifier = Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = .85f))
                     .padding(15.dp))
         }
-        if (!player.inPictureInPicture && showsControls) {
+        if (!player.inPictureInPicture && showsControls && mode != PlayerMode.FULLSCREEN) {
             if (mode == PlayerMode.MINI) {
                 Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).zIndex(4f).background(Glass)
                     .height(55.dp).padding(horizontal = 5.dp),
