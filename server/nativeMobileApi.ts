@@ -202,9 +202,13 @@ router.put('/api/native/data', async (req, res) => {
       body.watchlist.length > 500 || body.history.length > 50) return res.status(400).json({ error: 'Invalid user-data payload.' });
   const watchlist = body.watchlist.filter((v: unknown) => typeof v === 'string' && v.length <= 100).slice(0, 500);
   const history = body.history.filter((v: any) => v && typeof v === 'object' && typeof v.media?.id === 'string').slice(0, 20);
+  const previous = await remote('/rest/v1/flixleo_user_data?select=payload&user_id=eq.' + encodeURIComponent(auth.user.id) + '&limit=1', {}, auth.token);
+  if (!previous.ok) return res.status(previous.status).json({ error: message(previous) });
+  const existingPayload = Array.isArray(previous.data) && previous.data[0]?.payload &&
+    typeof previous.data[0].payload === 'object' ? previous.data[0].payload : {};
   const row = await remote('/rest/v1/flixleo_user_data?on_conflict=user_id', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ user_id: auth.user.id, payload: { watchlist, history, updatedAt: Date.now() }, updated_at: new Date().toISOString() })
+    body: JSON.stringify({ user_id: auth.user.id, payload: { ...existingPayload, watchlist, history, updatedAt: Date.now() }, updated_at: new Date().toISOString() })
   }, auth.token);
   return res.status(row.ok ? 200 : row.status).json(row.ok ? { success: true } : { error: message(row) });
 });
