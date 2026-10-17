@@ -1138,7 +1138,7 @@ app.get('/api/stremio/plavio/live/streams', async (req: Request, res: Response) 
     if (type === 'channel' && id.startsWith('flixlive_')) {
       const url = await legacyIptvStream(id);
       res.setHeader('Cache-Control', 'no-store');
-      return res.json({ streams: url ? [{ url: 'https://' + req.get('host') + url, title: 'Live TV' }] : [] });
+      return res.json({ streams: url ? [{ url: 'https://flixleo.cyou' + url, title: 'Live TV' }] : [] });
     }
     const payload = await fetchPlavioJson('/stream/' + type + '/' + encodeURIComponent(id) + '.json');
     const raw = Array.isArray(payload?.streams) ? payload.streams.slice(0, 40) : [];
