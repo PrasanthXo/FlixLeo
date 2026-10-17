@@ -543,14 +543,14 @@ private fun NativeVideoSurface(
                             color = Color.LightGray, fontSize = 12.sp)
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween) {
-                            OutlinedButton(onClick = { player.adjustSubtitleDelay(-250L) }) { Text("− 0.25s") }
+                            OutlinedButton(onClick = { player.adjustSubtitleDelay(-250L) }, enabled = !player.usingMedia3) { Text("− 0.25s") }
                             Text(String.format(java.util.Locale.US, "%+.2f s", player.subtitleDelayMs / 1000.0),
                                 color = Color.White, fontWeight = FontWeight.Bold)
-                            OutlinedButton(onClick = { player.adjustSubtitleDelay(250L) }) { Text("+ 0.25s") }
+                            OutlinedButton(onClick = { player.adjustSubtitleDelay(250L) }, enabled = !player.usingMedia3) { Text("+ 0.25s") }
                         }
-                        TextButton(onClick = { player.resetSubtitleDelay() }) { Text("Reset timing") }
+                        TextButton(onClick = { player.resetSubtitleDelay() }, enabled = !player.usingMedia3) { Text("Reset timing") }
                         if (player.usingMedia3) {
-                            Text("Timing adjustment works with uploaded SRT/VTT subtitles.",
+                            Text("Timing adjustment is temporarily unavailable for Media3 while playback stability is repaired.",
                                 color = Color.LightGray, fontSize = 11.sp)
                         }
                     }
