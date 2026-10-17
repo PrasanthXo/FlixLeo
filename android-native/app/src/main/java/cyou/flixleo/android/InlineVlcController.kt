@@ -416,6 +416,13 @@ class InlineVlcController(context: Context) {
     fun selectedSubtitle(): Int = if (usingMedia3) media3.selectedSubtitle() else runCatching { engine?.spuTrack ?: -1 }.getOrDefault(-1)
     fun chooseAudio(id: Int) { if (usingMedia3) { media3.chooseAudio(id); return }; runCatching { engine?.setAudioTrack(id) }; controlsVisible = true }
     fun chooseSubtitle(id: Int) { if (usingMedia3) { media3.chooseSubtitle(id); return }; runCatching { engine?.setSpuTrack(id) }; controlsVisible = true }
+    fun importSubtitle(uri: Uri): Boolean {
+        if (usingMedia3 || mode == PlayerMode.CLOSED) return false
+        return runCatching {
+            val path = uri.path ?: return@runCatching false
+            engine?.addSlave(Media.Slave.Type.Subtitle, path, true) == true
+        }.getOrDefault(false).also { if (it) trackRevision++ }
+    }
     fun changeAspect() {
         aspect = (aspect + 1) % 4
         if (usingMedia3) { media3.setAspect(aspect); return }
