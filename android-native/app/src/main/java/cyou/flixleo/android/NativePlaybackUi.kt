@@ -536,39 +536,24 @@ private fun NativeVideoSurface(
                         if (importedSubtitleNotice.isNotBlank()) Text(importedSubtitleNotice, color = GoldPlayer)
                     }
                     if (trackMenu == "subtitle") {
-                        Text("Subtitle sync", color = Color.White, fontWeight = FontWeight.SemiBold)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedButton(onClick = { player.adjustSubtitleDelay(-250L) },
-                                enabled = !player.usingMedia3) { Text("−") }
-                            Text(String.format(java.util.Locale.US, "%+.2f s",
-                                player.subtitleDelayMs / 1000.0),
-                                modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                            OutlinedButton(onClick = { player.adjustSubtitleDelay(250L) },
-                                enabled = !player.usingMedia3) { Text("+") }
-                        }
-                        TextButton(onClick = { player.resetSubtitleDelay() },
-                            enabled = !player.usingMedia3) { Text("Reset sync") }
-                        if (player.usingMedia3) Text("Delay adjustment is available in LibVLC playback only.",
+                        Text("Subtitle timing", color = GoldPlayer, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+                        Text("Adjust when subtitles appear relative to the video.",
                             color = Color.LightGray, fontSize = 12.sp)
-                    }
-                    if (trackMenu == "subtitle") {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceEvenly) {
-                            TextButton(onClick = { player.adjustSubtitleDelay(-250L) }, enabled = !player.usingMedia3) {
-                                Text("− 0.25s")
-                            }
-                            Text("Sync: " + String.format(java.util.Locale.US, "%+.2fs", player.subtitleDelayMs / 1000.0),
-                                color = Color.White, fontSize = 13.sp)
-                            TextButton(onClick = { player.adjustSubtitleDelay(250L) }, enabled = !player.usingMedia3) {
-                                Text("+ 0.25s")
-                            }
+                            horizontalArrangement = Arrangement.SpaceBetween) {
+                            OutlinedButton(onClick = { player.adjustSubtitleDelay(-250L) }) { Text("− 0.25s") }
+                            Text(String.format(java.util.Locale.US, "%+.2f s", player.subtitleDelayMs / 1000.0),
+                                color = Color.White, fontWeight = FontWeight.Bold)
+                            OutlinedButton(onClick = { player.adjustSubtitleDelay(250L) }) { Text("+ 0.25s") }
                         }
+                        TextButton(onClick = { player.resetSubtitleDelay() }) { Text("Reset timing") }
                         if (player.usingMedia3) {
-                            Text("Subtitle timing adjustment is available with LibVLC playback.",
-                                color = GoldPlayer, fontSize = 12.sp)
-                        } else {
-                            TextButton(onClick = { player.resetSubtitleDelay() }) { Text("Reset subtitle sync") }
+                            Text("Timing adjustment works with uploaded SRT/VTT subtitles.",
+                                color = Color.LightGray, fontSize = 11.sp)
                         }
+                        HorizontalDivider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 8.dp))
+                        Text("Subtitle tracks", color = GoldPlayer, fontWeight = FontWeight.SemiBold)
                     }
                     if (tracks.isEmpty()) Text("No tracks detected in this stream.")
                     tracks.forEach { track ->
