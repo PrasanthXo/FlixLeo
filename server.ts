@@ -1070,6 +1070,15 @@ function serveStalePlavioCatalog(res: Response): boolean {
 // Only known catalog IDs are exposed; this is not an arbitrary upstream URL proxy.
 
 app.get('/api/stremio/plavio/live/catalog', async (_req: Request, res: Response) => {
+  // Older native Android APKs only query this endpoint; serve current live channels here.
+  try {
+    const catalogs = await legacyIptvCatalogs();
+    if (catalogs.length) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ provider: 'FlixLeo Live TV', catalogs });
+    }
+  } catch { /* Fall back to original add-on behavior. */ }
+
   if (cachedPlavioChannels && cachedPlavioChannels.expires > Date.now()) {
     res.setHeader('Cache-Control', 'public, max-age=30');
     return res.json({ provider: 'PlavioHD', catalogs: cachedPlavioChannels.catalogs });
@@ -1131,6 +1140,15 @@ app.get('/api/stremio/plavio/live/catalog', async (_req: Request, res: Response)
   }
 });
 app.get('/api/stremio/plavio/live/streams', async (req: Request, res: Response) => {
+  const legacyId = String(req.query.id || '');
+  if (legacyId.startsWith('flixlive_')) {
+    try {
+      const url = await legacyIptvStream(legacyId);
+      return url ? res.json({ streams: [{ url: new URL(url, 'https://flixleo.cyou').href, title: 'Live TV' }] })
+        : res.status(404).json({ streams: [] });
+    } catch { return res.status(503).json({ streams: [] }); }
+  }
+
   const id = String(req.query.id || '');
   const type = String(req.query.type || 'tv');
   if ((type !== 'tv' && type !== 'channel') || !/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) {
