@@ -3,6 +3,10 @@ package cyou.flixleo.android
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.os.Build
+import android.net.Uri
+import java.io.File
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
@@ -52,6 +56,23 @@ fun NativePlaybackOverlay(
     if (currentMode == PlayerMode.CLOSED) return
     val activity = LocalContext.current as Activity
     var lastNonPiP by remember { mutableStateOf(PlayerMode.BIG) }
+    var importedSubtitleNotice by remember { mutableStateOf("") }
+    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
+        if (selected != null) {
+            importedSubtitleNotice = runCatching {
+                val mime = activity.contentResolver.getType(selected).orEmpty()
+                val extension = if (mime.contains("vtt")) "vtt" else "srt"
+                val bytes = activity.contentResolver.openInputStream(selected)?.use { it.readBytes() }
+                    ?: throw IllegalArgumentException("Unable to read subtitle")
+                if (bytes.size > 3_000_000) throw IllegalArgumentException("Subtitle must be under 3 MB")
+                val subtitle = File(activity.cacheDir, "flixleo-uploaded-subtitle." + extension)
+                subtitle.writeBytes(bytes)
+                if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
+                else "This playback engine cannot import subtitle files; select LibVLC playback"
+            }.getOrElse { "Could not import subtitle file" }
+        }
+    }
+
 
     // Keep the display awake only during active playback, including mini/fullscreen.
     // Release the flag when paused, stopped, or when the player UI is disposed.
@@ -382,6 +403,14 @@ private fun NativeVideoSurface(
             title = { Text(if (trackMenu == "audio") "Audio language" else "Subtitle language") },
             text = {
                 Column(Modifier.heightIn(max = 330.dp).verticalScroll(rememberScrollState())) {
+                    if (trackMenu == "subtitle" && !state.playingTitle?.id.orEmpty().startsWith("plavio-live-")) {
+                        TextButton(onClick = { subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream")) }) {
+                            Icon(Icons.Default.UploadFile, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Upload .srt / .vtt subtitle")
+                        }
+                        if (importedSubtitleNotice.isNotBlank()) Text(importedSubtitleNotice, color = GoldPlayer)
+                    }
                     if (tracks.isEmpty()) Text("No tracks detected in this stream.")
                     tracks.forEach { track ->
                         Row(Modifier.fillMaxWidth().clickable {
