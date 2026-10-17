@@ -135,10 +135,16 @@ export async function cloudRead(): Promise<CloudRecord | null> {
 }
 export async function cloudWrite(payload: CloudRecord) {
   const token = await accessToken();
+  const oldRows = await request('/rest/v1/flixleo_user_data?select=payload&user_id=eq.' +
+    encodeURIComponent(session!.user.id) + '&limit=1', {}, token);
+  const existing = Array.isArray(oldRows) && oldRows[0]?.payload &&
+    typeof oldRows[0].payload === 'object' ? oldRows[0].payload : {};
   await request('/rest/v1/flixleo_user_data?on_conflict=user_id', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ user_id: session!.user.id, payload, updated_at: new Date().toISOString() })
+    body: JSON.stringify({ user_id: session!.user.id,
+      payload: { ...existing, ...payload, liveFavorites: existing.liveFavorites || [] },
+      updated_at: new Date().toISOString() })
   }, token);
 }
 export function mergeCloudData(local: CloudRecord, remote: CloudRecord | null): CloudRecord {
