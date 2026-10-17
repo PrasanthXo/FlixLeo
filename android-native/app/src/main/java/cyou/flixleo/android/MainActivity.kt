@@ -119,10 +119,13 @@ class MainActivity : ComponentActivity() {
         val uri = incoming?.data ?: return
         if (uri.scheme != "flixleo" || uri.host != "email-confirmed") return
         incoming.data = null
+        // The verification link has returned to the app. Show a clear
+        // confirmation first, then let the user continue to sign in.
+        state.signupConfirmationEmail = ""
         state.showSignup = false
-        state.showAuth = true
+        state.showAuth = false
         state.authError = ""
-        state.notify("Mail confirmed. Sign in to FlixLeo.")
+        state.emailVerificationCompleted = true
     }
     override fun onResume() {
         super.onResume()
@@ -213,6 +216,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     // Show a dedicated confirmation dialog after a successful signup; a snackbar
     // is easily missed when the signup dialog closes.
     var signupConfirmationEmail by mutableStateOf("")
+    var emailVerificationCompleted by mutableStateOf(false)
     var showOnboarding by mutableStateOf(false)
     var streamsChecked by mutableStateOf(false)
     private var lastCatalogRefreshAt = 0L
