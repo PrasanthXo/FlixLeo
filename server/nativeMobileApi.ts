@@ -165,10 +165,9 @@ router.put('/api/live/favorites', async (req, res) => {
   if (!Array.isArray(incoming) || incoming.length > 150) return res.status(400).json({ error: 'Invalid favorites' });
   const favorites = incoming.filter((ch: any) =>
     ch && typeof ch.name === 'string' && ch.name.length <= 120 &&
-    typeof ch.id === 'string' && ch.id.length <= 150 &&
-    typeof ch.privateProvider === 'boolean'
+    typeof ch.id === 'string' && ch.id.length <= 150
   ).map((ch: any) => ({
-    id: ch.id, name: ch.name, privateProvider: ch.privateProvider,
+    id: ch.id, name: ch.name, privateProvider: ch.privateProvider === true,
     logo: typeof ch.logo === 'string' ? ch.logo.slice(0, 500) : '',
     category: typeof ch.category === 'string' ? ch.category.slice(0, 80) : '',
     language: typeof ch.language === 'string' ? ch.language.slice(0, 60) : '',
