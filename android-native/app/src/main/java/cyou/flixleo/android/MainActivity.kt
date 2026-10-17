@@ -210,6 +210,9 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var showAuth by mutableStateOf(false)
     var showSignup by mutableStateOf(false)
     var authError by mutableStateOf("")
+    // Show a dedicated confirmation dialog after a successful signup; a snackbar
+    // is easily missed when the signup dialog closes.
+    var signupConfirmationEmail by mutableStateOf("")
     var showOnboarding by mutableStateOf(false)
     var streamsChecked by mutableStateOf(false)
     private var lastCatalogRefreshAt = 0L
@@ -815,8 +818,11 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         try {
             val result = api.call("/api/native/auth/signup", "POST",
                 JSONObject().put("email", email.trim()).put("password", password))
+            if (!result.optBoolean("success", false)) {
+                throw IllegalStateException(result.optString("error", "Signup could not be completed. Please try again."))
+            }
             store.markSignup(email)
-            message = result.optString("message", "Verify your email before signing in")
+            signupConfirmationEmail = email.trim()
             showSignup = false
             showAuth = false
         } catch (e: Exception) {
