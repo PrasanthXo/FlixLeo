@@ -726,14 +726,25 @@ private fun SearchScreen(state: FlixState) {
 }
 @Composable
 private fun LiveScreen(state: FlixState) {
+    val spin = rememberInfiniteTransition(label = "Live TV antenna")
+    val antennaRotation by spin.animateFloat(initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)),
+        label = "Rotating antenna")
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 25.dp)) {
         item {
-            Heading("Live TV", "Channel categories from connected providers")
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 17.dp, vertical = 8.dp)) {
+                Icon(Icons.Default.LiveTv, contentDescription = null, tint = Gold, modifier = Modifier.size(30.dp))
+                Spacer(Modifier.width(11.dp))
+                Text("Live TV", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
+            }
             if (state.liveLoading) {
                 Row(Modifier.fillMaxWidth().padding(18.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Gold, strokeWidth = 2.dp)
+                    Icon(Icons.Default.SettingsInputAntenna, contentDescription = null,
+                        tint = Gold, modifier = Modifier.size(34.dp).graphicsLayer {
+                            rotationZ = antennaRotation
+                        })
                     Spacer(Modifier.width(12.dp))
                     Text("Tuning live channels…", color = Muted)
                 }
@@ -752,7 +763,10 @@ private fun LiveScreen(state: FlixState) {
                 items(category.channels, key = { it.id }) { channel ->
                     Column(Modifier.width(130.dp).clip(RoundedCornerShape(14.dp))
                         .background(Card).clickable { state.channel(channel) }.padding(6.dp)) {
-                        AsyncImage(channel.poster, channel.name, contentScale = ContentScale.Fit,
+                        AsyncImage(model = channel.poster.ifBlank { null }, contentDescription = channel.name,
+                            contentScale = ContentScale.Fit,
+                            error = painterResource(R.drawable.flixleo_brand),
+                            fallback = painterResource(R.drawable.flixleo_brand),
                             modifier = Modifier.fillMaxWidth().height(95.dp))
                         Text(channel.name, color = Color.White, fontSize = 12.sp,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
