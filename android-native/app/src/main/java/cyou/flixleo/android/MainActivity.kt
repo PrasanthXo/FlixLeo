@@ -186,6 +186,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var chosenEpisode by mutableIntStateOf(-1)
     var live by mutableStateOf<List<LiveCategory>>(emptyList())
     var liveLoading by mutableStateOf(false)
+    var liveFavorites by mutableStateOf<List<String>>(emptyList())
     var liveError by mutableStateOf("")
     var selectedChannel by mutableStateOf<LiveChannel?>(null)
     var movies by mutableStateOf<List<FlixTitle>>(emptyList())
@@ -408,12 +409,53 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         streams = emptyList()
         if (section == "Live TV" && live.isEmpty()) refreshLive()
     }
+    fun refreshLiveFavorites() = scope.launch {
+        val token = account?.accessToken ?: run { liveFavorites = emptyList(); return@launch }
+        try {
+            val rows = api.call("/api/live/favorites", token = token).optJSONArray("favorites")
+            liveFavorites = if (rows == null) emptyList() else (0 until rows.length())
+                .mapNotNull { i -> rows.optJSONObject(i)?.optString("name")?.lowercase()?.takeIf(String::isNotBlank) }
+        } catch (_: Exception) { /* Keep the last cloud favorites during temporary network errors. */ }
+    }
+    fun toggleLiveFavorite(channel: LiveChannel) = scope.launch {
+        val token = account?.accessToken
+        if (token.isNullOrBlank()) {
+            showSignup = false
+            showAuth = true
+            message = "Sign in or sign up to save favorite channels."
+            return@launch
+        }
+        val name = channel.name.lowercase()
+        try {
+            val old = api.call("/api/live/favorites", token = token).optJSONArray("favorites") ?: JSONArray()
+            val next = JSONArray()
+            var alreadySaved = false
+            for (i in 0 until old.length()) {
+                val obj = old.optJSONObject(i) ?: continue
+                if (obj.optString("name").equals(channel.name, ignoreCase = true)) alreadySaved = true
+                else next.put(obj)
+            }
+            if (!alreadySaved) next.put(JSONObject()
+                .put("id", channel.id.removePrefix("private:").removePrefix("iptv:"))
+                .put("name", channel.name)
+                .put("privateProvider", channel.id.startsWith("private:"))
+                .put("logo", channel.poster)
+                .put("category", "Other")
+                .put("language", "Unknown"))
+            api.call("/api/live/favorites", "PUT", JSONObject().put("favorites", next), token)
+            liveFavorites = (0 until next.length()).mapNotNull { i ->
+                next.optJSONObject(i)?.optString("name")?.lowercase()?.takeIf(String::isNotBlank)
+            }
+            message = if (alreadySaved) "Removed from favorite channels" else "Added to favorite channels"
+        } catch (_: Exception) { message = "Could not sync favorite channels. Please retry." }
+    }
     fun refreshLive() = scope.launch {
         if (liveLoading) return@launch
         liveLoading = true
         liveError = ""
         try {
             live = api.liveCategories()
+            if (account != null) refreshLiveFavorites()
             if (live.isEmpty()) liveError = "No live channels available. Try again."
         } catch (e: Exception) {
             liveError = "Unable to load Live TV. Check connection and retry."
@@ -703,6 +745,7 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             store.activateUser(signedIn.user.optString("id"))
             account = signedIn
             store.saveSession(account)
+            refreshLiveFavorites()
             localRevision++
             account?.user?.optJSONObject("user_metadata")?.let { metadata ->
                 fun optSet(key: String): Set<String> {
