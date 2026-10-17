@@ -408,15 +408,19 @@ class InlineVlcController(context: Context) {
         if (usingMedia3) { media3.seekTo((media3.positionMs + milliseconds).coerceAtLeast(0)); return }
         val video = engine ?: return
         try {
-            if (video.isSeekable) {
-                video.setTime((video.time + milliseconds).coerceIn(0L, video.length.coerceAtLeast(0L)))
+            // LibVLC can briefly reset isSeekable after addSlave(SRT/VTT).
+            // Retain the known seekability of the same playing stream.
+            if (canSeek || video.isSeekable) {
+                val end = video.length.takeIf { it > 0L } ?: duration
+                val target = (video.time.coerceAtLeast(0L) + milliseconds).coerceAtLeast(0L)
+                video.setTime(if (end > 0L) target.coerceAtMost(end) else target)
             }
         } catch (_: Exception) { }
         controlsVisible = true
     }
     fun seekTo(milliseconds: Long) {
         if (usingMedia3) { media3.seekTo(milliseconds); controlsVisible = true; return }
-        try { engine?.let { if (it.isSeekable) it.setTime(milliseconds.coerceIn(0L, it.length.coerceAtLeast(0L))) } }
+        try { engine?.let { if (canSeek || it.isSeekable) { val end = it.length.takeIf { value -> value > 0L } ?: duration; it.setTime(if (end > 0L) milliseconds.coerceIn(0L, end) else milliseconds.coerceAtLeast(0L)) } } }
         catch (_: Exception) { }
         controlsVisible = true
     }
