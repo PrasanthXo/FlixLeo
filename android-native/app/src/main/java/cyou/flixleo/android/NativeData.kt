@@ -218,7 +218,7 @@ class FlixApi {
         try {
             connection.requestMethod = method
             connection.connectTimeout = 12000
-            connection.readTimeout = 20000
+            connection.readTimeout = if (path.startsWith("/api/live/")) 45000 else 20000
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("User-Agent", "FlixLeoAndroidNative/1.2")
             if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
@@ -273,8 +273,14 @@ class FlixApi {
             }
         }
         val known = mutableSetOf<String>()
-        for (endpoint in listOf("/api/live/tamil/channels", "/api/live/private/channels")) {
-            val catalog = runCatching { call(endpoint).optJSONArray("channels").objects() }.getOrDefault(emptyList())
+        val endpoints = listOf("/api/live/tamil/channels", "/api/live/private/channels")
+        val catalogs = coroutineScope {
+            endpoints.map { endpoint ->
+                async { runCatching { call(endpoint).optJSONArray("channels").objects() }.getOrDefault(emptyList()) }
+            }.awaitAll()
+        }
+        for ((sourceIndex, endpoint) in endpoints.withIndex()) {
+            val catalog = catalogs[sourceIndex]
             for (item in catalog) {
                 val name = item.optString("name").trim()
                 val id = item.optString("id")
