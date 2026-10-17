@@ -409,14 +409,20 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         streams = emptyList()
         if (section == "Live TV" && live.isEmpty()) refreshLive()
     }
+    private var liveFavoriteSyncing = false
+
     fun refreshLiveFavorites() = scope.launch {
         val token = account?.accessToken ?: run { liveFavorites = emptyList(); return@launch }
+        if (liveFavoriteSyncing) return@launch
         try {
             val rows = api.call("/api/live/favorites", token = token).optJSONArray("favorites")
-            liveFavorites = if (rows == null) emptyList() else (0 until rows.length())
-                .mapNotNull { i -> rows.optJSONObject(i)?.optString("name")?.lowercase()?.takeIf(String::isNotBlank) }
-        } catch (_: Exception) { /* Keep the last cloud favorites during temporary network errors. */ }
+            if (!liveFavoriteSyncing && account?.accessToken == token) {
+                liveFavorites = if (rows == null) emptyList() else (0 until rows.length())
+                    .mapNotNull { i -> rows.optJSONObject(i)?.optString("name")?.lowercase()?.takeIf(String::isNotBlank) }
+            }
+        } catch (_: Exception) { /* Preserve favorites when offline. */ }
     }
+
     fun toggleLiveFavorite(channel: LiveChannel) = scope.launch {
         val token = account?.accessToken
         if (token.isNullOrBlank()) {
@@ -425,17 +431,21 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
             message = "Sign in or sign up to save favorite channels."
             return@launch
         }
+        if (liveFavoriteSyncing) return@launch
+        liveFavoriteSyncing = true
         val name = channel.name.lowercase()
+        val before = liveFavorites
+        val adding = name !in before
+        // Compose immediately redraws the catalogue and the three-dot menu.
+        liveFavorites = if (adding) before + name else before.filterNot { it == name }
         try {
             val old = api.call("/api/live/favorites", token = token).optJSONArray("favorites") ?: JSONArray()
             val next = JSONArray()
-            var alreadySaved = false
             for (i in 0 until old.length()) {
                 val obj = old.optJSONObject(i) ?: continue
-                if (obj.optString("name").equals(channel.name, ignoreCase = true)) alreadySaved = true
-                else next.put(obj)
+                if (!obj.optString("name").equals(channel.name, ignoreCase = true)) next.put(obj)
             }
-            if (!alreadySaved) next.put(JSONObject()
+            if (adding) next.put(JSONObject()
                 .put("id", channel.id.removePrefix("private:").removePrefix("iptv:"))
                 .put("name", channel.name)
                 .put("privateProvider", channel.id.startsWith("private:"))
@@ -443,11 +453,20 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
                 .put("category", "Other")
                 .put("language", "Unknown"))
             api.call("/api/live/favorites", "PUT", JSONObject().put("favorites", next), token)
-            liveFavorites = (0 until next.length()).mapNotNull { i ->
-                next.optJSONObject(i)?.optString("name")?.lowercase()?.takeIf(String::isNotBlank)
+            if (account?.accessToken == token) {
+                liveFavorites = (0 until next.length()).mapNotNull { i ->
+                    next.optJSONObject(i)?.optString("name")?.lowercase()?.takeIf(String::isNotBlank)
+                }
+                message = if (adding) "Added to favourite channels" else "Removed from favourite channels"
             }
-            message = if (alreadySaved) "Removed from favorite channels" else "Added to favorite channels"
-        } catch (_: Exception) { message = "Could not sync favorite channels. Please retry." }
+        } catch (_: Exception) {
+            if (account?.accessToken == token) {
+                liveFavorites = before
+                message = "Could not sync favourite channels. Please retry."
+            }
+        } finally {
+            liveFavoriteSyncing = false
+        }
     }
     fun refreshLive() = scope.launch {
         if (liveLoading) return@launch
