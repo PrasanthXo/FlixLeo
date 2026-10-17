@@ -37,7 +37,10 @@ class MainActivity : ComponentActivity() {
             packageInfo.versionCode
         }
         state = FlixState(FlixStore(applicationContext), FlixApi(), scope, installedVersionCode)
-        state.onPlay = { title, stream ->
+        state.onPlay = playback@{ title, stream ->
+            // Final guard at the actual decoder start, including Live TV,
+            // server switching and automatic next-episode playback.
+            if (state.requireLoginForPlayback()) return@playback
             state.dismissUpcoming()
             nextEpisodePreviewKey = ""
             // InlineVlcController.start() performs the one required stop itself.
@@ -632,7 +635,18 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         } catch (_: Exception) { message = "No streams available" }
         finally { detailsLoading = false; streamsChecked = true }
     }
+    // Browsing remains available to guests, but no video or live channel may
+    // start until a user has signed in (or verified and signed in after signup).
+    fun requireLoginForPlayback(): Boolean {
+        if (account != null) return false
+        showSignup = false
+        showAuth = true
+        authError = ""
+        message = "Sign in or create a FlixLeo account to start playback."
+        return true
+    }
     fun play(stream: FlixStream) {
+        if (requireLoginForPlayback()) return
         val title = selected ?: selectedChannel?.let {
             FlixTitle(JSONObject().put("id", "plavio-live-" + it.id).put("title", it.name).put("posterUrl", it.poster))
         } ?: playingTitle ?: return
