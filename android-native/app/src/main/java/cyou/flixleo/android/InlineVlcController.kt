@@ -367,6 +367,20 @@ class InlineVlcController(context: Context) {
             onError(problem)
         }
     }
+    /** Rebind the existing VLC output after Android's document picker/backgrounding.
+     * Never recreates the media player or resets the playing stream/position.
+     */
+    fun restoreVideoSurface() {
+        if (usingMedia3 || mode == PlayerMode.CLOSED) return
+        val view = surface ?: return
+        if (engine == null) return
+        if (attached) {
+            runCatching { engine?.detachViews() }
+            attached = false
+        }
+        attach(view)
+        controlsVisible = true
+    }
     fun detach(view: VLCVideoLayout) {
         if (surface !== view) return
         if (attached) runCatching { engine?.detachViews() }
