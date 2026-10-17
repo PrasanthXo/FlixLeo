@@ -140,7 +140,7 @@ fun FlixLeoNativeApp(state: FlixState, player: InlineVlcController) {
                             Modifier else Modifier.background(Color.Black.copy(alpha = .80f))),
                         contentAlignment = if (player.mode == PlayerMode.MINI) Alignment.BottomStart else Alignment.Center
                     ) {
-                        Column(Modifier.fillMaxWidth(if (player.mode == PlayerMode.MINI) .62f else 1f)
+                        Column(Modifier.fillMaxWidth(if (player.mode == PlayerMode.MINI) 0.62f else 1f)
                             .padding(18.dp)
                             .clip(RoundedCornerShape(24.dp)).background(Card).padding(18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally) {
