@@ -278,6 +278,7 @@ private fun Poster(item: FlixTitle, selected: Boolean, compact: Boolean = false,
                    onBookmark: (() -> Unit)? = null, onClick: () -> Unit) {
     val width = if (compact) 112.dp else 139.dp
     var expanded by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.width(width).clickable(onClick = onClick)) {
         Box(Modifier.fillMaxWidth()
             .height(if (compact) 151.dp else 197.dp)
@@ -297,7 +298,7 @@ private fun Poster(item: FlixTitle, selected: Boolean, compact: Boolean = false,
                         .padding(7.dp).clip(RoundedCornerShape(7.dp))
                         .background(Color(0xCC111827)).padding(horizontal = 7.dp, vertical = 4.dp))
             }
-            if (onBookmark != null) {
+            run {
                 Box(Modifier.align(Alignment.TopEnd)) {
                     IconButton(onClick = { expanded = true },
                         modifier = Modifier.padding(4.dp).size(33.dp)
@@ -311,20 +312,26 @@ private fun Poster(item: FlixTitle, selected: Boolean, compact: Boolean = false,
                             text = { Text("View details", color = Color.White) },
                             leadingIcon = { Icon(Icons.Default.Info, null, tint = Gold) },
                             onClick = { expanded = false; onClick() })
+                        if (onBookmark != null) {
+                            DropdownMenuItem(
+                                text = { Text(if (selected) "Remove from Watchlist" else "Add to Watchlist", color = Color.White) },
+                                leadingIcon = { Icon(if (selected) Icons.Default.BookmarkRemove else Icons.Default.BookmarkAdd, null, tint = Gold) },
+                                onClick = { expanded = false; onBookmark() })
+                        }
                         DropdownMenuItem(
-                            text = {
-                                Text(if (selected) "Remove from Watchlist" else "Add to Watchlist",
-                                    color = Color.White)
-                            },
-                            leadingIcon = {
-                                Icon(if (selected) Icons.Default.BookmarkRemove else Icons.Default.BookmarkAdd,
-                                    null, tint = Gold)
-                            }, onClick = { expanded = false; onBookmark() })
+                            text = { Text("Share", color = Color.White) },
+                            leadingIcon = { Icon(Icons.Default.Share, null, tint = Gold) },
+                            onClick = {
+                                expanded = false
+                                val link = "https://flixleo.cyou/?id=" + android.net.Uri.encode(item.id) + "&type=" + if (item.type == "tv") "tv" else "movie"
+                                val send = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, item.title + " — " + link)
+                                }
+                                context.startActivity(Intent.createChooser(send, "Share FlixLeo title"))
+                            })
                     }
                 }
-            } else if (selected) {
-                Icon(Icons.Default.Bookmark, "Saved", tint = Gold,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(7.dp).size(18.dp))
             }
             Text(if (item.type == "tv") "SERIES" else "MOVIE",
                 color = Gold, fontSize = 9.sp, fontWeight = FontWeight.Black,
@@ -1126,7 +1133,7 @@ private fun ProfileScreen(state: FlixState) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(11.dp),
                     contentPadding = PaddingValues(vertical = 7.dp)) {
                     items(items, key = { it.id }) { item ->
-                        Poster(item, true, compact = true) { state.open(item) }
+                        Poster(item, true, compact = true, onBookmark = { state.toggleWatch(item) }) { state.open(item) }
                     }
                 }
             }
@@ -1415,7 +1422,13 @@ private fun AccountDialog(state: FlixState) {
                     visualTransformation = PasswordVisualTransformation())
                 if (state.showSignup) Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(agreed, onCheckedChange = { agreed = it })
-                    Text("I agree to the Terms & Privacy Policy", fontSize = 11.sp)
+                    Column {
+                        Text("I agree to the Terms & Privacy Policy", fontSize = 11.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/terms.html") }) { Text("Terms & Conditions", fontSize = 11.sp) }
+                            TextButton(onClick = { state.onOpenUrl("https://flixleo.cyou/privacy.html") }) { Text("Privacy Policy", fontSize = 11.sp) }
+                        }
+                    }
                 }
                 if (state.authSuccess.isNotBlank()) {
                     Text(state.authSuccess, fontSize = 12.sp, color = Color(0xFF86EFAC),
