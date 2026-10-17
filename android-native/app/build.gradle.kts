@@ -10,8 +10,8 @@ android {
         applicationId = "cyou.flixleo.android"
         minSdk = 24
         targetSdk = 35
-        versionCode = (project.findProperty("flixleoVersionCode")?.toString()?.toIntOrNull() ?: 6)
-        versionName = project.findProperty("flixleoVersionName")?.toString() ?: "1.5.0-native"
+        versionCode = (project.findProperty("flixleoVersionCode")?.toString()?.toIntOrNull() ?: 1015)
+        versionName = project.findProperty("flixleoVersionName")?.toString() ?: "1.5.15"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
     signingConfigs {
