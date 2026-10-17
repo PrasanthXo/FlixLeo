@@ -165,6 +165,8 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
     var chosenSeason by mutableIntStateOf(-1)
     var chosenEpisode by mutableIntStateOf(-1)
     var live by mutableStateOf<List<LiveCategory>>(emptyList())
+    var liveLoading by mutableStateOf(false)
+    var liveError by mutableStateOf("")
     var selectedChannel by mutableStateOf<LiveChannel?>(null)
     var movies by mutableStateOf<List<FlixTitle>>(emptyList())
     var series by mutableStateOf<List<FlixTitle>>(emptyList())
@@ -387,8 +389,17 @@ class FlixState(val store: FlixStore, private val api: FlixApi, private val scop
         if (section == "Live TV" && live.isEmpty()) refreshLive()
     }
     fun refreshLive() = scope.launch {
-        try { live = api.liveCategories() }
-        catch (e: Exception) { message = e.localizedMessage ?: "Live TV temporarily unavailable" }
+        if (liveLoading) return@launch
+        liveLoading = true
+        liveError = ""
+        try {
+            live = api.liveCategories()
+            if (live.isEmpty()) liveError = "No live channels available. Try again."
+        } catch (e: Exception) {
+            liveError = "Unable to load Live TV. Check connection and retry."
+        } finally {
+            liveLoading = false
+        }
     }
     fun performSearch(text: String) {
         search = text
