@@ -126,8 +126,20 @@ async function refresh() {
 }
 function mediaToken(url: string) {
   const id = randomBytes(18).toString('hex');
-  mediaMap.set(id, { url, expires: Date.now() + 60 * 60_000 });
-  if (mediaMap.size > 120000) for (const [key,v] of mediaMap) if (v.expires < Date.now()) mediaMap.delete(key);
+  const now = Date.now();
+  mediaMap.set(id, { url, expires: now + 60 * 60_000 });
+  // Expire old tokens routinely, not only after storing 120,000 entries.
+  if (mediaMap.size % 256 === 0 || mediaMap.size > 10000) {
+    for (const [key, value] of mediaMap) {
+      if (value.expires <= now) mediaMap.delete(key);
+    }
+  }
+  // Hard cap prevents media-token accumulation during frequent HLS segment requests.
+  while (mediaMap.size > 10000) {
+    const oldest = mediaMap.keys().next().value;
+    if (!oldest) break;
+    mediaMap.delete(oldest);
+  }
   return '/api/live/private/media/' + id;
 }
 // Backward-compatible catalog for Android versions that fetch the Plavio Live TV endpoint.
