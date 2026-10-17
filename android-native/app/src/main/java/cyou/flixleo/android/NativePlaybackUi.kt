@@ -122,6 +122,12 @@ fun NativePlaybackOverlay(
                 else "Could not import subtitle; try another .srt or .vtt file"
             }.getOrElse { "Could not import subtitle file" }
         }
+        // Return to expanded playback after the Android file picker closes.
+        // Keep decoder and playback position unchanged.
+        if (player.mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
+        if (player.mode != PlayerMode.BIG && player.mode != PlayerMode.CLOSED) {
+            player.transitionTo(PlayerMode.BIG)
+        }
         player.controlsVisible = true
     }
     val activity = LocalContext.current as Activity
