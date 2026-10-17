@@ -423,13 +423,20 @@ class InlineVlcController(context: Context) {
         if (usingMedia3) media3.audioTracks() else runCatching { engine?.audioTracks?.filter { it.id >= 0 }?.map { AudioChoice(it.id, it.name ?: "Audio ${it.id}") } ?: emptyList() }
             .getOrDefault(emptyList())
     fun subtitleChoices(): List<AudioChoice> =
-        if (usingMedia3) media3.subtitleTracks() else listOf(AudioChoice(-1, "Off")) +
+        if (usingMedia3) media3.subtitleTracks() +
+            (if (media3.hasUploadedCaptions) listOf(AudioChoice(1000000, "Uploaded subtitle")) else emptyList()) else listOf(AudioChoice(-1, "Off")) +
             runCatching { engine?.spuTracks?.filter { it.id >= 0 }?.map { AudioChoice(it.id, it.name ?: "Subtitle ${it.id}") } ?: emptyList() }
                 .getOrDefault(emptyList())
     fun selectedAudio(): Int = if (usingMedia3) media3.selectedAudio() else runCatching { engine?.audioTrack ?: -1 }.getOrDefault(-1)
-    fun selectedSubtitle(): Int = if (usingMedia3) media3.selectedSubtitle() else runCatching { engine?.spuTrack ?: -1 }.getOrDefault(-1)
+    fun selectedSubtitle(): Int = if (usingMedia3) (if (media3.uploadedCaptionsSelected) 1000000 else media3.selectedSubtitle()) else runCatching { engine?.spuTrack ?: -1 }.getOrDefault(-1)
     fun chooseAudio(id: Int) { if (usingMedia3) { media3.chooseAudio(id); return }; runCatching { engine?.setAudioTrack(id) }; controlsVisible = true }
-    fun chooseSubtitle(id: Int) { if (usingMedia3) { media3.chooseSubtitle(id); return }; runCatching { engine?.setSpuTrack(id) }; controlsVisible = true }
+    fun chooseSubtitle(id: Int) { if (usingMedia3) {
+        media3.setUploadedCaptionsEnabled(id == 1000000)
+        media3.chooseSubtitle(if (id == 1000000) -1 else id)
+        trackRevision++
+        controlsVisible = true
+        return
+    }; runCatching { engine?.setSpuTrack(id) }; controlsVisible = true }
     fun importSubtitle(uri: Uri): Boolean {
         if (mode == PlayerMode.CLOSED) return false
         val format = if (uri.path.orEmpty().endsWith(".vtt", true))
@@ -437,13 +444,14 @@ class InlineVlcController(context: Context) {
             androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
         return runCatching {
             if (usingMedia3) {
-                media3.importSubtitle(uri, format).also { if (it) subtitleDelayMs = 0L }
+                media3.importSubtitle(uri, format).also { if (it) { subtitleDelayMs = 0L; media3.chooseSubtitle(-1) } }
             } else {
                 val path = uri.path ?: return@runCatching false
                 engine?.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle, path, true) == true
             }
         }.getOrDefault(false).also { if (it) trackRevision++ }
     }
+    fun uploadedCaptionText(): String = if (usingMedia3) media3.captionAt(position) else ""
     var subtitleDelayMs by mutableLongStateOf(0L)
         private set
     fun adjustSubtitleDelay(deltaMs: Long): Boolean {
@@ -453,8 +461,7 @@ class InlineVlcController(context: Context) {
             // Media3 subtitle replacement calls setMediaItem()/prepare(), which
             // tears down the video decoder and can leave a black video surface.
             // Do not invoke it during active playback until a seamless path exists.
-            if (usingMedia3) return@runCatching false
-            val success = if (usingMedia3) false
+            val success = if (usingMedia3) media3.setUploadedCaptionDelay(next)
                 else {
                     val vlc = engine ?: return@runCatching false
                     vlc.setSpuDelay(next * 1000L)
