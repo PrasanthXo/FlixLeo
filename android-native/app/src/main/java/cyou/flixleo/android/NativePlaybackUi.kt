@@ -254,10 +254,10 @@ fun NativePlaybackOverlay(
                                 else player.selectedSubtitle() != -1
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
-                                OutlinedButton(onClick = { player.adjustSubtitleDelay(-250L) },
-                                    enabled = canSync, modifier = Modifier.weight(1f)) { Text("− 0.25s") }
-                                OutlinedButton(onClick = { player.adjustSubtitleDelay(250L) },
-                                    enabled = canSync, modifier = Modifier.weight(1f)) { Text("+ 0.25s") }
+                                OutlinedButton(onClick = { player.adjustSubtitleDelay(-100L) },
+                                    enabled = canSync, modifier = Modifier.weight(1f)) { Text("− 0.1s") }
+                                OutlinedButton(onClick = { player.adjustSubtitleDelay(100L) },
+                                    enabled = canSync, modifier = Modifier.weight(1f)) { Text("+ 0.1s") }
                             }
                             TextButton(onClick = { player.resetSubtitleDelay() }, enabled = canSync) {
                                 Icon(Icons.Default.RestartAlt, null, modifier = Modifier.size(18.dp))
