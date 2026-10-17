@@ -104,6 +104,7 @@ fun NativePlaybackOverlay(
     val context = LocalContext.current
     var importedSubtitleNotice by remember { mutableStateOf("") }
     var subtitleReturnControls by remember(player) { mutableStateOf(false) }
+    var fullscreenTrackMenu by remember(player) { mutableStateOf("") }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) {
             importedSubtitleNotice = runCatching {
@@ -410,12 +411,53 @@ fun NativePlaybackOverlay(
                     IconButton(onClick = { player.jump(10_000L) }) {
                         Icon(Icons.Default.Forward10, contentDescription = "Forward 10 seconds", tint = Color.White)
                     }
+                    IconButton(onClick = { fullscreenTrackMenu = "audio" }) {
+                        Icon(Icons.Default.Audiotrack, contentDescription = "Change audio language", tint = Color.White)
+                    }
+                    IconButton(onClick = { fullscreenTrackMenu = "subtitle" }) {
+                        Icon(Icons.Default.Subtitles, contentDescription = "Change subtitle track", tint = Color.White)
+                    }
                     IconButton(onClick = { player.leaveFullscreen(); player.controlsVisible = true }) {
                         Icon(Icons.Default.FullscreenExit, contentDescription = "Exit fullscreen", tint = Color.White)
                     }
                 }
             }
         }
+    }
+    if (fullscreenTrackMenu.isNotBlank()) {
+        val audioMenu = fullscreenTrackMenu == "audio"
+        val options = if (audioMenu) player.audioChoices() else player.subtitleChoices()
+        val currentTrack = if (audioMenu) player.selectedAudio() else player.selectedSubtitle()
+        AlertDialog(
+            onDismissRequest = { fullscreenTrackMenu = "" },
+            title = { Text(if (audioMenu) "Audio language" else "Subtitles") },
+            text = {
+                Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                    if (options.isEmpty()) {
+                        Text(if (audioMenu) "No other audio tracks available."
+                            else "No subtitle tracks available.")
+                    }
+                    options.forEach { option ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                if (audioMenu) player.chooseAudio(option.id)
+                                else player.chooseSubtitle(option.id)
+                                player.controlsVisible = true
+                                fullscreenTrackMenu = ""
+                            }.padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = option.id == currentTrack, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(option.label, color = Color.White)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { fullscreenTrackMenu = "" }) { Text("Close") }
+            }
+        )
     }
 }
 
