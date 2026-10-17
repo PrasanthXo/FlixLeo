@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
                     // Keep the player visible while resolving the next episode.
                     state.playNextEpisode(finished.first, finished.second)
                 } else {
-                    video.pause()
+                    // Keep the completed video surface visible; do not navigate away.
                 }
             }
         }
