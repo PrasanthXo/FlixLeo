@@ -737,6 +737,9 @@ private fun LiveScreen(state: FlixState) {
         animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)),
         label = "Rotating antenna")
     var selectedCategory by remember { mutableStateOf("All Categories") }
+    var channelSearch by remember { mutableStateOf("") }
+    val query = channelSearch.trim()
+    val totalChannels = state.live.flatMap { it.channels }.distinctBy { it.id }.size
     var categoryMenuOpen by remember { mutableStateOf(false) }
     val categoryOptions = listOf("All Categories", "Favorites") +
         listOf("Sports", "News", "Entertainment", "Movies & Series", "Music", "Kids",
@@ -749,6 +752,18 @@ private fun LiveScreen(state: FlixState) {
                 Spacer(Modifier.width(11.dp))
                 Text("Live TV", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
             }
+            Text("$totalChannels channels available", color = Muted, fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 17.dp))
+            OutlinedTextField(
+                value = channelSearch, onValueChange = { channelSearch = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 8.dp),
+                placeholder = { Text("Search Live TV channels") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = { if (channelSearch.isNotEmpty()) IconButton(onClick = { channelSearch = "" }) {
+                    Icon(Icons.Default.Close, contentDescription = "Clear channel search")
+                } },
+                singleLine = true, shape = RoundedCornerShape(12.dp)
+            )
             Box(Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 10.dp)) {
                 OutlinedButton(onClick = { categoryMenuOpen = true },
                     modifier = Modifier.fillMaxWidth(),
@@ -785,7 +800,7 @@ private fun LiveScreen(state: FlixState) {
             }
         }
         val favoriteChannels = state.live.flatMap { it.channels }.filter {
-            state.liveFavorites.contains(it.name.lowercase())
+            state.liveFavorites.contains(it.name.lowercase()) && it.name.contains(query, ignoreCase = true)
         }.distinctBy { it.name.lowercase() }
         if (favoriteChannels.isNotEmpty() && selectedCategory in listOf("All Categories", "Favorites")) {
             item {
@@ -793,7 +808,9 @@ private fun LiveScreen(state: FlixState) {
                 LiveChannelRow(favoriteChannels, state)
             }
         }
-        items(state.live.filter { selectedCategory == "All Categories" || it.name == selectedCategory }) { category ->
+        items(state.live.filter { selectedCategory == "All Categories" || it.name == selectedCategory }
+            .map { category -> category.copy(channels = category.channels.filter { it.name.contains(query, ignoreCase = true) }) }
+            .filter { it.channels.isNotEmpty() }) { category ->
             Heading(category.name)
             LiveChannelRow(category.channels, state)
         }
