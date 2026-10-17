@@ -495,7 +495,10 @@ private fun NativeVideoSurface(
                 modifier = Modifier.fillMaxSize().zIndex(-1f)
             )
         }
-        if (mode == PlayerMode.MINI) Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode, holdControlsAfterSubtitle, forceFullscreenControls, subtitleReturnControls) {
+        // The transparent tap layer works in mini, expanded and fullscreen modes.
+        // Unlike the floating Tune icon, it does not cover the video; player chrome
+        // remains higher in z-order and retains its own click/seek gestures.
+        if (!player.inPictureInPicture) Box(Modifier.matchParentSize().zIndex(0f).pointerInput(mode, holdControlsAfterSubtitle, forceFullscreenControls, subtitleReturnControls) {
             detectTapGestures(
                 onTap = { 
                     onControlsRestored(); onVideoTap()
@@ -518,20 +521,6 @@ private fun NativeVideoSurface(
                     .padding(start = 20.dp, end = 20.dp, bottom = if (showsControls) 125.dp else 28.dp)
                     .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp))
                     .padding(horizontal = 8.dp, vertical = 3.dp))
-        }
-        // Dedicated recovery control: a SurfaceView or the Android document picker
-        // can consume the first tap, but this Compose button remains clickable.
-        if (!player.inPictureInPicture && !showsControls && mode != PlayerMode.MINI) {
-            IconButton(
-                onClick = { player.controlsVisible = true },
-                modifier = Modifier.align(Alignment.BottomEnd).zIndex(5f)
-                    .padding(12.dp)
-                    .background(Glass, RoundedCornerShape(14.dp))
-                    .size(44.dp)
-            ) {
-                Icon(Icons.Default.Tune, contentDescription = "Show player controls",
-                    tint = Color.White, modifier = Modifier.size(23.dp))
-            }
         }
         if (!player.inPictureInPicture && showsControls) {
             Row(
