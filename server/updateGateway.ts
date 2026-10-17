@@ -146,6 +146,13 @@ router.get('/api/gateway/v1/check/:appId', async (req: Request, res: Response) =
   if (!allowedApps.has(appId) || !Number.isSafeInteger(version) || version < 0) {
     return res.status(400).json({ error: 'Invalid app or versionCode' });
   }
+  // Release hold requested by owner: do not advertise or require any FlixLeo
+  // Android upgrade until the owner explicitly approves a new public rollout.
+  // This takes precedence over database min_version_code and GitHub releases.
+  if (appId === 'flixleo-android') {
+    return res.json({ policy: safeDefaultPolicy(appId, version), notices: [], ready: true,
+      reason: 'android_updates_paused_by_owner' });
+  }
   const windowsRelease = appId === 'flixleo-windows' ? await getLatestWindowsInstaller() : null;
   const androidRelease = appId === 'flixleo-android' ? await getLatestPublicSignedAndroid() : null;
   const promote = (policy: any) => promoteAndroidRelease(promoteWindowsRelease(policy, version, windowsRelease), version, androidRelease);
