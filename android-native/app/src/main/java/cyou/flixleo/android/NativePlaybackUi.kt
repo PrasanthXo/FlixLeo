@@ -10,6 +10,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -191,6 +194,19 @@ private fun NativeVideoSurface(
     DisposableEffect(view, player) {
         onDispose { player.detach(view) }
     }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var appForeground by remember { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
+    DisposableEffect(lifecycleOwner, player) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> { appForeground = true; player.controlsVisible = true }
+                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> appForeground = false
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     var trackMenu by remember { mutableStateOf("") }
     var importedSubtitleNotice by remember { mutableStateOf("") }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
@@ -211,12 +227,13 @@ private fun NativeVideoSurface(
                 if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
                 else "Could not import subtitle; try another .srt or .vtt file"
             }.getOrElse { "Could not import subtitle file" }
+            player.controlsVisible = true
         }
     }
 
     val showsControls = player.controlsVisible || mode == PlayerMode.MINI
-    LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture) {
-        if (showsControls && mode != PlayerMode.MINI && !player.inPictureInPicture) {
+    LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture, appForeground, trackMenu) {
+        if (showsControls && appForeground && trackMenu.isEmpty() && player.playing && mode != PlayerMode.MINI && !player.inPictureInPicture) {
             delay(4500)
             player.controlsVisible = false
         }
