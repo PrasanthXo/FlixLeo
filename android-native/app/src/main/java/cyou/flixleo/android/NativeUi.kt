@@ -1440,10 +1440,10 @@ private fun AccountDialog(state: FlixState) {
             }
         )
     } else AlertDialog(onDismissRequest = { state.showAuth = false },
-        title = { Text(if (state.showSignup) "Create FlixLeo account" else "Sign in to FlixLeo") },
+        title = { Text(if (state.showSignup) "Create your FlixLeo account" else "Sign in to start watching") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Use your existing FlixLeo login.", color = Muted, fontSize = 12.sp)
+                Text(if (state.showSignup) "Create a FlixLeo account to enjoy movies, series, and Live TV." else "Sign in to your FlixLeo account or create a new account to enjoy movies, series, and Live TV.", color = Muted, fontSize = 12.sp)
                 OutlinedTextField(value = email, onValueChange = { email = it },
                     label = { Text("Email") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
