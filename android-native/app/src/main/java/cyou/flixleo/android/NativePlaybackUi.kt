@@ -333,7 +333,7 @@ private fun NativeVideoSurface(
                 fontWeight = FontWeight.SemiBold,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 modifier = Modifier.align(Alignment.BottomCenter)
-                    .padding(horizontal = 20.dp, bottom = if (showsControls) 125.dp else 28.dp)
+                    .padding(start = 20.dp, end = 20.dp, bottom = if (showsControls) 125.dp else 28.dp)
                     .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp))
                     .padding(horizontal = 8.dp, vertical = 3.dp))
         }
