@@ -613,6 +613,7 @@ private fun HomeScreen(state: FlixState) {
 @Composable
 private fun BrowseScreen(state: FlixState, tv: Boolean) {
     val titles = if (tv) state.series else state.movies
+    val context = androidx.compose.ui.platform.LocalContext.current
     val listState = rememberLazyListState()
     val canLoad = if (tv) state.seriesHasMore else state.moviesHasMore
     val loadingMore = if (tv) state.seriesLoadingMore else state.moviesLoadingMore
@@ -643,6 +644,7 @@ private fun BrowseScreen(state: FlixState, tv: Boolean) {
         items(titles.chunked(3)) { group ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 group.forEach { title ->
+                    var menuOpen by remember(title.id) { mutableStateOf(false) }
                     Box(Modifier.weight(1f)) {
                         Column(Modifier.fillMaxWidth().clickable { state.open(title) }) {
                             Box(Modifier.fillMaxWidth().height(161.dp)
@@ -656,6 +658,34 @@ private fun BrowseScreen(state: FlixState, tv: Boolean) {
                                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
                                         .background(Color(0xD9111827), RoundedCornerShape(6.dp))
                                         .padding(horizontal = 6.dp, vertical = 3.dp))
+                                Box(Modifier.align(Alignment.TopEnd)) {
+                                    IconButton(onClick = { menuOpen = true },
+                                        modifier = Modifier.padding(4.dp).size(33.dp)
+                                            .background(Color(0xC0111827), CircleShape)) {
+                                        Icon(Icons.Default.MoreVert, contentDescription = "More options for ${title.title}",
+                                            tint = Color.White, modifier = Modifier.size(18.dp))
+                                    }
+                                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false },
+                                        modifier = Modifier.background(Color(0xFF222638))) {
+                                        DropdownMenuItem(text = { Text("View details") },
+                                            onClick = { menuOpen = false; state.open(title) })
+                                        DropdownMenuItem(
+                                            text = { Text(if (title.id in state.watchlist) "Remove from Watchlist" else "Add to Watchlist") },
+                                            onClick = { menuOpen = false; state.toggleWatch(title) })
+                                        DropdownMenuItem(
+                                            text = { Text("Share") },
+                                            leadingIcon = { Icon(Icons.Default.Share, null) },
+                                            onClick = {
+                                                menuOpen = false
+                                                val shareLink = "https://flixleo.cyou/?media=" + android.net.Uri.encode(title.id)
+                                                val send = Intent(Intent.ACTION_SEND).apply {
+                                                    type = "text/plain"
+                                                    putExtra(Intent.EXTRA_TEXT, title.title + " — " + shareLink)
+                                                }
+                                                context.startActivity(Intent.createChooser(send, "Share FlixLeo title"))
+                                            })
+                                    }
+                                }
                                 title.genres.firstOrNull { it.isNotBlank() }?.let { genre ->
                                     Text(genre, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
                                         color = Color.White, maxLines = 1,
