@@ -243,7 +243,7 @@ private fun NativeVideoSurface(
     DisposableEffect(lifecycleOwner, player) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> { appForeground = true; player.controlsVisible = true; player.restoreVideoSurface() }
+                Lifecycle.Event.ON_RESUME -> { appForeground = true; player.controlsVisible = true }
                 Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> appForeground = false
                 else -> Unit
             }
@@ -282,7 +282,7 @@ private fun NativeVideoSurface(
         holdControlsAfterSubtitle = true
         forceFullscreenControls = true
         player.controlsVisible = true
-        player.restoreVideoSurface()
+        // Never detach/reattach a playing video surface on document picker return.
     }
 
     val networkAdvice = rememberNetworkAdvice()
