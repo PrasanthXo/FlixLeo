@@ -229,8 +229,8 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
 
   const saveProgress = () => {
     const video = videoRef.current;
-    if (!video || !Number.isFinite(video.currentTime)) return;
-    if (Date.now() - lastSaveRef.current < 5000) return;
+    if (media.duration === 'Live' || !video || !Number.isFinite(video.currentTime)) return;
+    if (Date.now() - lastSaveRef.current < 5000 && !video.ended && video.duration - video.currentTime > 90) return;
     lastSaveRef.current = Date.now();
     try {
       const key = 'flixleo_continue_watching';
@@ -271,7 +271,7 @@ export const CinemaPlayer: React.FC<CinemaPlayerProps> = ({
           : desktopNative ? <div className={nativeFullscreen ? (fullscreenControlsVisible ? "h-[calc(100%-96px)] w-full" : "h-full w-full") : docked ? "h-[calc(100%-52px)] w-full" : "h-full w-full"}><DesktopNativeSurface key={active.id} url={active.url} media={media} mirrorId={active.id} onProgressSaved={onProgressSaved} /></div>
           : active.streamType === 'embed-iframe'
             ? <iframe key={active.id} src={active.url} title={active.label} className="w-full h-full border-0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
-            : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onDoubleClick={() => void toggleFrameFullscreen()} onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); onEpisodeEnded?.(); }} className="h-full w-full object-contain" />}
+            : <video key={active.id} ref={videoRef} controls autoPlay playsInline preload="auto" onDoubleClick={() => void toggleFrameFullscreen()} onLoadedMetadata={restoreProgress} onTimeUpdate={saveProgress} onEnded={() => { saveProgress(); if (media.type === 'tv') onEpisodeEnded?.(); }} className="h-full w-full object-contain" />}
         {nativeFullscreen && <DesktopFullscreenControls title={media.title} onClose={() => { saveProgress(); onClose(); }} visible={fullscreenControlsVisible} aspectRatio={aspectRatio} onAspectRatioChange={changeAspectRatio} />}
         {docked && desktopNative && <div className="absolute bottom-0 left-0 right-0 z-[90] flex h-[52px] items-center justify-around gap-1 border-t border-white/15 bg-[#151925] px-2 text-white">
           <button type="button" aria-label="Rewind 10 seconds" className="rounded-lg p-2 text-white" onClick={() => void desktopBridge()?.commandNative('seekBackward')}>↶</button>
