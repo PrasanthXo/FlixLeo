@@ -149,6 +149,44 @@ router.put('/api/native/account', async (req, res) => {
   const updated = await remote('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ data }) }, auth.token);
   return res.status(updated.status).json(updated.ok ? { user: updated.data } : { error: message(updated) });
 });
+// Live TV favorites are account-scoped and do not expose private IPTV URLs.
+router.get('/api/live/favorites', async (req, res) => {
+  const auth = await verified(req, res);
+  if (!auth) return;
+  const row = await remote('/rest/v1/flixleo_user_data?select=payload&user_id=eq.' + encodeURIComponent(auth.user.id) + '&limit=1', {}, auth.token);
+  if (!row.ok) return res.status(row.status).json({ error: message(row) });
+  const payload = Array.isArray(row.data) ? row.data[0]?.payload : null;
+  return res.json({ favorites: Array.isArray(payload?.liveFavorites) ? payload.liveFavorites : [] });
+});
+router.put('/api/live/favorites', async (req, res) => {
+  const auth = await verified(req, res);
+  if (!auth) return;
+  const incoming = req.body?.favorites;
+  if (!Array.isArray(incoming) || incoming.length > 150) return res.status(400).json({ error: 'Invalid favorites' });
+  const favorites = incoming.filter((ch: any) =>
+    ch && typeof ch.name === 'string' && ch.name.length <= 120 &&
+    typeof ch.id === 'string' && ch.id.length <= 150 &&
+    typeof ch.privateProvider === 'boolean'
+  ).map((ch: any) => ({
+    id: ch.id, name: ch.name, privateProvider: ch.privateProvider,
+    logo: typeof ch.logo === 'string' ? ch.logo.slice(0, 500) : '',
+    category: typeof ch.category === 'string' ? ch.category.slice(0, 80) : '',
+    language: typeof ch.language === 'string' ? ch.language.slice(0, 60) : '',
+    country: typeof ch.country === 'string' ? ch.country.slice(0, 30) : '',
+    tvgId: typeof ch.tvgId === 'string' ? ch.tvgId.slice(0, 150) : '',
+    // Public URLs are not saved in cloud favorites; resolve from current catalogs.
+  }));
+  const existing = await remote('/rest/v1/flixleo_user_data?select=payload&user_id=eq.' + encodeURIComponent(auth.user.id) + '&limit=1', {}, auth.token);
+  if (!existing.ok) return res.status(existing.status).json({ error: message(existing) });
+  const payload = Array.isArray(existing.data) && existing.data[0]?.payload &&
+    typeof existing.data[0].payload === 'object' ? existing.data[0].payload : {};
+  const saved = await remote('/rest/v1/flixleo_user_data?on_conflict=user_id', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ user_id: auth.user.id, payload: { ...payload, liveFavorites: favorites, updatedAt: Date.now() },
+      updated_at: new Date().toISOString() })
+  }, auth.token);
+  return res.status(saved.ok ? 200 : saved.status).json(saved.ok ? { success: true } : { error: message(saved) });
+});
 router.get('/api/native/data', async (req, res) => {
   const auth = await verified(req, res);
   if (!auth) return;
