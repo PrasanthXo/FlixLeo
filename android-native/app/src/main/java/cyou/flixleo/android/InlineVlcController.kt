@@ -417,10 +417,17 @@ class InlineVlcController(context: Context) {
     fun chooseAudio(id: Int) { if (usingMedia3) { media3.chooseAudio(id); return }; runCatching { engine?.setAudioTrack(id) }; controlsVisible = true }
     fun chooseSubtitle(id: Int) { if (usingMedia3) { media3.chooseSubtitle(id); return }; runCatching { engine?.setSpuTrack(id) }; controlsVisible = true }
     fun importSubtitle(uri: Uri): Boolean {
-        if (usingMedia3 || mode == PlayerMode.CLOSED) return false
+        if (mode == PlayerMode.CLOSED) return false
+        val format = if (uri.path.orEmpty().endsWith(".vtt", true))
+            androidx.media3.common.MimeTypes.TEXT_VTT else
+            androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
         return runCatching {
-            val path = uri.path ?: return@runCatching false
-            engine?.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle, path, true) == true
+            if (usingMedia3) {
+                media3.importSubtitle(uri, format)
+            } else {
+                val path = uri.path ?: return@runCatching false
+                engine?.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle, path, true) == true
+            }
         }.getOrDefault(false).also { if (it) trackRevision++ }
     }
     fun changeAspect() {
