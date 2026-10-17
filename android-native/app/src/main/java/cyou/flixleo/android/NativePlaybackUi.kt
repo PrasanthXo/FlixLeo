@@ -334,7 +334,14 @@ private fun NativeVideoSurface(
                     .padding(horizontal = 7.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Recommended " + networkAdvice.resolution, color = Color.White, fontSize = 10.sp, maxLines = 1)
+                Icon(Icons.Default.NetworkCheck, contentDescription = "Network quality",
+                    tint = when (networkAdvice.label) {
+                        "Excellent" -> Color(0xFF4ADE80)
+                        "Good" -> GoldPlayer
+                        else -> Color(0xFFFF7777)
+                    }, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(networkAdvice.label, color = Color.White, fontSize = 10.sp, maxLines = 1)
             }
         }
         if (player.buffering && !player.inPictureInPicture) {
