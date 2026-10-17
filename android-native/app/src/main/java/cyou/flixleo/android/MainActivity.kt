@@ -48,7 +48,7 @@ class MainActivity : ComponentActivity() {
             state.playbackStreams = state.streams.ifEmpty { state.playbackStreams.ifEmpty { listOf(stream) } }
             state.selected = null
             state.selectedChannel = null
-            video.start(stream, title.title + (if (title.episode > 0) " · S${title.season} E${title.episode}" else ""), resume)
+            video.start(stream, title.title + (if (title.episode > 0) " · S${title.season} E${title.episode}" else ""), resume, subtitleKey = state.entryKey(title))
         }
         state.onStopPlayback = { closePlayback() }
         state.onNavigation = {
