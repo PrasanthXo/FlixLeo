@@ -130,9 +130,9 @@ export async function legacyIptvCatalogs() {
     if (!channels.length) return [];
     return [{
       id: 'flixleo-' + name.toLowerCase().replace(/[^a-z]+/g, '-'),
-      type: 'channel', name,
+      type: 'channel' as const, name,
       items: channels.slice(0, 350).map(ch => ({
-        id: 'flixlive_' + ch.id, type: 'channel', name: ch.name,
+        id: 'flixlive_' + ch.id, type: 'channel' as const, name: ch.name,
         poster: ch.logo, description: '', genres: [name]
       }))
     }];
