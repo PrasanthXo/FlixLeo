@@ -23,6 +23,7 @@ async function request(path: string, init: RequestInit = {}, token?: string) {
   if (!response.ok) throw new Error(body.msg || body.error_description || body.message || 'Cloud request failed');
   return body;
 }
+export async function liveFavoriteAccessToken() { return accessToken(); }
 export function currentCloudUser() { return cloudConfigured ? (session?.user || null) : null; }
 async function accessToken() {
   if (!session) throw new Error('Sign in to sync your data.');
