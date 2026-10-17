@@ -802,10 +802,18 @@ private fun LiveScreen(state: FlixState) {
         val favoriteChannels = state.live.flatMap { it.channels }.filter {
             state.liveFavorites.contains(it.name.lowercase()) && it.name.contains(query, ignoreCase = true)
         }.distinctBy { it.name.lowercase() }
-        if (favoriteChannels.isNotEmpty() && selectedCategory in listOf("All Categories", "Favorites")) {
+        // Dedicated favorites catalog always precedes Sports in the Live TV browse view.
+        // Keep it visible when empty so the section doesn't disappear after signing in
+        // or before cloud favorites have finished syncing.
+        if (selectedCategory in listOf("All Categories", "Favorites")) {
             item {
-                Heading("Favorites")
-                LiveChannelRow(favoriteChannels, state)
+                Heading("Favourite Channels")
+                if (favoriteChannels.isNotEmpty()) {
+                    LiveChannelRow(favoriteChannels, state)
+                } else {
+                    Text("No favourite channels yet. Use a channel's three-dot menu to add one.",
+                        color = Muted, modifier = Modifier.padding(horizontal = 17.dp, vertical = 8.dp))
+                }
             }
         }
         items(state.live.filter { selectedCategory == "All Categories" || it.name == selectedCategory }
