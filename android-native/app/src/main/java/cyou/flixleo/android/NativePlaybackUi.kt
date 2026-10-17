@@ -325,6 +325,8 @@ private fun NativeVideoSurface(
                     else player.controlsVisible = !player.controlsVisible
                 },
                 onDoubleTap = {
+                    forceFullscreenControls = true
+                    player.controlsVisible = true
                     if (mode == PlayerMode.FULLSCREEN) player.leaveFullscreen()
                     else player.transitionTo(PlayerMode.FULLSCREEN)
                 }
@@ -396,7 +398,7 @@ private fun NativeVideoSurface(
         }
         if (!player.inPictureInPicture && showsControls) {
             if (mode == PlayerMode.MINI) {
-                Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).background(Glass)
+                Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).zIndex(4f).background(Glass)
                     .height(55.dp).padding(horizontal = 5.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { player.toggle() }, modifier = Modifier.size(36.dp)) {
@@ -420,7 +422,7 @@ private fun NativeVideoSurface(
                     }
                 }
             } else {
-                Row(Modifier.fillMaxWidth().align(Alignment.TopCenter)
+                Row(Modifier.fillMaxWidth().align(Alignment.TopCenter).zIndex(4f)
                     .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .8f), Color.Transparent)))
                     .padding(horizontal = 5.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically) {
@@ -453,7 +455,7 @@ private fun NativeVideoSurface(
                         Icon(Icons.Default.Close, contentDescription = "Close player", tint = Color.White)
                     }
                 }
-                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().zIndex(4f)
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .95f))))
                     .padding(horizontal = 8.dp, vertical = 4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
