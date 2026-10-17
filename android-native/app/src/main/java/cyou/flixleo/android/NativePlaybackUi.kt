@@ -56,22 +56,6 @@ fun NativePlaybackOverlay(
     if (currentMode == PlayerMode.CLOSED) return
     val activity = LocalContext.current as Activity
     var lastNonPiP by remember { mutableStateOf(PlayerMode.BIG) }
-    var importedSubtitleNotice by remember { mutableStateOf("") }
-    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
-        if (selected != null) {
-            importedSubtitleNotice = runCatching {
-                val mime = activity.contentResolver.getType(selected).orEmpty()
-                val extension = if (mime.contains("vtt")) "vtt" else "srt"
-                val bytes = activity.contentResolver.openInputStream(selected)?.use { it.readBytes() }
-                    ?: throw IllegalArgumentException("Unable to read subtitle")
-                if (bytes.size > 3_000_000) throw IllegalArgumentException("Subtitle must be under 3 MB")
-                val subtitle = File(activity.cacheDir, "flixleo-uploaded-subtitle." + extension)
-                subtitle.writeBytes(bytes)
-                if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
-                else "This playback engine cannot import subtitle files; select LibVLC playback"
-            }.getOrElse { "Could not import subtitle file" }
-        }
-    }
 
 
     // Keep the display awake only during active playback, including mini/fullscreen.
@@ -208,6 +192,23 @@ private fun NativeVideoSurface(
         onDispose { player.detach(view) }
     }
     var trackMenu by remember { mutableStateOf("") }
+    var importedSubtitleNotice by remember { mutableStateOf("") }
+    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
+        if (selected != null) {
+            importedSubtitleNotice = runCatching {
+                val mime = context.contentResolver.getType(selected).orEmpty()
+                val extension = if (mime.contains("vtt")) "vtt" else "srt"
+                val bytes = context.contentResolver.openInputStream(selected)?.use { it.readBytes() }
+                    ?: throw IllegalArgumentException("Unable to read subtitle")
+                if (bytes.size > 3_000_000) throw IllegalArgumentException("Subtitle must be under 3 MB")
+                val subtitle = File(context.cacheDir, "flixleo-uploaded-subtitle." + extension)
+                subtitle.writeBytes(bytes)
+                if (player.importSubtitle(Uri.fromFile(subtitle))) "Subtitle installed"
+                else "This playback engine cannot import subtitle files; select LibVLC playback"
+            }.getOrElse { "Could not import subtitle file" }
+        }
+    }
+
     val showsControls = player.controlsVisible || mode == PlayerMode.MINI
     LaunchedEffect(showsControls, mode, player.playing, player.inPictureInPicture) {
         if (showsControls && mode != PlayerMode.MINI && !player.inPictureInPicture) {
